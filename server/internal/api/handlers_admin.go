@@ -83,6 +83,8 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			OnlineLyrics:       ptr(s.Music.OnlineLyrics),
 			LoudnessAnalysis:   ptr(s.Music.LoudnessAnalysis),
 			ArtistDetails:      ptr(s.Music.ArtistDetails),
+			SoundModel:         ptr(MusicSettingsSoundModel(soundModelOr(s.Music.SoundModel))),
+			CommunityData:      ptr(s.Music.CommunityData),
 		},
 		Cinema: &CinemaSettings{Trailers: ptr(s.Cinema.Trailers), PrerollItemId: s.Cinema.PrerollItemID},
 		Integrations: &IntegrationSettings{
@@ -212,6 +214,10 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Music.OnlineLyrics, m.OnlineLyrics)
 		set(&s.Music.LoudnessAnalysis, m.LoudnessAnalysis)
 		set(&s.Music.ArtistDetails, m.ArtistDetails)
+		set(&s.Music.CommunityData, m.CommunityData)
+		if m.SoundModel != nil && (*m.SoundModel == MusicSettingsSoundModelGeneral || *m.SoundModel == MusicSettingsSoundModelMusic) {
+			s.Music.SoundModel = string(*m.SoundModel)
+		}
 	}
 	if a := u.Ai; a != nil {
 		set(&s.AI.Enabled, a.Enabled)

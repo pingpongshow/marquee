@@ -25,6 +25,7 @@ import (
 	"marquee/internal/avatars"
 	"marquee/internal/bazarr"
 	"marquee/internal/commercials"
+	"marquee/internal/community"
 	"marquee/internal/config"
 	"marquee/internal/db"
 	"marquee/internal/discovery"
@@ -349,13 +350,30 @@ func run() error {
 	// Music intelligence (M6.5): the Soundprint sidecar embeds tracks; the index serves radios etc.
 	soundprintSvc := &soundprint.Service{DB: database, Client: &soundprint.Client{BaseURL: envOr("MARQUEE_SOUNDPRINT_URL", envOr("MARQUEE_SONIC_URL", "http://127.0.0.1:32501"))},
 		Index: soundprint.NewIndex(), Enabled: func() bool { return store.Get().Music.SoundprintAnalysis },
-		Learn: func() bool { return store.Get().AI.LearnFromBehaviour }}
+		Learn: func() bool { return store.Get().AI.LearnFromBehaviour }, Model: func() string { return store.Get().Music.SoundModel }}
 	if err := soundprintSvc.Index.Load(ctx, database); err != nil {
 		slog.Warn("soundprint index", "err", err)
 	}
+	if err := soundprintSvc.LoadLearned(ctx); err != nil {
+		slog.Warn("music listening patterns", "err", err)
+	}
 	scheduler.Register(tasks.Task{ID: "soundprint", Name: "Soundprint analysis", Every: time.Hour,
-		Description: "Listens to new tracks on the GPU so radios, similar music, mixes and Muse include them.",
-		Run:         soundprintSvc.Analyze})
+		Description: "Listens to new tracks on the GPU so radios, similar music, mixes and Muse include them: how they sound, and what they're like (happy, sad, danceable, sung…). Reads the language of their lyrics, and tries another sound model on the library when one is chosen in Settings.",
+		Run:         soundprintSvc.Analyze, Progress: soundprintSvc.Progress})
+	scheduler.Register(tasks.Task{ID: "music-listening", Name: "Learn from listening", Window: true,
+		Description: "Pairs the tracks people play in one sitting or keep in one playlist, so radios and mixes play them together.",
+		Run:         soundprintSvc.RebuildCoplays})
+	communitySvc := &community.Service{DB: database, UserAgent: metadata.MBUserAgent, Pace: 400 * time.Millisecond,
+		Enabled:   func() bool { return store.Get().Music.CommunityData },
+		LastFMKey: func() string { return store.Get().Integrations.LastFMAPIKey },
+		Loaded: func(ctx context.Context) {
+			if err := soundprintSvc.LoadCommunity(ctx); err != nil {
+				slog.Warn("similar artists and tags", "err", err)
+			}
+		}}
+	scheduler.Register(tasks.Task{ID: "music-community", Name: "Similar artists and tags", Every: 24 * time.Hour,
+		Description: "With similar artists and tags on, looks up which artists listeners consider alike and how they tag artists and tracks, on ListenBrainz and, with a Last.fm API key, Last.fm, a few requests a second. The first run covers the library (an hour or more with Last.fm; it continues where it stopped), later runs new artists and tracks and refresh old ones.",
+		Run:         communitySvc.Run, Progress: communitySvc.Progress})
 	runSoundprint := func() { scheduler.Trigger(ctx, "soundprint") }
 	afterMusicScan.Store(&runSoundprint)
 	// Muse for movies and recommendations (USER-15, USER-16): text embeddings of movies and shows.

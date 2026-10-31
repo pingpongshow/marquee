@@ -23,6 +23,14 @@ type Track struct {
 	// same artist on an album and on a compilation (or imported twice) is one song to a
 	// listener, so a mix takes only one of them. Empty when there's nothing to compare.
 	Copy string
+	// DurationMS is the track's length (0 when unknown); Aside marks interludes, live and
+	// remixed versions, which stations and mixes leave out unless asked for (see aside.go).
+	DurationMS int64
+	Aside      Aside
+	// Traits is what the track sounds like (nil before its traits analysis); Language is the
+	// language it's sung in, from its lyrics ("" when instrumental, unknown or unsure).
+	Traits   *Traits
+	Language string
 }
 
 // CopyKey identifies a recording across its copies: the artist and the title, letters and
@@ -67,9 +75,8 @@ func decode(b []byte) []float32 {
 
 // Load reads every embedding from the database.
 func (x *Index) Load(ctx context.Context, db *sql.DB) error {
-	rows, err := db.QueryContext(ctx, `SELECT s.item_id, COALESCE(i.parent_id, 0), COALESCE(i.grandparent_id, 0), i.library_id,
-		COALESCE(i.year, a.year, 0), s.embedding, COALESCE(s.bpm, 0), COALESCE(s.energy, 0), COALESCE(s.musical_key, ''), COALESCE(s.mode, ''),
-		COALESCE(i.title, '')
+	rows, err := db.QueryContext(ctx, `SELECT s.item_id, `+trackColumns+`, s.embedding, COALESCE(s.bpm, 0), COALESCE(s.energy, 0),
+		COALESCE(s.musical_key, ''), COALESCE(s.mode, ''), COALESCE(s.traits, ''), COALESCE(s.language, '')
 		FROM soundprint s JOIN items i ON i.id = s.item_id LEFT JOIN items a ON a.id = i.parent_id WHERE s.embedding IS NOT NULL`)
 	if err != nil {
 		return err
@@ -79,12 +86,15 @@ func (x *Index) Load(ctx context.Context, db *sql.DB) error {
 	for rows.Next() {
 		t := &Track{}
 		var emb []byte
-		var title string
-		if err := rows.Scan(&t.ItemID, &t.AlbumID, &t.ArtistID, &t.LibraryID, &t.Year, &emb, &t.BPM, &t.Energy, &t.Key, &t.Mode, &title); err != nil {
+		var d trackDetails
+		var traits string
+		dest := append([]any{&t.ItemID}, d.dest(t)...)
+		if err := rows.Scan(append(dest, &emb, &t.BPM, &t.Energy, &t.Key, &t.Mode, &traits, &t.Language)...); err != nil {
 			return err
 		}
 		t.Vec = decode(emb)
-		t.Copy = CopyKey(title, t.ArtistID)
+		d.apply(t)
+		t.Traits = parseTraits(traits)
 		m[t.ItemID] = t
 	}
 	x.mu.Lock()
@@ -93,10 +103,38 @@ func (x *Index) Load(ctx context.Context, db *sql.DB) error {
 	return rows.Err()
 }
 
+// trackColumns are a track's details from the library (items i, its album a), read into
+// trackDetails.
+const trackColumns = `COALESCE(i.parent_id, 0), COALESCE(i.grandparent_id, 0), i.library_id, COALESCE(i.year, a.year, 0),
+	COALESCE(i.title, ''), COALESCE(a.title, ''), COALESCE(i.duration_ms, 0)`
+
+type trackDetails struct{ title, album string }
+
+func (d *trackDetails) dest(t *Track) []any {
+	return []any{&t.AlbumID, &t.ArtistID, &t.LibraryID, &t.Year, &d.title, &d.album, &t.DurationMS}
+}
+
+func (d *trackDetails) apply(t *Track) {
+	t.Copy = CopyKey(d.title, t.ArtistID)
+	t.Aside = AsideOf(d.title, d.album, t.DurationMS)
+}
+
 func (x *Index) Put(t *Track) {
 	x.mu.Lock()
 	x.tracks[t.ItemID] = t
 	x.mu.Unlock()
+}
+
+// update changes a track by replacing it with an edited copy (the old one may be in use by a
+// station being built); nothing happens when it isn't in the index.
+func (x *Index) update(id int64, edit func(*Track)) {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if old := x.tracks[id]; old != nil {
+		c := *old
+		edit(&c)
+		x.tracks[id] = &c
+	}
 }
 
 func (x *Index) Get(id int64) *Track {

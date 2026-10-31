@@ -9,9 +9,15 @@ import {
   Card,
   Field,
   Input,
+  Select,
   Spinner,
   Toggle,
 } from "@/components/ui";
+import type { components } from "@/api/schema.gen";
+
+type SoundModelScore = components["schemas"]["SoundModelScore"];
+const modelName = { general: "general", music: "music" } as const;
+const percent = (v: number | undefined) => (v === undefined ? "—" : `${Math.round(v * 100)}%`);
 import { SaveBar } from "./SaveBar";
 import { useSectionDraft } from "./useSectionDraft";
 
@@ -28,6 +34,16 @@ export function MusicSettings() {
     mutationFn: (taskId: string) =>
       unwrap(api.POST("/tasks/{taskId}/run", { params: { path: { taskId } } })),
     onSettled: () => qc.invalidateQueries({ queryKey: ["music", "status"] }),
+  });
+  // Switch to the sound model that was tried, or keep the one in use (MUSIC-1).
+  const choose = useMutation({
+    mutationFn: (action: "switch" | "keep") =>
+      unwrap(api.POST("/music/sound-model", { body: { action } })),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["music", "status"] });
+      qc.invalidateQueries({ queryKey: settingsQuery.queryKey });
+      s.reset();
+    },
   });
   if (!s.draft) return <Spinner />;
   const st = status.data;
@@ -61,9 +77,16 @@ export function MusicSettings() {
               </div>
               {st.running && st.runTotal ? (
                 <div className="text-xs text-muted">
-                  Analysing now: {st.progress ?? 0} of {st.runTotal} new tracks
+                  {st.phase || "Analysing new tracks"}: {(st.progress ?? 0).toLocaleString()} of{" "}
+                  {st.runTotal.toLocaleString()}
                 </div>
               ) : null}
+              {st.analyzed > 0 && (
+                <div className="text-xs text-muted">
+                  What tracks are like (happy, sad, danceable, sung…) measured for {(st.traits ?? 0).toLocaleString()};
+                  language read from the lyrics of {(st.languages ?? 0).toLocaleString()}
+                </div>
+              )}
             </div>
           )}
           {!st?.available && st?.enabled && (
@@ -88,6 +111,113 @@ export function MusicSettings() {
               <Play className="size-4" /> Analyse new tracks now
             </Button>
           </div>
+        </Card>
+        <Card
+          title="Sound model"
+          description="How Soundprint hears music. The general model knows all kinds of sound; the music model was trained on music alone. Choosing the other one analyses the library with it alongside the one in use (radios keep working), compares the two on your music, and switches only when you say so."
+        >
+          <Field label="Model">
+            {(id) => (
+              <Select
+                id={id}
+                value={s.draft?.soundModel ?? "general"}
+                onChange={(e) => s.update({ soundModel: e.target.value as "general" | "music" })}
+              >
+                <option value="general">General (all kinds of sound)</option>
+                <option value="music">Music (trained on music alone)</option>
+              </Select>
+            )}
+          </Field>
+          {st?.soundModel && (
+            <p className="text-sm text-muted">In use: the {modelName[st.soundModel]} model.</p>
+          )}
+          {st?.trial && (
+            <div className="space-y-3 rounded-lg bg-surface-2 p-4 text-sm">
+              {!st.trial.tried ? (
+                <>
+                  <p>
+                    Trying the {modelName[st.trial.model]} model: {st.trial.analyzed.toLocaleString()} of{" "}
+                    {st.trial.total.toLocaleString()} tracks analysed with it. It's compared once it covers the library.
+                  </p>
+                  <div>
+                    <Button
+                      size="sm"
+                      onClick={() => run.mutate("soundprint")}
+                      disabled={!st.available || st.running}
+                      loading={run.isPending && run.variables === "soundprint"}
+                    >
+                      <Play className="size-4" /> Continue now
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p>
+                    The {modelName[st.trial.model]} model has been tried on the whole library. How often each model's
+                    closest-sounding tracks share a genre with the track (and were played in the same sitting, with
+                    enough history), and how well it finds music from words, which Muse and the moods depend on.
+                    Higher is better:
+                  </p>
+                  <ModelComparison
+                    current={st.trial.current}
+                    tried={st.trial.tried}
+                    currentName={modelName[st.soundModel ?? "general"]}
+                    triedName={modelName[st.trial.model]}
+                  />
+                  {(st.trial.current?.textMatch ?? 0) > 0 &&
+                    (st.trial.tried?.textMatch ?? 0) < 0.6 * (st.trial.current?.textMatch ?? 0) && (
+                      <Alert tone="error">
+                        The {modelName[st.trial.model]} model finds music from words much less well, so Muse and the
+                        mood stations would get worse with it.
+                      </Alert>
+                    )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="primary" size="sm" loading={choose.isPending && choose.variables === "switch"}
+                      onClick={() => choose.mutate("switch")}>
+                      Switch to the {modelName[st.trial.model]} model
+                    </Button>
+                    <Button size="sm" variant="ghost" loading={choose.isPending && choose.variables === "keep"}
+                      onClick={() => choose.mutate("keep")}>
+                      Keep the {modelName[st.soundModel ?? "general"]} model
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          {choose.error && <Alert tone="error">{choose.error.message}</Alert>}
+        </Card>
+        <Card
+          title="Similar artists and tags"
+          description="What listeners elsewhere say about your music: which artists they consider alike, and how they tag artists and tracks (melancholic, chill, female vocals…). Artist radios and Discovery reach further, and moods and Muse understand more."
+        >
+          <Toggle
+            label="Look up similar artists and tags"
+            help="Asks ListenBrainz (free and open) about artists with a MusicBrainz id, a few requests a second, and Last.fm too once a Last.fm API key is set below. Only artist and track names and MusicBrainz ids are sent. The first run takes a while for a large library (an hour or more with Last.fm); later runs cover new music and refresh old lookups."
+            checked={!!s.draft.communityData}
+            onChange={(v) => s.update({ communityData: v })}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => run.mutate("music-community")}
+              disabled={!s.draft.communityData}
+              loading={run.isPending && run.variables === "music-community"}
+            >
+              <Play className="size-4" /> Look up now
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => run.mutate("music-listening")}
+              loading={run.isPending && run.variables === "music-listening"}
+            >
+              <Play className="size-4" /> Learn from listening now
+            </Button>
+          </div>
+          <p className="text-xs text-muted">
+            Learning from listening pairs the tracks people play in one sitting or keep in one playlist, so radios and
+            mixes play them together. It runs nightly in the maintenance window.
+          </p>
         </Card>
         <Card
           title="Artist and album details"
@@ -167,7 +297,8 @@ function LastFmSettings() {
       description={
         <>
           Lets people send what they play to their Last.fm accounts (each
-          connects under Account). Create an API account at{" "}
+          connects under Account), and adds Last.fm's similar artists and tags
+          to the ones from ListenBrainz. Create an API account at{" "}
           <a
             className="underline"
             href="https://www.last.fm/api/account/create"
@@ -247,5 +378,47 @@ function LastFmSettings() {
       </div>
       {save.error && <Alert tone="error">{save.error.message}</Alert>}
     </Card>
+  );
+}
+
+/** The two models' scores side by side. */
+function ModelComparison({
+  current,
+  tried,
+  currentName,
+  triedName,
+}: {
+  current?: SoundModelScore;
+  tried?: SoundModelScore;
+  currentName: string;
+  triedName: string;
+}) {
+  const played = !!(current?.playedMatch || tried?.playedMatch);
+  const words = !!(current?.textMatch || tried?.textMatch);
+  return (
+    <table className="w-full max-w-md text-left text-sm">
+      <thead className="text-xs text-muted">
+        <tr>
+          <th className="py-1 font-medium">Model</th>
+          <th className="py-1 font-medium">Same genre</th>
+          {played && <th className="py-1 font-medium">Played together</th>}
+          {words && <th className="py-1 font-medium">Found by description</th>}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td className="py-1">{currentName} (in use)</td>
+          <td className="py-1 tabular-nums">{percent(current?.genreMatch)}</td>
+          {played && <td className="py-1 tabular-nums">{percent(current?.playedMatch)}</td>}
+          {words && <td className="py-1 tabular-nums">{percent(current?.textMatch)}</td>}
+        </tr>
+        <tr>
+          <td className="py-1">{triedName}</td>
+          <td className="py-1 tabular-nums">{percent(tried?.genreMatch)}</td>
+          {played && <td className="py-1 tabular-nums">{percent(tried?.playedMatch)}</td>}
+          {words && <td className="py-1 tabular-nums">{percent(tried?.textMatch)}</td>}
+        </tr>
+      </tbody>
+    </table>
   );
 }

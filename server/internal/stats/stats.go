@@ -38,7 +38,28 @@ type Report struct {
 	Methods              map[string]int // direct_play, direct_stream, transcode
 	Local, Remote        int
 	MusicHours, VideoHrs float64
+	Playlists            []Playlist
 }
+
+// Playlist is how the music played from one kind of station or mix went (MUSIC-17).
+type Playlist struct {
+	Context, Label    string
+	Plays, Listeners  int
+	Finished, Skipped float64 // shares of the plays
+	Favourited        int     // tracks favourited within a week of a play from here
+}
+
+// playlistLabels names the contexts the apps send (Station.context).
+var playlistLabels = map[string]string{
+	"mix:daily": "Daily Mixes", "mix:discovery": "Discovery Mix", "mix:rediscover": "Rediscover", "mix:new": "New Music Mix",
+	"mix:decade": "Decade Mix", "mix:time": "Time of day Mix", "mix:favorites": "Favourites Mix",
+	"radio:item": "Artist, album and song radios", "radio:genre": "Genre radios", "radio:decade": "Decade radios",
+	"radio:mood": "Mood radios", "radio:favourites": "Favourites Radio", "radio:library": "Library Radio",
+	"muse": "Muse playlists", "journey": "Sound Journeys", "dj": "DJ picks",
+}
+
+// PlaylistLabel names a context ("" for one the apps don't send).
+func PlaylistLabel(c string) string { return playlistLabels[c] }
 
 // hours is how long a play lasted: wall time from start to stop, but never longer than
 // the item (a paused-overnight session shouldn't count as eight hours of watching).
@@ -163,5 +184,42 @@ func Build(ctx context.Context, db *sql.DB, days int, userID int64, limit int) (
 			r.Remote += n
 		}
 	}
-	return r, rows.Err()
+	if err := rows.Err(); err != nil {
+		return r, err
+	}
+	r.Playlists, err = playlists(ctx, db, where, args)
+	return r, err
+}
+
+// playlists sums the music plays by what they were started from: plays, listeners, how many
+// were played to the end (80%) and skipped (stopped in the first 30 s, before half way), and
+// the tracks favourited within a week of such a play.
+func playlists(ctx context.Context, db *sql.DB, where string, args []any) ([]Playlist, error) {
+	rows, err := db.QueryContext(ctx, `SELECT h.context, COUNT(*), COUNT(DISTINCT h.user_id),
+		SUM(CASE WHEN i.duration_ms > 0 AND COALESCE(h.position_ms, 0) >= i.duration_ms * 0.8 THEN 1 ELSE 0 END),
+		SUM(CASE WHEN h.stopped_at IS NOT NULL AND COALESCE(h.position_ms, 0) < MIN(30000, COALESCE(i.duration_ms, 60000) / 2) THEN 1 ELSE 0 END),
+		(SELECT COUNT(DISTINCT s.user_id || ':' || s.item_id) FROM play_history h2 JOIN user_item_state s ON s.user_id = h2.user_id AND s.item_id = h2.item_id
+			WHERE h2.context = h.context AND h2.id IN (SELECT h.id`+from+where+` AND h.context IS NOT NULL)
+			  AND s.favorite_at >= h2.started_at AND julianday(s.favorite_at) - julianday(h2.started_at) <= 7)`+
+		from+where+` AND i.type = 'track' AND h.context IS NOT NULL GROUP BY h.context ORDER BY COUNT(*) DESC`, append(append([]any{}, args...), args...)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Playlist
+	for rows.Next() {
+		var p Playlist
+		var finished, skipped int
+		if err := rows.Scan(&p.Context, &p.Plays, &p.Listeners, &finished, &skipped, &p.Favourited); err != nil {
+			return nil, err
+		}
+		if p.Label = PlaylistLabel(p.Context); p.Label == "" {
+			p.Label = p.Context
+		}
+		if p.Plays > 0 {
+			p.Finished, p.Skipped = float64(finished)/float64(p.Plays), float64(skipped)/float64(p.Plays)
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }

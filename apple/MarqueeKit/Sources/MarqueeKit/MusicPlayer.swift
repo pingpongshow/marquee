@@ -14,13 +14,15 @@ import UIKit
 @MainActor @Observable
 public final class MusicPlayer {
     /// What's playing: an album, a playlist or a station. Stations with a radio request
-    /// top themselves up as they play (MUSIC-3).
+    /// top themselves up as they play (MUSIC-3); `context` is the station's (Station.context).
     public struct Source: Sendable {
         public let title: String
         public let radio: RadioRequest?
-        public init(title: String, radio: RadioRequest? = nil) {
+        public let context: String?
+        public init(title: String, radio: RadioRequest? = nil, context: String? = nil) {
             self.title = title
             self.radio = radio
+            self.context = context
         }
     }
 
@@ -129,6 +131,14 @@ public final class MusicPlayer {
     @ObservationIgnored private var sessions: [ObjectIdentifier: Loaded] = [:]
     @ObservationIgnored private var sleepTask: Task<Void, Never>?
     @ObservationIgnored private var refilling = false
+    /// Bumped by every top-up, so a slower one that was overtaken (by an early top-up) is dropped.
+    @ObservationIgnored private var refillGeneration = 0
+    /// Bumped whenever something else starts playing, so a station's late top-up is dropped.
+    @ObservationIgnored private var sourceGeneration = 0
+    /// Skips and plays-through of the radio playing, which steer its top-ups (MUSIC-17).
+    @ObservationIgnored private var steering = RadioSteering()
+    /// The entry last counted as played through (the 80% mark passes on every tick after it).
+    @ObservationIgnored private var playedThrough: Int?
     @ObservationIgnored private var observers: [NSKeyValueObservation] = []
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var lastReport = Date.distantPast
@@ -223,6 +233,7 @@ public final class MusicPlayer {
                 self.time = t.seconds.isFinite ? max(0, t.seconds) : 0
                 if let d = self.player.currentItem?.duration.seconds, d.isFinite, d > 0 { self.duration = d }
                 if Date().timeIntervalSince(self.lastReport) > 15, self.playing { self.report("playing") }
+                self.notePlayedThrough()
                 // Full volume whenever no crossfade is running (one never leaves it silent).
                 if self.fadeTask == nil, self.fader == nil, self.player.volume != 1 { self.player.volume = 1 }
                 self.maybeCrossfade()
@@ -297,9 +308,10 @@ public final class MusicPlayer {
 
     /// Plays items; `source` names what they are (an album or playlist) for Now Playing.
     /// `at` starts the first track part-way (a queue handed over from another device).
-    public func play(_ items: [Item], start: Int = 0, shuffle: Bool = false, source: String? = nil, at seconds: Double = 0) {
-        self.source = source.map { Source(title: $0) }
-        queue.load(items, start: start, shuffle: shuffle)
+    /// `context` is set for a station's tracks played as a list (Station.context).
+    public func play(_ items: [Item], start: Int = 0, shuffle: Bool = false, source: String? = nil, context: String? = nil, at seconds: Double = 0) {
+        newSource(source.map { Source(title: $0, context: context) })
+        queue.load(items, start: start, shuffle: shuffle, from: context.map { .init(context: $0) })
         retriedEntry = nil
         startFailures = 0
         rebuild(at: max(0, seconds))
@@ -308,8 +320,9 @@ public final class MusicPlayer {
     /// Plays a generated station; with a radio request it keeps topping itself up.
     public func playStation(_ station: Station, radio: RadioRequest? = nil) {
         guard !station.items.isEmpty else { return }
-        source = Source(title: station.title, radio: radio)
-        queue.load(station.items, start: 0, shuffle: false)
+        newSource(Source(title: station.title, radio: radio, context: station.context))
+        // Each play of its tracks is reported with the station's context (MUSIC-17).
+        queue.load(station.items, start: 0, shuffle: false, from: .init(context: station.context))
         retriedEntry = nil
         startFailures = 0
         rebuild()
@@ -345,6 +358,7 @@ public final class MusicPlayer {
     }
 
     public func jump(_ id: Int) {
+        if queue.current?.id != id { noteMovedOn() }
         queue.jump(id)
         retriedEntry = nil
         startFailures = 0
@@ -352,6 +366,12 @@ public final class MusicPlayer {
     }
 
     public func next() {
+        noteMovedOn()
+        skipForward()
+    }
+
+    /// Moves on to the next track (Next, or a track that wouldn't play).
+    private func skipForward() {
         let i = queue.skipIndex
         guard i >= 0 else { return }
         // The next track is already preloaded: move on to it rather than start it again.
@@ -430,7 +450,7 @@ public final class MusicPlayer {
         for item in player.items() { endSession(for: item) }
         player.removeAllItems()
         queue = PlayQueue()
-        source = nil
+        newSource(nil)
         sleep = nil
         playing = false
         time = 0
@@ -463,8 +483,10 @@ public final class MusicPlayer {
             return item
         }
         guard let client = app.client else { return nil }
+        // The context goes with preloads too: the play counts once the track starts (MUSIC-17).
         guard let s = try? await client.startPlayback(body: .json(.init(itemId: entry.item.id, startMs: 0, preload: preload,
-                                                                         profile: AppleDeviceProfile.current()))).ok.body.json,
+                                                                         profile: AppleDeviceProfile.current(),
+                                                                         context: entry.playContext))).ok.body.json,
               let url = app.absolute(s.url) else { return nil }
         if preload, killNextPreload {
             killNextPreload = false
@@ -520,7 +542,7 @@ public final class MusicPlayer {
         }
         showError("Couldn't play \(entry.item.title).")
         if queue.skipIndex >= 0 {
-            next()
+            skipForward() // not the listener's skip: the radio isn't steered by it
         } else {
             cancelFade()
             for item in player.items() { endSession(for: item) }
@@ -564,7 +586,7 @@ public final class MusicPlayer {
         if !autoplay { playing = false }
         updateNowPlaying()
         if let remote {
-            remote.play(entry.item, at: start)
+            remote.play(entry.item, at: start, context: entry.playContext)
             return
         }
         Task {
@@ -654,12 +676,14 @@ public final class MusicPlayer {
         self.playing = playing
         self.time = time
         if duration > 0 { self.duration = duration }
+        notePlayedThrough()
         updateNowPlaying()
     }
 
     /// The remote device finished a track: on to what follows, as when a track ends here.
     public func remoteFinished() {
         guard remote != nil else { return }
+        noteFinished(queue.current)
         let i = queue.followingIndex
         guard i >= 0 else {
             playing = false
@@ -721,6 +745,8 @@ public final class MusicPlayer {
         // A track that played to its end still has its session here: skips, rebuilds and
         // stops end theirs before the player lets go of the item.
         let ended = previous.map { sessions[$0] != nil } ?? false
+        // Played to its end (a crossfade hands over at the end too): played through.
+        if let previous, ended, let s = sessions[previous] { noteFinished(queue.entries.first { $0.id == s.entry }) }
         // Sleep at the end of the track: checked before the crossfade hand-over, and pause()
         // stops the fading tail too.
         if ended, sleep == .endOfTrack, player.currentItem != nil {
@@ -817,19 +843,69 @@ public final class MusicPlayer {
 
     // MARK: - Stations, sleep and levelling
 
-    /// Continues a radio station when fewer than five tracks are left.
-    private func topUpRadio() {
-        guard var radio = source?.radio, !refilling, queue.entries.count - queue.index <= 5 else { return }
+    /// Something else plays (or nothing): a new station starts with nothing learnt.
+    private func newSource(_ s: Source?) {
+        source = s
+        sourceGeneration += 1
+        steering = RadioSteering()
+        playedThrough = nil
+    }
+
+    /// The entry, when it's a track the radio playing queued (not one queued by hand or the DJ's).
+    private func radioEntry(_ e: PlayQueue.Entry?) -> PlayQueue.Entry? {
+        guard source?.radio != nil, let e, e.fromStation else { return nil }
+        return e
+    }
+
+    /// The listener moved on from the current track (Next, or another track picked): a quick
+    /// skip on a radio steers it, and two in a row top it up early.
+    private func noteMovedOn() {
+        guard let e = radioEntry(queue.current) else { return }
+        let d = duration > 0 ? duration : Double(e.item.durationMs ?? 0) / 1000
+        if steering.movedOn(from: e.item.id, at: time, duration: d) { topUpRadio(early: true) }
+    }
+
+    /// The current track passed 80%: played through.
+    private func notePlayedThrough() {
+        guard let e = queue.current, playedThrough != e.id, RadioSteering.isPlayedThrough(at: time, duration: duration) else { return }
+        noteFinished(e)
+    }
+
+    private func noteFinished(_ entry: PlayQueue.Entry?) {
+        guard let e = radioEntry(entry) else { return }
+        playedThrough = e.id
+        steering.finish(e.item.id)
+    }
+
+    /// Continues a radio station when fewer than five tracks are left. `early` (two quick
+    /// skips in a row) asks now and replaces the station's tracks still to come, so it
+    /// changes course at once rather than after what's already queued.
+    private func topUpRadio(early: Bool = false) {
+        guard var radio = source?.radio else { return }
+        guard early || (!refilling && queue.entries.count - queue.index <= 5) else { return }
         refilling = true
+        refillGeneration += 1
+        let gen = refillGeneration
+        let run = sourceGeneration
         let exclude = queue.entries.map(\.item.id)
         radio.exclude = exclude
+        steering.apply(to: &radio)
         radio.limit = 25
-        let title = source?.title
+        if early { steering.toppedUp() }
+        // Top-ups keep the station's context, whatever the response says.
+        let from = PlayQueue.FromStation(context: source?.context)
         Task {
-            defer { refilling = false }
-            guard let st = try? await app.radio(radio), source?.title == title else { return }
+            defer { if gen == refillGeneration { refilling = false } }
+            guard let st = try? await app.radio(radio), run == sourceGeneration, gen == refillGeneration else { return }
             let fresh = st.items.filter { !exclude.contains($0.id) }
-            if !fresh.isEmpty { addToQueue(fresh) }
+            guard !fresh.isEmpty else { return }
+            let wasEmpty = queue.current == nil
+            if early, !wasEmpty {
+                queue.replaceUpcomingStation(with: fresh, from: from)
+            } else {
+                queue.append(fresh, from: from)
+            }
+            wasEmpty ? rebuild() : refreshFollowing()
         }
     }
 
@@ -1182,7 +1258,8 @@ public final class MusicPlayer {
 /// Another device playing the queue (Chromecast, D82), driven by MusicPlayer.
 @MainActor
 public protocol RemotePlayback: AnyObject {
-    func play(_ item: Item, at seconds: Double)
+    /// `context`: what the play was started from, for the server's statistics (MUSIC-17).
+    func play(_ item: Item, at seconds: Double, context: String?)
     func toggle()
     func resume()
     func pause()

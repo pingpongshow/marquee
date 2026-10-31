@@ -62,7 +62,7 @@ func soundPhrasings(sound string) []string {
 
 // TextVectorMulti embeds several phrasings and averages them.
 func (s *Service) TextVectorMulti(ctx context.Context, texts []string) ([]float32, error) {
-	vs, err := s.Client.EmbedText(ctx, texts)
+	vs, err := s.Client.EmbedText(ctx, texts, s.ActiveModel(ctx))
 	if err != nil {
 		return nil, errors.Join(ErrUnavailable, err)
 	}

@@ -35,6 +35,8 @@ import kotlinx.serialization.Contextual
  * @param onlineLyrics Look up lyrics on LRCLIB when a track has none (sends artist and title).
  * @param artistDetails Look up artists and albums on MusicBrainz (about one request a second) and artist bios on Wikipedia: styles, solo artist or band, country, active years, album types and labels, for artist pages and Muse.
  * @param loudnessAnalysis Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured.
+ * @param soundModel The Soundprint sound model: general (all kinds of sound) or music (trained on music alone). Another than the one in use is tried on the library first and compared; switching is then confirmed in Settings (MUSIC-1).
+ * @param communityData Similar artists and tags from ListenBrainz, and from Last.fm with an API key (MUSIC-15): sends artist and track names and MusicBrainz ids.
  */
 @Serializable
 
@@ -55,10 +57,28 @@ data class MusicSettings (
     /* Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured. */
     @SerialName(value = "loudnessAnalysis")
     @Deprecated(message = "This property is deprecated.")
-    val loudnessAnalysis: kotlin.Boolean? = null
+    val loudnessAnalysis: kotlin.Boolean? = null,
+
+    /* The Soundprint sound model: general (all kinds of sound) or music (trained on music alone). Another than the one in use is tried on the library first and compared; switching is then confirmed in Settings (MUSIC-1). */
+    @SerialName(value = "soundModel")
+    val soundModel: MusicSettings.SoundModel? = null,
+
+    /* Similar artists and tags from ListenBrainz, and from Last.fm with an API key (MUSIC-15): sends artist and track names and MusicBrainz ids. */
+    @SerialName(value = "communityData")
+    val communityData: kotlin.Boolean? = null
 
 ) {
 
+    /**
+     * The Soundprint sound model: general (all kinds of sound) or music (trained on music alone). Another than the one in use is tried on the library first and compared; switching is then confirmed in Settings (MUSIC-1).
+     *
+     * Values: GENERAL,MUSIC
+     */
+    @Serializable
+    enum class SoundModel(val value: kotlin.String) {
+        @SerialName(value = "general") GENERAL("general"),
+        @SerialName(value = "music") MUSIC("music");
+    }
 
 }
 

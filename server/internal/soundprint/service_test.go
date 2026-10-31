@@ -34,7 +34,7 @@ func TestAnalyzeBatchIsolatesBadFile(t *testing.T) {
 	}))
 	defer srv.Close()
 	s := &Service{Client: &Client{BaseURL: srv.URL}}
-	model, res, err := s.analyzeBatch(context.Background(), []string{"a", "bad", "c"})
+	model, res, err := s.analyzeBatch(context.Background(), []string{"a", "bad", "c"}, ModelGeneral)
 	if err != nil || model != "m" || len(res) != 3 {
 		t.Fatalf("got %q %v %v", model, res, err)
 	}

@@ -57,9 +57,10 @@ class MusicService : MediaLibraryService() {
     /**
      * The stream for a queue entry: the downloaded file, or its playback session's URL (one
      * session per track, kept while it's queued). fresh drops a cached session the server has
-     * ended and starts a new one.
+     * ended and starts a new one. context is the entry's play context (MUSIC-17), sent when its
+     * session starts, preloads included.
      */
-    private fun trackUri(id: Long, fresh: Boolean): Uri {
+    private fun streamUri(id: Long, fresh: Boolean, context: String?): Uri {
         // Downloaded tracks play from the device (and count when the server is back).
         app.downloads.localFile(id)?.let { f ->
             local.add(id)
@@ -70,7 +71,7 @@ class MusicService : MediaLibraryService() {
         val (_, url) = resolved.getOrPut(id) {
             // Preloaded sessions take over the device's playback when they first report "playing".
             val s = try {
-                marquee.playback.startPlayback(PlaybackRequest(id, AndroidProfile.profile, startMs = 0, preload = true))
+                marquee.playback.startPlayback(PlaybackRequest(id, AndroidProfile.profile, startMs = 0, preload = true, context = context))
             } catch (e: Exception) { throw IOException("Couldn't start track $id: ${e.message}", e) }
             // Known before any audio is decoded, so levelling applies from the first sample.
             TrackGains.put(id, Levelling.Gains(s.trackGainDb, s.albumGainDb, s.peak), persist = app.downloads.entries.value.containsKey(id))
@@ -91,13 +92,14 @@ class MusicService : MediaLibraryService() {
         override fun open(dataSpec: DataSpec): Long {
             if (dataSpec.uri.scheme != "marquee") return upstream.open(dataSpec)
             val id = dataSpec.uri.lastPathSegment!!.toLong()
+            val context = dataSpec.uri.getQueryParameter("context")
             return try {
-                upstream.open(dataSpec.withUri(trackUri(id, fresh = false)))
+                upstream.open(dataSpec.withUri(streamUri(id, fresh = false, context)))
             } catch (e: HttpDataSource.InvalidResponseCodeException) {
                 if (e.responseCode != 404 && e.responseCode != 410) throw e
                 android.util.Log.i("Marquee", "track $id: stream gone (${e.responseCode}), starting a new session")
                 runCatching { upstream.close() }
-                upstream.open(dataSpec.withUri(trackUri(id, fresh = true)))
+                upstream.open(dataSpec.withUri(streamUri(id, fresh = true, context)))
             }
         }
         override fun read(buffer: ByteArray, offset: Int, length: Int) = upstream.read(buffer, offset, length)
@@ -270,7 +272,7 @@ class MusicService : MediaLibraryService() {
         val f = faderPlayer()
         val fromVolume = 1f
         fadingFrom = id
-        f.setMediaItem(item.buildUpon().setUri("marquee://track/$id").build())
+        f.setMediaItem(item.buildUpon().setUri(trackUri(id, playContext(item))).build())
         f.prepare()
         f.seekTo(p.currentPosition + 200)
         f.volume = fromVolume

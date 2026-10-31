@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.SoundModelTrial
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -39,8 +40,13 @@ import kotlinx.serialization.Contextual
  * @param model 
  * @param device 
  * @param failed 
- * @param progress 
- * @param runTotal 
+ * @param progress Tracks done in the current stage of the run.
+ * @param runTotal Tracks in the current stage.
+ * @param phase The stage of the run when it isn't analysing new tracks: measuring what tracks are like, or trying another sound model.
+ * @param soundModel The sound model in use.
+ * @param trial 
+ * @param traits Analysed tracks with traits (how happy, sad, danceable… they sound).
+ * @param languages Analysed tracks whose language was read from their lyrics.
  */
 @Serializable
 
@@ -71,14 +77,45 @@ data class MusicStatus (
     @SerialName(value = "failed")
     val failed: kotlin.Int? = null,
 
+    /* Tracks done in the current stage of the run. */
     @SerialName(value = "progress")
     val progress: kotlin.Int? = null,
 
+    /* Tracks in the current stage. */
     @SerialName(value = "runTotal")
-    val runTotal: kotlin.Int? = null
+    val runTotal: kotlin.Int? = null,
+
+    /* The stage of the run when it isn't analysing new tracks: measuring what tracks are like, or trying another sound model. */
+    @SerialName(value = "phase")
+    val phase: kotlin.String? = null,
+
+    /* The sound model in use. */
+    @SerialName(value = "soundModel")
+    val soundModel: MusicStatus.SoundModel? = null,
+
+    @SerialName(value = "trial")
+    val trial: SoundModelTrial? = null,
+
+    /* Analysed tracks with traits (how happy, sad, danceable… they sound). */
+    @SerialName(value = "traits")
+    val traits: kotlin.Int? = null,
+
+    /* Analysed tracks whose language was read from their lyrics. */
+    @SerialName(value = "languages")
+    val languages: kotlin.Int? = null
 
 ) {
 
+    /**
+     * The sound model in use.
+     *
+     * Values: GENERAL,MUSIC
+     */
+    @Serializable
+    enum class SoundModel(val value: kotlin.String) {
+        @SerialName(value = "general") GENERAL("general"),
+        @SerialName(value = "music") MUSIC("music");
+    }
 
 }
 

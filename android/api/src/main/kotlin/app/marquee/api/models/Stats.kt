@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.PlaylistStats
 import app.marquee.api.models.StatsCount
 import app.marquee.api.models.StatsDaysInner
 import app.marquee.api.models.StatsMethods
@@ -51,6 +52,7 @@ import kotlinx.serialization.Contextual
  * @param local 
  * @param remote 
  * @param since 
+ * @param playlists How the music played from each kind of station and mix went (MUSIC-17), most played first.
  */
 @Serializable
 
@@ -106,7 +108,11 @@ data class Stats (
     val remote: kotlin.Int,
 
     @Contextual @SerialName(value = "since")
-    val since: java.time.OffsetDateTime? = null
+    val since: java.time.OffsetDateTime? = null,
+
+    /* How the music played from each kind of station and mix went (MUSIC-17), most played first. */
+    @SerialName(value = "playlists")
+    val playlists: kotlin.collections.List<PlaylistStats>? = null
 
 ) {
 

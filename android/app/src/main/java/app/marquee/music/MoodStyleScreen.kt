@@ -58,8 +58,12 @@ fun MoodStyleScreen(nav: NavHostController, libraryId: Long, kind: String, name:
     val req = if (isMood) RadioRequest(RadioRequest.Seed.MOOD, value = name.lowercase(), libraryId = libraryId, limit = 30)
     else RadioRequest(RadioRequest.Seed.GENRE, value = name, libraryId = libraryId, limit = 30)
     var error by remember { mutableStateOf<String?>(null) }
+    // The sampler is the station's own answer, so its tracks play with its context (MUSIC-17).
+    var context by remember { mutableStateOf<String?>(null) }
     val tracks by produceState<List<ItemSummary>?>(null) {
-        value = withContext(Dispatchers.IO) { runCatching { marquee.music.musicRadio(req).items }.onFailure { error = serverMessage(it) }.getOrDefault(emptyList()) }
+        value = withContext(Dispatchers.IO) {
+            runCatching { marquee.music.musicRadio(req) }.onFailure { error = serverMessage(it) }.getOrNull()
+        }?.also { context = it.context }?.items.orEmpty()
     }
     val albums by produceState(emptyList<ItemSummary>(), tracks) {
         value = if (!isMood) withContext(Dispatchers.IO) {
@@ -90,7 +94,7 @@ fun MoodStyleScreen(nav: NavHostController, libraryId: Long, kind: String, name:
         else {
             item { Text("Tracks", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             itemsIndexed(list, key = { _, t -> t.id }) { i, t ->
-                Row(Modifier.fillMaxWidth().focusCard({ music.play(list, i, source = name) }).padding(horizontal = sidePadding, vertical = 8.dp),
+                Row(Modifier.fillMaxWidth().focusCard({ music.play(list, i, source = name, context = context) }).padding(horizontal = sidePadding, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     Text("${i + 1}", Modifier.width(28.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     Column(Modifier.weight(1f)) {

@@ -22,12 +22,14 @@ public extension AppleDeviceProfile {
 
 @MainActor
 public extension AppSession {
-    /// A playback session in the Chromecast profile.
-    func castSession(itemID: Int64, startMs: Int64, fileID: Int64? = nil, audio: Int64? = nil, subtitle: Int64? = nil) async throws -> PlaybackSession {
+    /// A playback session in the Chromecast profile; `context` is a music track's play
+    /// context (MUSIC-17).
+    func castSession(itemID: Int64, startMs: Int64, fileID: Int64? = nil, audio: Int64? = nil, subtitle: Int64? = nil,
+                     context: String? = nil) async throws -> PlaybackSession {
         guard let client else { throw MarqueeError("Not connected") }
         return try await client.startPlayback(body: .json(.init(
             itemId: itemID, fileId: fileID, audioStreamId: audio, subtitleStreamId: subtitle, startMs: startMs,
-            profile: AppleDeviceProfile.chromecast()))).ok.body.json
+            profile: AppleDeviceProfile.chromecast(), context: context))).ok.body.json
     }
 
     /// A stream URL a Cast device can reach: the server's home-network address when known.

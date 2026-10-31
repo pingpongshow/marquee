@@ -2204,6 +2204,21 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/MusicSettings/loudnessAnalysis`.
             @available(*, deprecated)
             public var loudnessAnalysis: Swift.Bool?
+            /// The Soundprint sound model: general (all kinds of sound) or music (trained on music alone). Another than the one in use is tried on the library first and compared; switching is then confirmed in Settings (MUSIC-1).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicSettings/soundModel`.
+            @frozen public enum SoundModelPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case general = "general"
+                case music = "music"
+            }
+            /// The Soundprint sound model: general (all kinds of sound) or music (trained on music alone). Another than the one in use is tried on the library first and compared; switching is then confirmed in Settings (MUSIC-1).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicSettings/soundModel`.
+            public var soundModel: Components.Schemas.MusicSettings.SoundModelPayload?
+            /// Similar artists and tags from ListenBrainz, and from Last.fm with an API key (MUSIC-15): sends artist and track names and MusicBrainz ids.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicSettings/communityData`.
+            public var communityData: Swift.Bool?
             /// Creates a new `MusicSettings`.
             ///
             /// - Parameters:
@@ -2211,22 +2226,30 @@ extension Components {
             ///   - onlineLyrics: Look up lyrics on LRCLIB when a track has none (sends artist and title).
             ///   - artistDetails: Look up artists and albums on MusicBrainz (about one request a second) and artist bios on Wikipedia: styles, solo artist or band, country, active years, album types and labels, for artist pages and Muse.
             ///   - loudnessAnalysis: Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured.
+            ///   - soundModel: The Soundprint sound model: general (all kinds of sound) or music (trained on music alone). Another than the one in use is tried on the library first and compared; switching is then confirmed in Settings (MUSIC-1).
+            ///   - communityData: Similar artists and tags from ListenBrainz, and from Last.fm with an API key (MUSIC-15): sends artist and track names and MusicBrainz ids.
             public init(
                 soundprintAnalysis: Swift.Bool? = nil,
                 onlineLyrics: Swift.Bool? = nil,
                 artistDetails: Swift.Bool? = nil,
-                loudnessAnalysis: Swift.Bool? = nil
+                loudnessAnalysis: Swift.Bool? = nil,
+                soundModel: Components.Schemas.MusicSettings.SoundModelPayload? = nil,
+                communityData: Swift.Bool? = nil
             ) {
                 self.soundprintAnalysis = soundprintAnalysis
                 self.onlineLyrics = onlineLyrics
                 self.artistDetails = artistDetails
                 self.loudnessAnalysis = loudnessAnalysis
+                self.soundModel = soundModel
+                self.communityData = communityData
             }
             public enum CodingKeys: String, CodingKey {
                 case soundprintAnalysis
                 case onlineLyrics
                 case artistDetails
                 case loudnessAnalysis
+                case soundModel
+                case communityData
             }
         }
         /// - Remark: Generated from `#/components/schemas/SecuritySettings`.
@@ -8344,6 +8367,10 @@ extension Components {
             public var audioOffsetMs: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/PlaybackRequest/profile`.
             public var profile: Components.Schemas.DeviceProfile
+            /// What the play was started from, for the music playlist statistics (MUSIC-17): a station's or mix's context (Station.context), or "dj" for a track the DJ wove in. Omit otherwise.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackRequest/context`.
+            public var context: Swift.String?
             /// Creates a new `PlaybackRequest`.
             ///
             /// - Parameters:
@@ -8359,6 +8386,7 @@ extension Components {
             ///   - subtitleOffsetMs: Subtitle timing (PLAY-17), ms; positive shows subtitles later. Omit both offsets to use what this user last chose for this file; values sent are remembered.
             ///   - audioOffsetMs: Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play).
             ///   - profile:
+            ///   - context: What the play was started from, for the music playlist statistics (MUSIC-17): a station's or mix's context (Station.context), or "dj" for a track the DJ wove in. Omit otherwise.
             public init(
                 itemId: Swift.Int64,
                 fileId: Swift.Int64? = nil,
@@ -8371,7 +8399,8 @@ extension Components {
                 preload: Swift.Bool? = nil,
                 subtitleOffsetMs: Swift.Int? = nil,
                 audioOffsetMs: Swift.Int? = nil,
-                profile: Components.Schemas.DeviceProfile
+                profile: Components.Schemas.DeviceProfile,
+                context: Swift.String? = nil
             ) {
                 self.itemId = itemId
                 self.fileId = fileId
@@ -8385,6 +8414,7 @@ extension Components {
                 self.subtitleOffsetMs = subtitleOffsetMs
                 self.audioOffsetMs = audioOffsetMs
                 self.profile = profile
+                self.context = context
             }
             public enum CodingKeys: String, CodingKey {
                 case itemId
@@ -8399,6 +8429,7 @@ extension Components {
                 case subtitleOffsetMs
                 case audioOffsetMs
                 case profile
+                case context
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaybackDecision`.
@@ -12255,10 +12286,39 @@ extension Components {
             public var total: Swift.Int
             /// - Remark: Generated from `#/components/schemas/MusicStatus/failed`.
             public var failed: Swift.Int?
+            /// Tracks done in the current stage of the run.
+            ///
             /// - Remark: Generated from `#/components/schemas/MusicStatus/progress`.
             public var progress: Swift.Int?
+            /// Tracks in the current stage.
+            ///
             /// - Remark: Generated from `#/components/schemas/MusicStatus/runTotal`.
             public var runTotal: Swift.Int?
+            /// The stage of the run when it isn't analysing new tracks: measuring what tracks are like, or trying another sound model.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/phase`.
+            public var phase: Swift.String?
+            /// The sound model in use.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/soundModel`.
+            @frozen public enum SoundModelPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case general = "general"
+                case music = "music"
+            }
+            /// The sound model in use.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/soundModel`.
+            public var soundModel: Components.Schemas.MusicStatus.SoundModelPayload?
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/trial`.
+            public var trial: Components.Schemas.SoundModelTrial?
+            /// Analysed tracks with traits (how happy, sad, danceable… they sound).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/traits`.
+            public var traits: Swift.Int?
+            /// Analysed tracks whose language was read from their lyrics.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/languages`.
+            public var languages: Swift.Int?
             /// Creates a new `MusicStatus`.
             ///
             /// - Parameters:
@@ -12270,8 +12330,13 @@ extension Components {
             ///   - analyzed:
             ///   - total:
             ///   - failed:
-            ///   - progress:
-            ///   - runTotal:
+            ///   - progress: Tracks done in the current stage of the run.
+            ///   - runTotal: Tracks in the current stage.
+            ///   - phase: The stage of the run when it isn't analysing new tracks: measuring what tracks are like, or trying another sound model.
+            ///   - soundModel: The sound model in use.
+            ///   - trial:
+            ///   - traits: Analysed tracks with traits (how happy, sad, danceable… they sound).
+            ///   - languages: Analysed tracks whose language was read from their lyrics.
             public init(
                 enabled: Swift.Bool,
                 available: Swift.Bool,
@@ -12282,7 +12347,12 @@ extension Components {
                 total: Swift.Int,
                 failed: Swift.Int? = nil,
                 progress: Swift.Int? = nil,
-                runTotal: Swift.Int? = nil
+                runTotal: Swift.Int? = nil,
+                phase: Swift.String? = nil,
+                soundModel: Components.Schemas.MusicStatus.SoundModelPayload? = nil,
+                trial: Components.Schemas.SoundModelTrial? = nil,
+                traits: Swift.Int? = nil,
+                languages: Swift.Int? = nil
             ) {
                 self.enabled = enabled
                 self.available = available
@@ -12294,6 +12364,11 @@ extension Components {
                 self.failed = failed
                 self.progress = progress
                 self.runTotal = runTotal
+                self.phase = phase
+                self.soundModel = soundModel
+                self.trial = trial
+                self.traits = traits
+                self.languages = languages
             }
             public enum CodingKeys: String, CodingKey {
                 case enabled
@@ -12306,6 +12381,126 @@ extension Components {
                 case failed
                 case progress
                 case runTotal
+                case phase
+                case soundModel
+                case trial
+                case traits
+                case languages
+            }
+        }
+        /// Another sound model, chosen in Settings, being tried on the library before switching (MUSIC-1). Once it covers the library, current and tried compare the two.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SoundModelTrial`.
+        public struct SoundModelTrial: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SoundModelTrial/model`.
+            @frozen public enum ModelPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case general = "general"
+                case music = "music"
+            }
+            /// - Remark: Generated from `#/components/schemas/SoundModelTrial/model`.
+            public var model: Components.Schemas.SoundModelTrial.ModelPayload
+            /// - Remark: Generated from `#/components/schemas/SoundModelTrial/analyzed`.
+            public var analyzed: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/SoundModelTrial/total`.
+            public var total: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/SoundModelTrial/current`.
+            public var current: Components.Schemas.SoundModelScore?
+            /// - Remark: Generated from `#/components/schemas/SoundModelTrial/tried`.
+            public var tried: Components.Schemas.SoundModelScore?
+            /// When the comparison was made.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SoundModelTrial/at`.
+            public var at: Foundation.Date?
+            /// Creates a new `SoundModelTrial`.
+            ///
+            /// - Parameters:
+            ///   - model:
+            ///   - analyzed:
+            ///   - total:
+            ///   - current:
+            ///   - tried:
+            ///   - at: When the comparison was made.
+            public init(
+                model: Components.Schemas.SoundModelTrial.ModelPayload,
+                analyzed: Swift.Int,
+                total: Swift.Int,
+                current: Components.Schemas.SoundModelScore? = nil,
+                tried: Components.Schemas.SoundModelScore? = nil,
+                at: Foundation.Date? = nil
+            ) {
+                self.model = model
+                self.analyzed = analyzed
+                self.total = total
+                self.current = current
+                self.tried = tried
+                self.at = at
+            }
+            public enum CodingKeys: String, CodingKey {
+                case model
+                case analyzed
+                case total
+                case current
+                case tried
+                case at
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SoundModelScore`.
+        public struct SoundModelScore: Codable, Hashable, Sendable {
+            /// Of sampled tracks' 10 nearest tracks by sound (other albums), the share sharing one of its genres.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SoundModelScore/genreMatch`.
+            public var genreMatch: Swift.Double
+            /// The share someone has played in the same sitting; absent without enough listening history.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SoundModelScore/playedMatch`.
+            public var playedMatch: Swift.Double?
+            /// How well the model finds music from words (Muse and the moods depend on it): of the tracks it ranks first for "<genre> music", the share that have that genre. Absent when it couldn't be measured.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SoundModelScore/textMatch`.
+            public var textMatch: Swift.Double?
+            /// Creates a new `SoundModelScore`.
+            ///
+            /// - Parameters:
+            ///   - genreMatch: Of sampled tracks' 10 nearest tracks by sound (other albums), the share sharing one of its genres.
+            ///   - playedMatch: The share someone has played in the same sitting; absent without enough listening history.
+            ///   - textMatch: How well the model finds music from words (Muse and the moods depend on it): of the tracks it ranks first for "<genre> music", the share that have that genre. Absent when it couldn't be measured.
+            public init(
+                genreMatch: Swift.Double,
+                playedMatch: Swift.Double? = nil,
+                textMatch: Swift.Double? = nil
+            ) {
+                self.genreMatch = genreMatch
+                self.playedMatch = playedMatch
+                self.textMatch = textMatch
+            }
+            public enum CodingKeys: String, CodingKey {
+                case genreMatch
+                case playedMatch
+                case textMatch
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SoundModelChoice`.
+        public struct SoundModelChoice: Codable, Hashable, Sendable {
+            /// switch: use the tried model from now on; keep: stay with the current one (the trial is dropped and Settings set back).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SoundModelChoice/action`.
+            @frozen public enum ActionPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case _switch = "switch"
+                case keep = "keep"
+            }
+            /// switch: use the tried model from now on; keep: stay with the current one (the trial is dropped and Settings set back).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SoundModelChoice/action`.
+            public var action: Components.Schemas.SoundModelChoice.ActionPayload
+            /// Creates a new `SoundModelChoice`.
+            ///
+            /// - Parameters:
+            ///   - action: switch: use the tried model from now on; keep: stay with the current one (the trial is dropped and Settings set back).
+            public init(action: Components.Schemas.SoundModelChoice.ActionPayload) {
+                self.action = action
+            }
+            public enum CodingKeys: String, CodingKey {
+                case action
             }
         }
         /// - Remark: Generated from `#/components/schemas/RadioRequest`.
@@ -12341,6 +12536,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/RadioRequest/exclude`.
             public var exclude: [Swift.Int64]?
+            /// Tracks of this station the listener skipped quickly (in the first 30 s, before half way). The station steers away from their sound and holds back artists skipped twice (MUSIC-17). Send them when topping up a station, and top it up early after two quick skips in a row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RadioRequest/skipped`.
+            public var skipped: [Swift.Int64]?
+            /// Tracks of this station the listener played through. The station steers towards their sound.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RadioRequest/finished`.
+            public var finished: [Swift.Int64]?
             /// Creates a new `RadioRequest`.
             ///
             /// - Parameters:
@@ -12350,13 +12553,17 @@ extension Components {
             ///   - libraryId:
             ///   - limit:
             ///   - exclude: Tracks already queued (to continue a station).
+            ///   - skipped: Tracks of this station the listener skipped quickly (in the first 30 s, before half way). The station steers away from their sound and holds back artists skipped twice (MUSIC-17). Send them when topping up a station, and top it up early after two quick skips in a row.
+            ///   - finished: Tracks of this station the listener played through. The station steers towards their sound.
             public init(
                 seed: Components.Schemas.RadioRequest.SeedPayload,
                 itemId: Swift.Int64? = nil,
                 value: Swift.String? = nil,
                 libraryId: Swift.Int64? = nil,
                 limit: Swift.Int? = nil,
-                exclude: [Swift.Int64]? = nil
+                exclude: [Swift.Int64]? = nil,
+                skipped: [Swift.Int64]? = nil,
+                finished: [Swift.Int64]? = nil
             ) {
                 self.seed = seed
                 self.itemId = itemId
@@ -12364,6 +12571,8 @@ extension Components {
                 self.libraryId = libraryId
                 self.limit = limit
                 self.exclude = exclude
+                self.skipped = skipped
+                self.finished = finished
             }
             public enum CodingKeys: String, CodingKey {
                 case seed
@@ -12372,6 +12581,8 @@ extension Components {
                 case libraryId
                 case limit
                 case exclude
+                case skipped
+                case finished
             }
         }
         /// - Remark: Generated from `#/components/schemas/Station`.
@@ -12382,6 +12593,10 @@ extension Components {
             public var title: Swift.String
             /// - Remark: Generated from `#/components/schemas/Station/description`.
             public var description: Swift.String?
+            /// What kind of station or mix this is (e.g. mix:daily, radio:mood, muse). Send it back as PlaybackRequest.context when playing its tracks, for the music playlist statistics (MUSIC-17).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Station/context`.
+            public var context: Swift.String?
             /// - Remark: Generated from `#/components/schemas/Station/items`.
             public var items: [Components.Schemas.ItemSummary]
             /// Creates a new `Station`.
@@ -12390,22 +12605,26 @@ extension Components {
             ///   - id:
             ///   - title:
             ///   - description:
+            ///   - context: What kind of station or mix this is (e.g. mix:daily, radio:mood, muse). Send it back as PlaybackRequest.context when playing its tracks, for the music playlist statistics (MUSIC-17).
             ///   - items:
             public init(
                 id: Swift.String? = nil,
                 title: Swift.String,
                 description: Swift.String? = nil,
+                context: Swift.String? = nil,
                 items: [Components.Schemas.ItemSummary]
             ) {
                 self.id = id
                 self.title = title
                 self.description = description
+                self.context = context
                 self.items = items
             }
             public enum CodingKeys: String, CodingKey {
                 case id
                 case title
                 case description
+                case context
                 case items
             }
         }
@@ -12677,6 +12896,10 @@ extension Components {
             public var local: Swift.Int
             /// - Remark: Generated from `#/components/schemas/Stats/remote`.
             public var remote: Swift.Int
+            /// How the music played from each kind of station and mix went (MUSIC-17), most played first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Stats/playlists`.
+            public var playlists: [Components.Schemas.PlaylistStats]?
             /// Creates a new `Stats`.
             ///
             /// - Parameters:
@@ -12697,6 +12920,7 @@ extension Components {
             ///   - methods:
             ///   - local:
             ///   - remote:
+            ///   - playlists: How the music played from each kind of station and mix went (MUSIC-17), most played first.
             public init(
                 since: Foundation.Date? = nil,
                 plays: Swift.Int,
@@ -12714,7 +12938,8 @@ extension Components {
                 platforms: [Components.Schemas.StatsCount],
                 methods: Components.Schemas.Stats.MethodsPayload,
                 local: Swift.Int,
-                remote: Swift.Int
+                remote: Swift.Int,
+                playlists: [Components.Schemas.PlaylistStats]? = nil
             ) {
                 self.since = since
                 self.plays = plays
@@ -12733,6 +12958,7 @@ extension Components {
                 self.methods = methods
                 self.local = local
                 self.remote = remote
+                self.playlists = playlists
             }
             public enum CodingKeys: String, CodingKey {
                 case since
@@ -12752,6 +12978,66 @@ extension Components {
                 case methods
                 case local
                 case remote
+                case playlists
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlaylistStats`.
+        public struct PlaylistStats: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlaylistStats/context`.
+            public var context: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PlaylistStats/label`.
+            public var label: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PlaylistStats/plays`.
+            public var plays: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/PlaylistStats/listeners`.
+            public var listeners: Swift.Int
+            /// Share of plays listened to the end (80% or more).
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistStats/finished`.
+            public var finished: Swift.Double
+            /// Share of plays skipped in the first 30 seconds (before half way).
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistStats/skipped`.
+            public var skipped: Swift.Double
+            /// Tracks favourited within a week of being played from here.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistStats/favourited`.
+            public var favourited: Swift.Int
+            /// Creates a new `PlaylistStats`.
+            ///
+            /// - Parameters:
+            ///   - context:
+            ///   - label:
+            ///   - plays:
+            ///   - listeners:
+            ///   - finished: Share of plays listened to the end (80% or more).
+            ///   - skipped: Share of plays skipped in the first 30 seconds (before half way).
+            ///   - favourited: Tracks favourited within a week of being played from here.
+            public init(
+                context: Swift.String,
+                label: Swift.String,
+                plays: Swift.Int,
+                listeners: Swift.Int,
+                finished: Swift.Double,
+                skipped: Swift.Double,
+                favourited: Swift.Int
+            ) {
+                self.context = context
+                self.label = label
+                self.plays = plays
+                self.listeners = listeners
+                self.finished = finished
+                self.skipped = skipped
+                self.favourited = favourited
+            }
+            public enum CodingKeys: String, CodingKey {
+                case context
+                case label
+                case plays
+                case listeners
+                case finished
+                case skipped
+                case favourited
             }
         }
         /// - Remark: Generated from `#/components/schemas/StatsCount`.

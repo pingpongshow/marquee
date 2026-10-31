@@ -205,14 +205,15 @@ class MarqueeCast(private val context: Context, private val marquee: Marquee) {
     /**
      * Plays an item on the connected device from positionMs: asks the server for a stream in
      * the Cast profile and loads it. Returns an error message, or null when it started.
+     * context is a music track's play context, for the playlist statistics (MUSIC-17).
      */
     suspend fun load(
         itemId: Long, positionMs: Long, title: String, subtitle: String?, artwork: String?, music: Boolean,
-        fileId: Long? = null, audioStreamId: Long? = null, subtitleStreamId: Long? = null,
+        fileId: Long? = null, audioStreamId: Long? = null, subtitleStreamId: Long? = null, context: String? = null,
     ): String? {
         val r = withContext(Dispatchers.Main) { remote } ?: return "Not connected to a Cast device"
         val req = PlaybackRequest(itemId, CastProfile.profile, fileId = fileId, audioStreamId = audioStreamId,
-            subtitleStreamId = subtitleStreamId, startMs = positionMs)
+            subtitleStreamId = subtitleStreamId, startMs = positionMs, context = context)
         val s = withContext(Dispatchers.IO) { runCatching { marquee.playback.startPlayback(req) } }.getOrElse { return it.message ?: "Couldn't start playback" }
         val meta = MediaMetadata(if (music) MediaMetadata.MEDIA_TYPE_MUSIC_TRACK else MediaMetadata.MEDIA_TYPE_MOVIE).apply {
             putString(MediaMetadata.KEY_TITLE, title)

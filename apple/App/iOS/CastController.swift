@@ -85,13 +85,13 @@ final class CastController: NSObject {
     /// Plays an item on the connected device. Returns an error message, or nil.
     @discardableResult
     func load(itemID: Int64, at seconds: Double, title: String, subtitle: String?, artwork: URL?, music: Bool,
-              fileID: Int64? = nil, audio: Int64? = nil, subtitleStream: Int64? = nil) async -> String? {
+              fileID: Int64? = nil, audio: Int64? = nil, subtitleStream: Int64? = nil, context: String? = nil) async -> String? {
         guard let app, remote != nil else { return "Not connected to a Cast device" }
         loadGeneration += 1
         let generation = loadGeneration
         let s: PlaybackSession
         do {
-            s = try await app.castSession(itemID: itemID, startMs: Int64(seconds * 1000), fileID: fileID, audio: audio, subtitle: subtitleStream)
+            s = try await app.castSession(itemID: itemID, startMs: Int64(seconds * 1000), fileID: fileID, audio: audio, subtitle: subtitleStream, context: context)
         } catch {
             return generation == loadGeneration ? error.localizedDescription : nil
         }
@@ -212,11 +212,11 @@ extension CastController: @preconcurrency GCKRemoteMediaClientListener {
 
 /// Music's queue plays on the Cast device track by track.
 extension CastController: RemotePlayback {
-    func play(_ item: Item, at seconds: Double) {
+    func play(_ item: Item, at seconds: Double, context: String?) {
         let artist = item.artistCredit ?? item.grandparentTitle
         let art = app?.imageURL(item.images?.poster, width: 512)
         Task {
-            guard let err = await load(itemID: item.id, at: seconds, title: item.title, subtitle: artist, artwork: art, music: true),
+            guard let err = await load(itemID: item.id, at: seconds, title: item.title, subtitle: artist, artwork: art, music: true, context: context),
                   castingMusic else { return }
             // Couldn't cast: say why and carry on here.
             castingMusic = false

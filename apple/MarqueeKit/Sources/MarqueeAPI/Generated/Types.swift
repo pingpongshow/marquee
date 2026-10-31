@@ -1358,6 +1358,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /music/status`.
     /// - Remark: Generated from `#/paths//music/status/get(musicStatus)`.
     func musicStatus(_ input: Operations.MusicStatus.Input) async throws -> Operations.MusicStatus.Output
+    /// Switch to the sound model being tried, or keep the current one (admin only, MUSIC-1).
+    ///
+    /// - Remark: HTTP `POST /music/sound-model`.
+    /// - Remark: Generated from `#/paths//music/sound-model/post(chooseSoundModel)`.
+    func chooseSoundModel(_ input: Operations.ChooseSoundModel.Input) async throws -> Operations.ChooseSoundModel.Output
     /// AI (Ollama) status (admin only): reachable, installed and loaded models, the last error and indexing progress.
     ///
     /// - Remark: HTTP `GET /ai/status`.
@@ -4730,6 +4735,19 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//music/status/get(musicStatus)`.
     public func musicStatus(headers: Operations.MusicStatus.Input.Headers = .init()) async throws -> Operations.MusicStatus.Output {
         try await musicStatus(Operations.MusicStatus.Input(headers: headers))
+    }
+    /// Switch to the sound model being tried, or keep the current one (admin only, MUSIC-1).
+    ///
+    /// - Remark: HTTP `POST /music/sound-model`.
+    /// - Remark: Generated from `#/paths//music/sound-model/post(chooseSoundModel)`.
+    public func chooseSoundModel(
+        headers: Operations.ChooseSoundModel.Input.Headers = .init(),
+        body: Operations.ChooseSoundModel.Input.Body
+    ) async throws -> Operations.ChooseSoundModel.Output {
+        try await chooseSoundModel(Operations.ChooseSoundModel.Input(
+            headers: headers,
+            body: body
+        ))
     }
     /// AI (Ollama) status (admin only): reachable, installed and loaded models, the last error and indexing progress.
     ///

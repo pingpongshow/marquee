@@ -128,3 +128,42 @@ private func ids(_ q: PlayQueue) -> [Int64] { q.entries.map(\.item.id) }
     }
     #expect(firsts.count == 5)
 }
+
+@Test func stationTracksCarryTheirContext() {
+    var q = PlayQueue()
+    q.load([track(1), track(2)], from: .init(context: "radio:mood"))
+    #expect(q.entries.allSatisfy { $0.playContext == "radio:mood" && $0.fromStation })
+    // A top-up keeps the station's context; tracks queued by hand have none; the DJ's are "dj".
+    q.append([track(3)], from: .init(context: "radio:mood"))
+    q.append([track(4)])
+    q.playNext([track(5)], dj: "wander")
+    #expect(q.entries.map(\.playContext) == ["radio:mood", "dj", "radio:mood", "radio:mood", nil])
+    #expect(q.entries.map(\.fromStation) == [true, false, true, true, false])
+
+    var album = PlayQueue()
+    album.load([track(1), track(2)])
+    #expect(album.entries.allSatisfy { $0.playContext == nil && !$0.fromStation })
+}
+
+@Test func replacingAStationsUpcomingTracksKeepsHandQueuedOnes() {
+    var q = PlayQueue()
+    q.load((1...4).map(track), start: 1, from: .init(context: "radio:track"))
+    q.playNext([track(9)])               // by hand: 1 2 9 3 4
+    q.append([track(8)])                 // by hand at the end
+    q.playNext([track(7)], dj: "wander") // the DJ's: 1 2 7 9 3 4 8
+    q.replaceUpcomingStation(with: [track(20), track(21)], from: .init(context: "radio:track"))
+    #expect(ids(q) == [1, 2, 7, 9, 20, 21, 8])
+    #expect(q.current?.item.id == 2)
+    #expect(q.entries.first { $0.item.id == 20 }?.playContext == "radio:track")
+}
+
+@Test func replacingWhileShuffledKeepsTheUnshuffledOrderInStep() {
+    var q = PlayQueue()
+    q.load((1...5).map(track), start: 0, from: .init(context: "radio:library"))
+    q.toggleShuffle()
+    q.replaceUpcomingStation(with: [track(30)], from: .init(context: "radio:library"))
+    #expect(ids(q) == [1, 30])
+    q.toggleShuffle()
+    #expect(ids(q) == [1, 30])
+    #expect(q.current?.item.id == 1)
+}

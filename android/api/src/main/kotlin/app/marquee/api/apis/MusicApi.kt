@@ -37,6 +37,7 @@ import app.marquee.api.models.MusicMuseRequest
 import app.marquee.api.models.MusicStatus
 import app.marquee.api.models.Playlist
 import app.marquee.api.models.RadioRequest
+import app.marquee.api.models.SoundModelChoice
 import app.marquee.api.models.Station
 
 import kotlinx.serialization.SerialName
@@ -63,6 +64,78 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "/api/v1")
         }
+    }
+
+    /**
+     * POST /music/sound-model
+     * Switch to the sound model being tried, or keep the current one (admin only, MUSIC-1).
+     * 
+     * @param soundModelChoice 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun chooseSoundModel(soundModelChoice: SoundModelChoice) : Unit {
+        val localVarResponse = chooseSoundModelWithHttpInfo(soundModelChoice = soundModelChoice)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /music/sound-model
+     * Switch to the sound model being tried, or keep the current one (admin only, MUSIC-1).
+     * 
+     * @param soundModelChoice 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun chooseSoundModelWithHttpInfo(soundModelChoice: SoundModelChoice) : ApiResponse<Unit?> {
+        val localVariableConfig = chooseSoundModelRequestConfig(soundModelChoice = soundModelChoice)
+
+        return request<SoundModelChoice, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation chooseSoundModel
+     *
+     * @param soundModelChoice 
+     * @return RequestConfig
+     */
+    fun chooseSoundModelRequestConfig(soundModelChoice: SoundModelChoice) : RequestConfig<SoundModelChoice> {
+        val localVariableBody = soundModelChoice
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/music/sound-model",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
     }
 
     /**

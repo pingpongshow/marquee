@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -14,6 +15,7 @@ import (
 	"marquee/internal/items"
 	"marquee/internal/lyrics"
 	"marquee/internal/muse"
+	"marquee/internal/settings"
 	"marquee/internal/soundprint"
 )
 
@@ -49,7 +51,58 @@ func (h *Handlers) station(ctx context.Context, st soundprint.Station) (Station,
 	if err != nil {
 		return Station{}, err
 	}
-	return Station{Title: st.Title, Items: summaries(list)}, nil
+	out := Station{Title: st.Title, Items: summaries(list)}
+	if st.Context != "" {
+		out.Context = ptr(st.Context)
+	}
+	return out, nil
+}
+
+// playContext keeps a play's context to the shape the apps get it in (letters, digits, ':',
+// '-' and '_'; at most 64), so the statistics aren't fed arbitrary text.
+func playContext(c string) string {
+	c = strings.ToLower(strings.TrimSpace(c))
+	if len(c) > 64 {
+		return ""
+	}
+	for _, r := range c {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == ':' || r == '-' || r == '_') {
+			return ""
+		}
+	}
+	return c
+}
+
+// soundModelOr is a sound model setting, "general" when unset.
+func soundModelOr(m string) string {
+	if m == soundprint.ModelMusic {
+		return m
+	}
+	return soundprint.ModelGeneral
+}
+
+// mixContext is the statistics context of a mix by its id (daily-2 → mix:daily).
+func mixContext(id string) string {
+	if strings.HasPrefix(id, "daily-") {
+		return "mix:daily"
+	}
+	return "mix:" + id
+}
+
+// asideWords lets a Muse prompt that asks for live recordings, remixes or interludes have them.
+func asideWords(prompt string) soundprint.Aside {
+	p := " " + strings.ToLower(prompt) + " "
+	var a soundprint.Aside
+	if strings.Contains(p, " live ") || strings.Contains(p, "concert") || strings.Contains(p, "unplugged") {
+		a |= soundprint.AsideLive
+	}
+	if strings.Contains(p, "remix") {
+		a |= soundprint.AsideRemix
+	}
+	if strings.Contains(p, "interlude") || strings.Contains(p, "skit") || strings.Contains(p, " intro") {
+		a |= soundprint.AsideInterlude
+	}
+	return a
 }
 
 func soundprintErr(err error) (code string, msg string, status int) {
@@ -67,8 +120,60 @@ func (h *Handlers) MusicStatus(ctx context.Context, _ MusicStatusRequestObject) 
 		return MusicStatus401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	st := h.Soundprint.Status(ctx)
-	return MusicStatus200JSONResponse{Enabled: st.Enabled, Available: st.Available, Running: st.Running, Model: nz(st.Model),
-		Device: nz(st.Device), Analyzed: st.Analyzed, Total: st.Total, Failed: nz(st.Failed), Progress: nz(st.Progress), RunTotal: nz(st.RunTotal)}, nil
+	out := MusicStatus200JSONResponse{Enabled: st.Enabled, Available: st.Available, Running: st.Running, Model: nz(st.Model),
+		Device: nz(st.Device), Analyzed: st.Analyzed, Total: st.Total, Failed: nz(st.Failed), Progress: nz(st.Progress), RunTotal: nz(st.RunTotal),
+		Phase: nz(st.Phase), SoundModel: ptr(MusicStatusSoundModel(soundModelOr(st.SoundModel))), Traits: nz(st.Traits), Languages: nz(st.Languages)}
+	if t := st.Trial; t != nil {
+		score := func(m *soundprint.ModelScore) *SoundModelScore {
+			if m == nil {
+				return nil
+			}
+			return &SoundModelScore{GenreMatch: float32(m.GenreMatch), PlayedMatch: nz(float32(m.PlayedMatch)), TextMatch: nz(float32(m.TextMatch))}
+		}
+		trial := &SoundModelTrial{Model: SoundModelTrialModel(t.Model), Analyzed: t.Analyzed, Total: t.Total, Current: score(t.Current), Tried: score(t.Tried)}
+		if at, err := time.Parse(time.RFC3339, t.At); err == nil {
+			trial.At = &at
+		}
+		out.Trial = trial
+	}
+	return out, nil
+}
+
+// ChooseSoundModel switches to the sound model being tried, or keeps the current one (MUSIC-1).
+func (h *Handlers) ChooseSoundModel(ctx context.Context, req ChooseSoundModelRequestObject) (ChooseSoundModelResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return ChooseSoundModel401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return ChooseSoundModel403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	if req.Body == nil {
+		return ChooseSoundModel409JSONResponse(apiErr("invalid", "action is required")), nil
+	}
+	switch req.Body.Action {
+	case SoundModelChoiceActionSwitch:
+		if err := h.Soundprint.SwitchModel(ctx); errors.Is(err, soundprint.ErrNoTrial) {
+			return ChooseSoundModel409JSONResponse(apiErr("no_trial", err.Error())), nil
+		} else if err != nil {
+			return nil, internal(ctx, "sound model", err)
+		}
+		// Tracks the new model couldn't analyse (or added since) are analysed now.
+		if h.Tasks != nil {
+			h.Tasks.Trigger(context.WithoutCancel(ctx), "soundprint")
+		}
+	case SoundModelChoiceActionKeep:
+		active := h.Soundprint.ActiveModel(ctx)
+		if _, err := h.Settings.Update(ctx, func(s *settings.Settings) error {
+			s.Music.SoundModel = active
+			return nil
+		}); err != nil {
+			return nil, internal(ctx, "sound model", err)
+		}
+		if err := h.Soundprint.EndTrial(ctx); err != nil {
+			return nil, internal(ctx, "sound model", err)
+		}
+	}
+	return ChooseSoundModel204Response{}, nil
 }
 
 func (h *Handlers) SoundsLike(ctx context.Context, req SoundsLikeRequestObject) (SoundsLikeResponseObject, error) {
@@ -123,13 +228,20 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 	b := req.Body
 	acc := access(ctx)
 	o := soundprint.Options{Length: 50, Keep: keepFor(acc, b.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{},
-		Favour: h.Soundprint.Favour(ctx, s.User.ID)}
+		Favour: h.Soundprint.Favour(ctx, s.User.ID), CoPlay: h.Soundprint.CoPlay, Languages: h.Soundprint.ListenerLanguages(ctx, s.User.ID)}
 	set(&o.Length, b.Limit)
 	o.Length = clampCount(o.Length, 5, 100)
 	if b.Exclude != nil {
 		for _, id := range *b.Exclude {
 			o.Exclude[id] = true
 		}
+	}
+	// Steering (MUSIC-17): what the listener skipped and played through so far.
+	if b.Skipped != nil {
+		o.Skipped = (*b.Skipped)[:min(len(*b.Skipped), 100)]
+	}
+	if b.Finished != nil {
+		o.Finished = (*b.Finished)[:min(len(*b.Finished), 100)]
 	}
 	bad := func(msg string) (MusicRadioResponseObject, error) {
 		return MusicRadio400JSONResponse{BadRequestJSONResponse(apiErr("invalid", msg))}, nil
@@ -148,6 +260,7 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 			return MusicRadio400JSONResponse{BadRequestJSONResponse(apiErr("not_found", "item not found"))}, nil
 		}
 		st, err = h.Soundprint.RadioFromItem(ctx, d.ID, d.Title, o)
+		st.Context = "radio:item"
 	case RadioRequestSeedGenre:
 		ids, gerr := h.Items.TrackIDsByGenre(ctx, acc, value)
 		if gerr != nil {
@@ -158,6 +271,7 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", "no analysed tracks in "+value))}, nil
 		}
 		st = h.Soundprint.RadioFromVector(v, value+" Radio", o)
+		st.Context = "radio:genre"
 	case RadioRequestSeedDecade:
 		dec, perr := strconv.Atoi(strings.TrimSuffix(value, "s"))
 		if perr != nil {
@@ -170,16 +284,14 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", "no analysed tracks from the "+strconv.Itoa(dec)+"s"))}, nil
 		}
 		st = h.Soundprint.RadioFromVector(soundprint.Mean(members), strconv.Itoa(dec)+"s Radio", o)
+		st.Context = "radio:decade"
 	case RadioRequestSeedMood:
 		if value == "" {
 			return bad("value (the mood) is required")
 		}
-		v, verr := h.Soundprint.TextVector(ctx, value+" music")
-		if verr != nil {
-			err = verr
-			break
-		}
-		st = h.Soundprint.RadioFromVector(v, upperFirst(value)+" Radio", o)
+		// Each mood's descriptions, traits, energy and tags (MUSIC-18).
+		st, err = h.Soundprint.MoodRadio(ctx, value, o)
+		st.Context = "radio:mood"
 	case RadioRequestSeedFavourites:
 		// The sound of their favourite songs first, then what they play and rate highly.
 		taste := h.Soundprint.Taste(ctx, s.User.ID, h.Soundprint.Liked(ctx, s.User.ID))
@@ -187,6 +299,7 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("no_history", "Play, rate or favourite some music first."))}, nil
 		}
 		st = h.Soundprint.RadioFromVector(taste, "Your Favourites Radio", o)
+		st.Context = "radio:favourites"
 	case RadioRequestSeedLibrary:
 		all := h.Soundprint.Index.Where(o.Keep)
 		if len(all) == 0 {
@@ -197,7 +310,7 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 		if len(o.Exclude) == 0 {
 			first = all[int(s.User.ID+int64(len(all)))%len(all)]
 		}
-		st = soundprint.Station{Title: "Library Radio", IDs: soundprint.TrackIDs(h.Soundprint.Index.Flow(first.Vec, first, o))}
+		st = soundprint.Station{Title: "Library Radio", IDs: soundprint.TrackIDs(h.Soundprint.Index.Flow(first.Vec, first, o)), Context: "radio:library"}
 	default:
 		return bad("unknown seed")
 	}
@@ -229,7 +342,7 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	set(&n, req.Body.Limit)
 	n = clampCount(n, 5, 100)
 	o := soundprint.Options{Keep: keepFor(access(ctx), req.Body.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID),
-		Favour: h.Soundprint.Favour(ctx, s.User.ID)}
+		Favour: h.Soundprint.Favour(ctx, s.User.ID), Arc: true, AllowAside: asideWords(prompt)}
 	// Read the prompt (AI, or keywords against the library's genres and artists), filter,
 	// then rank by sound, "like" artists, genres and, with AI, lyric themes.
 	ctx = ai.WithBudget(ctx, museAIBudget) // see museAIBudget
@@ -259,6 +372,7 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 		reading.Query.Title = prompt
 	}
 	st, err := h.Soundprint.MuseQuery(ctx, s.User.ID, reading.Query, n, o)
+	st.Context = "muse"
 	if err != nil {
 		if code, msg, status := soundprintErr(err); status == 503 {
 			return MusicMuse503JSONResponse{ServiceUnavailableJSONResponse(apiErr(code, msg))}, nil
@@ -295,7 +409,7 @@ func (h *Handlers) MusicJourney(ctx context.Context, req MusicJourneyRequestObje
 	set(&n, b.Length)
 	n = clampCount(n, 3, 60)
 	ts := h.Soundprint.Index.Journey(from, to, n, soundprint.Options{Keep: keepFor(acc, nil)})
-	out, err := h.station(ctx, soundprint.Station{Title: "Sound Journey", IDs: soundprint.TrackIDs(ts)})
+	out, err := h.station(ctx, soundprint.Station{Title: "Sound Journey", IDs: soundprint.TrackIDs(ts), Context: "journey"})
 	if err != nil {
 		return nil, internal(ctx, "journey", err)
 	}
@@ -316,6 +430,7 @@ func (h *Handlers) MusicMixes(ctx context.Context, req MusicMixesRequestObject) 
 		out = append(out, *fav)
 	}
 	for i, m := range h.Soundprint.DailyMixes(ctx, s.User.ID, mixScope(req.Params.LibraryId), keepFor(access(ctx), req.Params.LibraryId)) {
+		m.Context = mixContext(m.ID)
 		st, err := h.station(ctx, m.Station)
 		if err != nil {
 			return nil, internal(ctx, "mixes", err)
@@ -358,7 +473,7 @@ func (h *Handlers) favoritesMix(ctx context.Context, libraryID *int64) (*Station
 	}
 	rand.Shuffle(len(list), func(i, j int) { list[i], list[j] = list[j], list[i] })
 	list = list[:min(len(list), favoritesMixSize)]
-	return &Station{Id: ptr("favorites"), Title: "Favourites Mix", Description: ptr("Your favourite songs, shuffled"), Items: summaries(list)}, nil
+	return &Station{Id: ptr("favorites"), Title: "Favourites Mix", Description: ptr("Your favourite songs, shuffled"), Context: ptr("mix:favorites"), Items: summaries(list)}, nil
 }
 
 // mixDescription names a few artists in a mix ("Portishead, Massive Attack and more").

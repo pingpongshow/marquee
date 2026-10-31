@@ -150,17 +150,69 @@ How much bandwidth remote streams may use overall is set under **Settings → Re
 
 ## Music
 
-**Settings → Music** covers Soundprint analysis, artist details, lyrics, volume levelling and Last.fm.
+**Settings → Music** covers Soundprint analysis, the sound model, similar artists and tags, artist details, lyrics, volume levelling and Last.fm.
 
 ### Soundprint analysis
 
 Marquee listens to every track on your server to power radios, "sounds like" suggestions, Sound Journey, Muse and daily mixes. Audio never leaves the server. The card shows the model, whether it's running on the GPU or the CPU, and how many tracks are analysed.
+
+Each track gets:
+
+- **Its sound:** what it sounds like, so tracks that sound alike can be found.
+- **Its traits:** how happy, sad, tender, exciting, angry, danceable, sung, electronic, acoustic and ambient it sounds. These come from an audio classifier trained on AudioSet's labelled sounds.
+- **Tempo, key and energy.**
+
+Marquee also reads which language each song is sung in from its lyrics, so turning on online lyrics (below) helps. The card shows how many tracks have traits and a language so far, and what a run is doing.
 
 | Setting | Default | What it does |
 |---|---|---|
 | Analyse music | On | New tracks are analysed within the hour, and right after a music scan. |
 
 **Analyse new tracks now** starts a run straight away. If the card says the analysis service isn't running, start the `soundprint` container (it's in the compose file).
+
+After this update, the first run measures the traits of every track already analysed. That takes a while for a large library (roughly an hour per 10,000 tracks on a GPU).
+
+### Sound model
+
+The sound model decides how Soundprint hears music.
+
+| Setting | Default | What it does |
+|---|---|---|
+| Model | General | **General** knows all kinds of sound. **Music** was trained on music alone (LAION's `larger_clap_music`). |
+
+Switching models means analysing the whole library again, so a different model is tried first:
+
+1. Choose the other model and save.
+2. The next Soundprint run (or **Continue now**) analyses the library with it. Radios and mixes keep using the current model meanwhile.
+3. When the trial covers the library, the card compares the two models on your music. For a sample of tracks it shows how often each model's closest-sounding tracks share a genre with the track, and, with enough listening history, how often they were played in the same sitting. It also shows how well each model finds music from words (**Found by description**), which Muse and the mood stations depend on. Higher is better.
+4. Press **Switch to the … model** to use it from now on, or **Keep the … model** to drop the trial.
+
+Switching makes the day's mixes again.
+
+**Recommended:** keep **General**. When tested on a real library, the music model was no better at matching descriptions to music than chance. If it does the same on yours, the card warns that Muse and the mood stations would get worse with it.
+
+### Similar artists and tags
+
+| Setting | Default | What it does |
+|---|---|---|
+| Look up similar artists and tags | On | Asks ListenBrainz which artists listeners consider alike and how they tag artists and tracks ("melancholic", "chill", "female vocals"). With a Last.fm API key (see [Last.fm and ListenBrainz](#lastfm-and-listenbrainz)) it asks Last.fm too. Only artist and track names and MusicBrainz IDs are sent. |
+
+**Look up now** starts a run, and **Learn from listening now** pairs up the tracks played together (see below). Both also run on their own schedule (see [Scheduled Tasks](settings-server.md#scheduled-tasks)).
+
+ListenBrainz covers artists with a MusicBrainz ID, so turning on artist and album details (below) first gives it more to work with. The first run takes a while for a large library, an hour or more with Last.fm, and continues where it stopped.
+
+### How radios and mixes are made
+
+- **Moods:** each mood (Chill, Energetic, Focus, Melancholy, Party, Romantic, Dreamy, Aggressive) is described several ways for the sound model. Each also sets the traits it wants and avoids (Melancholy wants sad and avoids happy and danceable; Focus avoids vocals), an energy range, a key or tempo where it matters, and the community tags that mean it. Every track is scored on all of that. The best-fitting tracks, two per artist at most, set the station's sound, and tracks that clearly don't fit are left out.
+- **Played together:** every night, Marquee pairs the tracks people play in one sitting (pauses under 45 minutes; quick skips and tracks from the same album don't count) and the tracks that sit next to each other in playlists. Radios and mixes then favour those pairs.
+- **Similar artists:** an artist's or a song's radio also favours artists that listeners call similar. Discovery favours artists similar to the ones you play most and favourite.
+- **Steering:** a radio adjusts to what you do. Tracks you skip in the first 30 seconds push it away from their sound, and tracks you play to the end pull it closer. An artist you skip twice is held back. After two quick skips in a row, the rest of the station is chosen again straight away.
+- **Time of day:** besides the Daily Mixes, you get a mix of what you usually play at this time of day: morning, afternoon, evening or late night.
+- **Flow:** mixes and Muse playlists start gently, build to a peak about two thirds of the way in, then ease off. Each next track is also chosen to suit the previous one's key and tempo.
+- **Left out:** stations and mixes skip interludes, intros, skits, live recordings and remixes. A live album's radio still plays live tracks, and a Muse prompt that asks for live music or remixes gets them.
+- **Languages:** mixes stay with the languages your favourite music is sung in, unless you listen in several. A song's radio leans towards the song's language. Instrumentals always fit.
+
+**Settings → Statistics** shows how each kind of radio and mix is doing (see [Statistics](settings-server.md#statistics)).
 
 ### Artist and album details
 
@@ -184,7 +236,7 @@ Volume levelling is always on. Tracks with ReplayGain tags use them; tracks with
 
 ### Last.fm and ListenBrainz
 
-Last.fm needs an API account for your server, which you set up once here. Each person then connects their own Last.fm account under **Account → Last.fm**.
+Last.fm needs an API account for your server, which you set up once here. Each person then connects their own Last.fm account under **Account → Last.fm**. The same API key also lets [Similar artists and tags](#similar-artists-and-tags) use Last.fm.
 
 1. Create an API account at last.fm/api/account/create. The callback URL can be left empty.
 2. Enter its details here and press **Save**.

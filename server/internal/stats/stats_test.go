@@ -85,3 +85,51 @@ func TestBuildOnRealDatabase(t *testing.T) {
 	}
 	t.Logf("plays %d hours %.1f users %d days %d top %+v artists %+v platforms %+v methods %v", r.Plays, r.Hours, r.Users, len(r.Days), r.Movies, r.Artists, r.Platforms, r.Methods)
 }
+
+// Music plays sum up by what they were started from: plays, listeners, how many were played
+// to the end and skipped, and tracks favourited within a week of a play from there.
+func TestPlaylists(t *testing.T) {
+	d := seeded(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	at := func(d time.Duration) string { return now.Add(d).Format("2006-01-02T15:04:05.000Z") }
+	for _, p := range []struct {
+		user    int64
+		ctx     string
+		started time.Duration
+		pos     int64
+	}{
+		{1, "mix:daily", -10 * time.Hour, 230000}, // to the end
+		{2, "mix:daily", -9 * time.Hour, 10000},   // skipped
+		{1, "mix:daily", -8 * time.Hour, 100000},  // neither
+		{1, "radio:mood", -7 * time.Hour, 240000}, // to the end
+	} {
+		if _, err := d.Exec(`INSERT INTO play_history (user_id, item_id, item_title, started_at, stopped_at, position_ms, context) VALUES (?, 22, 't', ?, ?, ?, ?)`,
+			p.user, at(p.started), at(p.started+4*time.Minute), p.pos, p.ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d.Exec(`INSERT INTO user_item_state (user_id, item_id, favorite_at) VALUES (2, 22, ?)`, at(-8*time.Hour))
+	r, err := Build(ctx, d, 30, 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Playlists) != 2 {
+		t.Fatalf("%+v", r.Playlists)
+	}
+	daily, mood := r.Playlists[0], r.Playlists[1]
+	if daily.Context != "mix:daily" || daily.Label != "Daily Mixes" || daily.Plays != 3 || daily.Listeners != 2 {
+		t.Errorf("daily: %+v", daily)
+	}
+	if daily.Finished < 0.33 || daily.Finished > 0.34 || daily.Skipped < 0.33 || daily.Skipped > 0.34 || daily.Favourited != 1 {
+		t.Errorf("daily rates: %+v", daily)
+	}
+	if mood.Plays != 1 || mood.Finished != 1 || mood.Favourited != 0 {
+		t.Errorf("mood: %+v", mood)
+	}
+	// One person's report counts only their plays.
+	r, _ = Build(ctx, d, 30, 1, 10)
+	if r.Playlists[0].Plays != 2 || r.Playlists[0].Favourited != 0 {
+		t.Errorf("Ann's: %+v", r.Playlists[0])
+	}
+}

@@ -32,6 +32,73 @@ type Options struct {
 	// either set, Pick's order also keeps an artist's tracks apart. Flow holds an artist to
 	// their share of a station the same way: PerArtist, or a tenth of it (at least 3) when unset.
 	PerArtist, PerAlbum int
+	// Affinity raises tracks like Favour: those played together with the seeds, by artists
+	// listeners call similar, that fit a mood (0–~0.3 each).
+	Affinity map[int64]float64
+	// CoPlay is how strongly two tracks are played together (0–1; nil = not used): in Flow,
+	// what's played with the track before lifts the next.
+	CoPlay func(a, b int64) float64
+	// AllowAside is the asides (interludes, live, remixes) that may play; others are left out.
+	AllowAside Aside
+	// Languages keeps the list to these languages (see Languages); nil allows any.
+	Languages Languages
+	// Arc orders Pick's list along an energy arc, with keys and tempos that follow on (mixes
+	// and prompts); without it the list is chained by sound alone.
+	Arc bool
+	// Skipped and Finished are the station's tracks the listener skipped quickly and played
+	// through so far: Flow steers away from the sound of the first and towards the second, and
+	// holds back the artists they skip (MUSIC-17).
+	Skipped, Finished []int64
+}
+
+// Steering weights: how far a station's sound moves towards what was played through and
+// away from what was skipped, and how much an artist skipped twice is held back.
+const (
+	steerTowards     = 0.35
+	steerAway        = 0.35
+	steerArtistAvoid = 0.5
+)
+
+// steer moves a station's sound by what the listener skipped and played through, and holds
+// back artists skipped twice or more.
+func (o *Options) steer(x *Index, anchor []float32) []float32 {
+	if len(o.Skipped)+len(o.Finished) == 0 {
+		return anchor
+	}
+	get := func(ids []int64) []*Track {
+		var ts []*Track
+		for _, id := range ids {
+			if t := x.Get(id); t != nil {
+				ts = append(ts, t)
+			}
+		}
+		return ts
+	}
+	skipped, finished := get(o.Skipped), get(o.Finished)
+	anchor = BlendVectors([][]float32{anchor, Mean(finished), Mean(skipped)}, []float64{1, steerTowards, -steerAway})
+	skips := map[int64]int{}
+	for _, t := range skipped {
+		if t.ArtistID != 0 {
+			skips[t.ArtistID]++
+		}
+	}
+	held := map[int64]bool{}
+	for a, n := range skips {
+		if n >= 2 {
+			held[a] = true
+		}
+	}
+	if len(held) > 0 {
+		avoid := make(map[int64]float64, len(o.Avoid))
+		for id, w := range o.Avoid {
+			avoid[id] = w
+		}
+		for _, t := range x.Where(func(t *Track) bool { return held[t.ArtistID] }) {
+			avoid[t.ItemID] = max(avoid[t.ItemID], steerArtistAvoid)
+		}
+		o.Avoid = avoid
+	}
+	return anchor
 }
 
 func (o *Options) rng() *rand.Rand {
@@ -42,7 +109,7 @@ func (o *Options) rng() *rand.Rand {
 }
 
 func (o *Options) allowed(t *Track) bool {
-	if o.Exclude[t.ItemID] || (t.Copy != "" && o.ExcludeCopy[t.Copy]) {
+	if o.Exclude[t.ItemID] || (t.Copy != "" && o.ExcludeCopy[t.Copy]) || t.Aside&^o.AllowAside != 0 {
 		return false
 	}
 	return o.Keep == nil || o.Keep(t)
@@ -56,6 +123,7 @@ func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 	if o.Length <= 0 {
 		o.Length = 50
 	}
+	anchor = o.steer(x, anchor)
 	pool := x.Nearest(anchor, max(400, o.Length*8), o.allowed)
 	used := map[int64]bool{}
 	// The spacing penalties alone let an artist back every fourth track, so a station started
@@ -76,8 +144,10 @@ func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 	r := o.rng()
 	for len(out) < o.Length {
 		var cur []float32
+		var prev *Track
 		if len(out) > 0 {
-			cur = out[len(out)-1].Vec
+			prev = out[len(out)-1]
+			cur = prev.Vec
 		}
 		best, bestScore := -1, math.Inf(-1)
 		for i, c := range pool {
@@ -86,7 +156,10 @@ func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 			}
 			s := c.Score
 			if cur != nil {
-				s = 0.55*dot(cur, c.Vec) + 0.45*c.Score
+				s = 0.55*dot(cur, c.Vec) + 0.45*c.Score + transitionWeight*(transition(prev, c.Track)-0.5)
+				if o.CoPlay != nil {
+					s += coplayWeight * o.CoPlay(prev.ItemID, c.ItemID)
+				}
 			}
 			for j := len(out) - 1; j >= 0 && j >= len(out)-6; j-- {
 				if out[j].AlbumID == c.AlbumID && c.AlbumID != 0 {
@@ -100,7 +173,7 @@ func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 				s -= 0.35 * float64(over)
 			}
 			s -= 0.3 * o.Avoid[c.ItemID]
-			s += o.Favour[c.ItemID]
+			s += o.Favour[c.ItemID] + o.Affinity[c.ItemID] - o.Languages.penalty(c.Track)
 			s += r.Float64() * 0.04
 			if s > bestScore {
 				best, bestScore = i, s
@@ -170,7 +243,7 @@ func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 					sim = math.Max(sim, 0.97)
 				}
 			}
-			s := 0.75*c.Score - 0.25*sim - 0.3*o.Avoid[c.ItemID] + o.Favour[c.ItemID]
+			s := 0.75*c.Score - 0.25*sim - 0.3*o.Avoid[c.ItemID] + o.Favour[c.ItemID] + o.Affinity[c.ItemID] - o.Languages.penalty(c.Track)
 			if o.Jitter > 0 {
 				s += o.Jitter * o.rng().Float64()
 			}
@@ -198,11 +271,18 @@ func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 		byArtist[pool[best].ArtistID]++
 		byAlbum[pool[best].AlbumID]++
 	}
-	if o.PerArtist > 0 || o.PerAlbum > 0 {
+	apart := o.PerArtist > 0 || o.PerAlbum > 0
+	if o.Arc {
+		return arcOrder(chosen, v, apart)
+	}
+	if apart {
 		return orderApart(chosen, v)
 	}
 	return order(chosen, v)
 }
+
+// coplayWeight is how much being played together with the track before lifts the next in Flow.
+const coplayWeight = 0.12
 
 // order chains tracks greedily by similarity, starting from the one closest to v (the
 // prompt or mix centre) so the strongest match plays first.

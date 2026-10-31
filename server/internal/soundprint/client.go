@@ -30,9 +30,45 @@ type Analysis struct {
 }
 
 type Health struct {
-	Model  string `json:"model"`
+	Model  string `json:"model"` // the general sound model's analysis id
 	Device string `json:"device"`
 	Dims   int    `json:"dims"`
+	// Models are the sound models the sidecar offers (by name: general, music) and their
+	// analysis ids; Traits is the traits analysis id. Empty from an older sidecar.
+	Models map[string]string `json:"models"`
+	Traits string            `json:"traits"`
+}
+
+// ModelID is the analysis id of a sound model by name ("" when the sidecar doesn't offer it).
+func (h Health) ModelID(name string) string {
+	if id, ok := h.Models[name]; ok {
+		return id
+	}
+	if name == ModelGeneral {
+		return h.Model
+	}
+	return ""
+}
+
+// Traits is what a track is like, 0–1 each (relative: compared across the library).
+type Traits struct {
+	Happy      float64 `json:"happy"`
+	Sad        float64 `json:"sad"`
+	Tender     float64 `json:"tender"`
+	Exciting   float64 `json:"exciting"`
+	Angry      float64 `json:"angry"`
+	Scary      float64 `json:"scary"`
+	Dance      float64 `json:"dance"`
+	Vocal      float64 `json:"vocal"`
+	Electronic float64 `json:"electronic"`
+	Acoustic   float64 `json:"acoustic"`
+	Ambient    float64 `json:"ambient"`
+}
+
+type TraitsResult struct {
+	Path   string `json:"path"`
+	Traits Traits `json:"traits"`
+	Error  string `json:"error"`
 }
 
 func (c *Client) http() *http.Client {
@@ -80,24 +116,35 @@ func (c *Client) Health(ctx context.Context) (Health, error) {
 	return h, json.NewDecoder(resp.Body).Decode(&h)
 }
 
-// Analyze embeds and measures up to 64 files.
-func (c *Client) Analyze(ctx context.Context, paths []string) (string, []Analysis, error) {
+// Analyze embeds and measures up to 64 files with a sound model (ModelGeneral or
+// ModelMusic); without features only the embeddings are made.
+func (c *Client) Analyze(ctx context.Context, paths []string, model string, features bool) (string, []Analysis, error) {
 	var out struct {
 		Model   string     `json:"model"`
 		Results []Analysis `json:"results"`
 	}
-	err := c.post(ctx, "/analyze", map[string]any{"paths": paths}, &out)
+	err := c.post(ctx, "/analyze", map[string]any{"paths": paths, "model": model, "features": features}, &out)
 	return out.Model, out.Results, err
 }
 
-// EmbedText embeds prompts into the same space as tracks.
-func (c *Client) EmbedText(ctx context.Context, texts []string) ([][]float32, error) {
+// Traits measures what up to 64 files are like.
+func (c *Client) Traits(ctx context.Context, paths []string) (string, []TraitsResult, error) {
+	var out struct {
+		Model   string         `json:"model"`
+		Results []TraitsResult `json:"results"`
+	}
+	err := c.post(ctx, "/traits", map[string]any{"paths": paths}, &out)
+	return out.Model, out.Results, err
+}
+
+// EmbedText embeds prompts into the same space as a sound model's tracks.
+func (c *Client) EmbedText(ctx context.Context, texts []string, model string) ([][]float32, error) {
 	var out struct {
 		Embeddings [][]float32 `json:"embeddings"`
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	err := c.post(ctx, "/embed_text", map[string]any{"texts": texts}, &out)
+	err := c.post(ctx, "/embed_text", map[string]any{"texts": texts, "model": model}, &out)
 	return out.Embeddings, err
 }
 

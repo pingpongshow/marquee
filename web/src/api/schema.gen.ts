@@ -4018,6 +4018,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/music/sound-model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Switch to the sound model being tried, or keep the current one (admin only, MUSIC-1). */
+        post: operations["chooseSoundModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ai/status": {
         parameters: {
             query?: never;
@@ -4821,6 +4838,13 @@ export interface components {
              * @description Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured.
              */
             loudnessAnalysis?: boolean;
+            /**
+             * @description The Soundprint sound model: general (all kinds of sound) or music (trained on music alone). Another than the one in use is tried on the library first and compared; switching is then confirmed in Settings (MUSIC-1).
+             * @enum {string}
+             */
+            soundModel?: "general" | "music";
+            /** @description Similar artists and tags from ListenBrainz, and from Last.fm with an API key (MUSIC-15): sends artist and track names and MusicBrainz ids. */
+            communityData?: boolean;
         };
         SecuritySettings: {
             /**
@@ -6262,6 +6286,8 @@ export interface components {
             /** @description Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play). */
             audioOffsetMs?: number;
             profile: components["schemas"]["DeviceProfile"];
+            /** @description What the play was started from, for the music playlist statistics (MUSIC-17): a station's or mix's context (Station.context), or "dj" for a track the DJ wove in. Omit otherwise. */
+            context?: string;
         };
         PlaybackDecision: {
             /** @enum {string} */
@@ -7158,8 +7184,51 @@ export interface components {
             analyzed: number;
             total: number;
             failed?: number;
+            /** @description Tracks done in the current stage of the run. */
             progress?: number;
+            /** @description Tracks in the current stage. */
             runTotal?: number;
+            /** @description The stage of the run when it isn't analysing new tracks: measuring what tracks are like, or trying another sound model. */
+            phase?: string;
+            /**
+             * @description The sound model in use.
+             * @enum {string}
+             */
+            soundModel?: "general" | "music";
+            trial?: components["schemas"]["SoundModelTrial"];
+            /** @description Analysed tracks with traits (how happy, sad, danceable… they sound). */
+            traits?: number;
+            /** @description Analysed tracks whose language was read from their lyrics. */
+            languages?: number;
+        };
+        /** @description Another sound model, chosen in Settings, being tried on the library before switching (MUSIC-1). Once it covers the library, current and tried compare the two. */
+        SoundModelTrial: {
+            /** @enum {string} */
+            model: "general" | "music";
+            analyzed: number;
+            total: number;
+            current?: components["schemas"]["SoundModelScore"];
+            tried?: components["schemas"]["SoundModelScore"];
+            /**
+             * Format: date-time
+             * @description When the comparison was made.
+             */
+            at?: string;
+        };
+        SoundModelScore: {
+            /** @description Of sampled tracks' 10 nearest tracks by sound (other albums), the share sharing one of its genres. */
+            genreMatch: number;
+            /** @description The share someone has played in the same sitting; absent without enough listening history. */
+            playedMatch?: number;
+            /** @description How well the model finds music from words (Muse and the moods depend on it): of the tracks it ranks first for "<genre> music", the share that have that genre. Absent when it couldn't be measured. */
+            textMatch?: number;
+        };
+        SoundModelChoice: {
+            /**
+             * @description switch: use the tried model from now on; keep: stay with the current one (the trial is dropped and Settings set back).
+             * @enum {string}
+             */
+            action: "switch" | "keep";
         };
         RadioRequest: {
             /**
@@ -7180,11 +7249,17 @@ export interface components {
             limit: number;
             /** @description Tracks already queued (to continue a station). */
             exclude?: number[];
+            /** @description Tracks of this station the listener skipped quickly (in the first 30 s, before half way). The station steers away from their sound and holds back artists skipped twice (MUSIC-17). Send them when topping up a station, and top it up early after two quick skips in a row. */
+            skipped?: number[];
+            /** @description Tracks of this station the listener played through. The station steers towards their sound. */
+            finished?: number[];
         };
         Station: {
             id?: string;
             title: string;
             description?: string;
+            /** @description What kind of station or mix this is (e.g. mix:daily, radio:mood, muse). Send it back as PlaybackRequest.context when playing its tracks, for the music playlist statistics (MUSIC-17). */
+            context?: string;
             items: components["schemas"]["ItemSummary"][];
         };
         Download: {
@@ -7255,6 +7330,22 @@ export interface components {
             };
             local: number;
             remote: number;
+            /** @description How the music played from each kind of station and mix went (MUSIC-17), most played first. */
+            playlists?: components["schemas"]["PlaylistStats"][];
+        };
+        PlaylistStats: {
+            /** @example mix:daily */
+            context: string;
+            /** @example Daily Mixes */
+            label: string;
+            plays: number;
+            listeners: number;
+            /** @description Share of plays listened to the end (80% or more). */
+            finished: number;
+            /** @description Share of plays skipped in the first 30 seconds (before half way). */
+            skipped: number;
+            /** @description Tracks favourited within a week of being played from here. */
+            favourited: number;
         };
         StatsCount: {
             /**
@@ -15092,6 +15183,39 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    chooseSoundModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SoundModelChoice"];
+            };
+        };
+        responses: {
+            /** @description Done. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description No other model has finished its trial. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     aiStatus: {

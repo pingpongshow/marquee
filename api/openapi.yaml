@@ -4950,6 +4950,26 @@ paths:
               schema: { $ref: "#/components/schemas/MusicStatus" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /music/sound-model:
+    post:
+      tags: [music]
+      operationId: chooseSoundModel
+      summary: "Switch to the sound model being tried, or keep the current one (admin only, MUSIC-1)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SoundModelChoice" }
+      responses:
+        "204": { description: Done. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: No other model has finished its trial.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /ai/status:
     get:
       tags: [settings]
@@ -5919,6 +5939,8 @@ components:
         onlineLyrics: { type: boolean, description: Look up lyrics on LRCLIB when a track has none (sends artist and title). }
         artistDetails: { type: boolean, description: "Look up artists and albums on MusicBrainz (about one request a second) and artist bios on Wikipedia: styles, solo artist or band, country, active years, album types and labels, for artist pages and Muse." }
         loudnessAnalysis: { type: boolean, deprecated: true, description: "Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured." }
+        soundModel: { type: string, enum: [general, music], description: "The Soundprint sound model: general (all kinds of sound) or music (trained on music alone). Another than the one in use is tried on the library first and compared; switching is then confirmed in Settings (MUSIC-1)." }
+        communityData: { type: boolean, description: "Similar artists and tags from ListenBrainz, and from Last.fm with an API key (MUSIC-15): sends artist and track names and MusicBrainz ids." }
 
     SecuritySettings:
       type: object
@@ -7192,6 +7214,10 @@ components:
           maximum: 30000
           description: "Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play)."
         profile: { $ref: "#/components/schemas/DeviceProfile" }
+        context:
+          type: string
+          maxLength: 64
+          description: "What the play was started from, for the music playlist statistics (MUSIC-17): a station's or mix's context (Station.context), or \"dj\" for a track the DJ wove in. Omit otherwise."
 
     PlaybackDecision:
       type: object
@@ -8066,8 +8092,39 @@ components:
         analyzed: { type: integer }
         total: { type: integer }
         failed: { type: integer }
-        progress: { type: integer }
-        runTotal: { type: integer }
+        progress: { type: integer, description: Tracks done in the current stage of the run. }
+        runTotal: { type: integer, description: Tracks in the current stage. }
+        phase: { type: string, description: "The stage of the run when it isn't analysing new tracks: measuring what tracks are like, or trying another sound model." }
+        soundModel: { type: string, enum: [general, music], description: The sound model in use. }
+        trial: { $ref: "#/components/schemas/SoundModelTrial" }
+        traits: { type: integer, description: "Analysed tracks with traits (how happy, sad, danceable… they sound)." }
+        languages: { type: integer, description: Analysed tracks whose language was read from their lyrics. }
+
+    SoundModelTrial:
+      type: object
+      description: "Another sound model, chosen in Settings, being tried on the library before switching (MUSIC-1). Once it covers the library, current and tried compare the two."
+      required: [model, analyzed, total]
+      properties:
+        model: { type: string, enum: [general, music] }
+        analyzed: { type: integer }
+        total: { type: integer }
+        current: { $ref: "#/components/schemas/SoundModelScore" }
+        tried: { $ref: "#/components/schemas/SoundModelScore" }
+        at: { type: string, format: date-time, description: When the comparison was made. }
+
+    SoundModelScore:
+      type: object
+      required: [genreMatch]
+      properties:
+        genreMatch: { type: number, description: "Of sampled tracks' 10 nearest tracks by sound (other albums), the share sharing one of its genres." }
+        playedMatch: { type: number, description: "The share someone has played in the same sitting; absent without enough listening history." }
+        textMatch: { type: number, description: "How well the model finds music from words (Muse and the moods depend on it): of the tracks it ranks first for \"<genre> music\", the share that have that genre. Absent when it couldn't be measured." }
+
+    SoundModelChoice:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [switch, keep], description: "switch: use the tried model from now on; keep: stay with the current one (the trial is dropped and Settings set back)." }
 
     RadioRequest:
       type: object
@@ -8082,6 +8139,14 @@ components:
           type: array
           description: Tracks already queued (to continue a station).
           items: { type: integer, format: int64 }
+        skipped:
+          type: array
+          description: "Tracks of this station the listener skipped quickly (in the first 30 s, before half way). The station steers away from their sound and holds back artists skipped twice (MUSIC-17). Send them when topping up a station, and top it up early after two quick skips in a row."
+          items: { type: integer, format: int64 }
+        finished:
+          type: array
+          description: Tracks of this station the listener played through. The station steers towards their sound.
+          items: { type: integer, format: int64 }
 
     Station:
       type: object
@@ -8090,6 +8155,7 @@ components:
         id: { type: string }
         title: { type: string }
         description: { type: string }
+        context: { type: string, description: "What kind of station or mix this is (e.g. mix:daily, radio:mood, muse). Send it back as PlaybackRequest.context when playing its tracks, for the music playlist statistics (MUSIC-17)." }
         items:
           type: array
           items: { $ref: "#/components/schemas/ItemSummary" }
@@ -8159,6 +8225,22 @@ components:
             transcode: { type: integer }
         local: { type: integer }
         remote: { type: integer }
+        playlists:
+          type: array
+          description: How the music played from each kind of station and mix went (MUSIC-17), most played first.
+          items: { $ref: "#/components/schemas/PlaylistStats" }
+
+    PlaylistStats:
+      type: object
+      required: [context, label, plays, listeners, finished, skipped, favourited]
+      properties:
+        context: { type: string, example: "mix:daily" }
+        label: { type: string, example: Daily Mixes }
+        plays: { type: integer }
+        listeners: { type: integer }
+        finished: { type: number, description: Share of plays listened to the end (80% or more). }
+        skipped: { type: number, description: Share of plays skipped in the first 30 seconds (before half way). }
+        favourited: { type: integer, description: Tracks favourited within a week of being played from here. }
 
     StatsCount:
       type: object

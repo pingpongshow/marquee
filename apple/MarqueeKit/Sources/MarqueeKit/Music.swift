@@ -93,6 +93,66 @@ public extension AppSession {
     }
 }
 
+/// What the listener does with a radio's tracks (MUSIC-17), sent with every top-up so the
+/// station steers away from quick skips and towards what's played through.
+public struct RadioSteering: Sendable, Equatable {
+    /// The latest of each kind that are sent.
+    public static let keep = 100
+    public private(set) var skipped: [Int64] = []
+    public private(set) var finished: [Int64] = []
+    /// Quick skips in a row; two top the station up early.
+    public private(set) var skipsInARow = 0
+
+    public init() {}
+
+    /// Moved on in the first 30 seconds and before half way (the server's definition).
+    public static func isQuickSkip(at time: Double, duration: Double) -> Bool {
+        time < 30 && (duration <= 0 || time < duration / 2)
+    }
+
+    /// Reached 80% of the track.
+    public static func isPlayedThrough(at time: Double, duration: Double) -> Bool {
+        duration > 0 && time >= duration * 0.8
+    }
+
+    /// The listener moved on from a track at `time`. Returns true after two quick skips in a
+    /// row: time to top the station up early with what it has learnt.
+    public mutating func movedOn(from id: Int64, at time: Double, duration: Double) -> Bool {
+        if Self.isPlayedThrough(at: time, duration: duration) {
+            finish(id)
+            return false
+        }
+        // Skipped part-way: not a quick skip, so the run of them is broken.
+        guard Self.isQuickSkip(at: time, duration: duration) else { skipsInARow = 0; return false }
+        Self.note(id, in: &skipped, dropFrom: &finished)
+        skipsInARow += 1
+        return skipsInARow >= 2
+    }
+
+    /// A track played through (80%, or to its end).
+    public mutating func finish(_ id: Int64) {
+        Self.note(id, in: &finished, dropFrom: &skipped)
+        skipsInARow = 0
+    }
+
+    /// The station was topped up early: the skips so far have been answered.
+    public mutating func toppedUp() { skipsInARow = 0 }
+
+    /// Adds what's been learnt to a top-up request.
+    public func apply(to r: inout RadioRequest) {
+        r.skipped = skipped.isEmpty ? nil : skipped
+        r.finished = finished.isEmpty ? nil : finished
+    }
+
+    /// Latest last, each track once and in one list only (the listener's last word counts).
+    private static func note(_ id: Int64, in list: inout [Int64], dropFrom other: inout [Int64]) {
+        other.removeAll { $0 == id }
+        list.removeAll { $0 == id }
+        list.append(id)
+        if list.count > keep { list.removeFirst(list.count - keep) }
+    }
+}
+
 /// The moods offered as stations (same as the web client).
 public let musicMoods = ["Chill", "Energetic", "Focus", "Melancholy", "Party", "Romantic", "Dreamy", "Aggressive"]
 

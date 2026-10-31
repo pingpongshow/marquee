@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -r
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py idle.py ./
+COPY app.py idle.py traits.py ./
 ENV HF_HOME=/models HF_HUB_DISABLE_TELEMETRY=1 PYTHONUNBUFFERED=1 NUMBA_CACHE_DIR=/tmp/numba MPLCONFIGDIR=/tmp/mpl
 EXPOSE 32501
 CMD ["uvicorn", "app:app", "--host", "127.0.0.1", "--port", "32501", "--workers", "1"]

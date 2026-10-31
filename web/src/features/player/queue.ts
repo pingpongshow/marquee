@@ -1,8 +1,14 @@
 import type { ItemSummary } from "@/api/types";
 
 /** One queue slot. The key keeps duplicates of the same track distinct. */
-/** dj marks a track the DJ wove in (MUSIC-6). */
-export type Entry = { key: number; item: ItemSummary; dj?: string };
+/** dj marks a track the DJ wove in (MUSIC-6); ctx is the station or mix it came from
+ * (Station.context), sent with its play for the playlist statistics (MUSIC-17). */
+export type Entry = {
+  key: number;
+  item: ItemSummary;
+  dj?: string;
+  ctx?: string;
+};
 export type Repeat = "off" | "all" | "one";
 
 /**
@@ -26,8 +32,17 @@ export const emptyQueue: Queue = {
 };
 
 let nextKey = 1;
-const wrap = (items: ItemSummary[], dj?: string): Entry[] =>
-  items.map((item) => ({ key: nextKey++, item, ...(dj ? { dj } : {}) }));
+const wrap = (items: ItemSummary[], dj?: string, ctx?: string): Entry[] =>
+  items.map((item) => ({
+    key: nextKey++,
+    item,
+    ...(dj ? { dj } : {}),
+    ...(ctx ? { ctx } : {}),
+  }));
+
+/** The context a play of the entry reports: "dj" for the DJ's picks, else its station's. */
+export const playContext = (e: Entry): string | undefined =>
+  e.dj ? "dj" : e.ctx;
 
 function shuffled<T>(list: T[], random = Math.random): T[] {
   const out = [...list];
@@ -50,8 +65,9 @@ export function load(
   start = 0,
   shuffle = false,
   random = Math.random,
+  ctx?: string,
 ): Queue {
-  const entries = wrap(items);
+  const entries = wrap(items, undefined, ctx);
   if (!entries.length) return { ...emptyQueue, repeat: q.repeat };
   if (!shuffle)
     return {
@@ -111,14 +127,53 @@ export function playNext(q: Queue, items: ItemSummary[], dj?: string): Queue {
   return { ...q, entries, original };
 }
 
-export function append(q: Queue, items: ItemSummary[]): Queue {
-  if (q.index < 0) return load(q, items);
-  const add = wrap(items);
+export function append(q: Queue, items: ItemSummary[], ctx?: string): Queue {
+  if (q.index < 0) return load(q, items, 0, false, Math.random, ctx);
+  const add = wrap(items, undefined, ctx);
   return {
     ...q,
     entries: [...q.entries, ...add],
     original: q.original ? [...q.original, ...add] : null,
   };
+}
+
+/**
+ * Replaces a station's upcoming tracks (after the current one, those from the station) with
+ * new ones: a radio steered after skips (MUSIC-17). Tracks queued by hand or by the DJ stay.
+ */
+export function replaceUpcoming(
+  q: Queue,
+  items: ItemSummary[],
+  ctx: string,
+): Queue {
+  if (q.index < 0) return load(q, items, 0, false, Math.random, ctx);
+  const fromStation = (e: Entry) => e.ctx === ctx && !e.dj;
+  const kept = q.entries.slice(q.index + 1).filter((e) => !fromStation(e));
+  const add = wrap(items, undefined, ctx);
+  const entries = [...q.entries.slice(0, q.index + 1), ...kept, ...add];
+  const upcoming = new Set(q.entries.slice(q.index + 1).filter(fromStation));
+  return {
+    ...q,
+    entries,
+    original: q.original
+      ? [...q.original.filter((e) => !upcoming.has(e)), ...add]
+      : null,
+  };
+}
+
+/**
+ * How a station's track went when the listener left it (MUSIC-17): "finished" when played
+ * to 80% (or the end), "skipped" when left in the first 30 s and before half way, else null.
+ */
+export function departure(
+  positionS: number,
+  durationS: number,
+): "finished" | "skipped" | null {
+  if (durationS > 0 && positionS >= Math.min(durationS * 0.8, durationS - 2))
+    return "finished";
+  if (positionS < Math.min(30, durationS > 0 ? durationS / 2 : 30))
+    return "skipped";
+  return null;
 }
 
 export function remove(q: Queue, key: number): Queue {

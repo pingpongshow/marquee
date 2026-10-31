@@ -8,6 +8,7 @@ import { Alert, Card, Select, Spinner } from "@/components/ui";
 
 type Stats = components["schemas"]["Stats"];
 type Count = components["schemas"]["StatsCount"];
+type PlaylistStats = components["schemas"]["PlaylistStats"];
 
 const periods = [
   { days: 7, label: "Last 7 days" },
@@ -78,6 +79,7 @@ export function StatsView({ admin }: { admin: boolean }) {
             <TopList title="Apps" items={s.platforms.map((p) => ({ ...p, title: platformName(p.title) }))} />
             <Delivery s={s} />
           </div>
+          {!!s.playlists?.length && <Playlists rows={s.playlists} />}
         </>
       )}
     </div>
@@ -192,6 +194,43 @@ function Delivery({ s }: { s: Stats }) {
         <p className="text-sm text-muted">
           {Math.round((s.local / net) * 100)}% at home, {Math.round((s.remote / net) * 100)}% away (over Tailscale).
         </p>
+      </div>
+    </Card>
+  );
+}
+
+/** How the music from each kind of station and mix went (MUSIC-17): a high skip rate shows a
+ * kind that misses. */
+function Playlists({ rows }: { rows: PlaylistStats[] }) {
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  return (
+    <Card
+      title="Music playlists"
+      description="Plays from each kind of radio and mix: how many were listened to the end, how many were skipped in the first 30 seconds, and the tracks favourited within a week of playing from it."
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[32rem] text-left text-sm">
+          <thead className="text-xs text-muted">
+            <tr>
+              <th className="py-1.5 font-medium">From</th>
+              <th className="py-1.5 text-right font-medium">Plays</th>
+              <th className="py-1.5 text-right font-medium">To the end</th>
+              <th className="py-1.5 text-right font-medium">Skipped</th>
+              <th className="py-1.5 text-right font-medium">Favourited</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.context} className="border-t border-border">
+                <td className="py-1.5">{r.label}</td>
+                <td className="py-1.5 text-right tabular-nums">{r.plays.toLocaleString()}</td>
+                <td className="py-1.5 text-right tabular-nums">{pct(r.finished)}</td>
+                <td className="py-1.5 text-right tabular-nums">{pct(r.skipped)}</td>
+                <td className="py-1.5 text-right tabular-nums">{r.favourited.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </Card>
   );

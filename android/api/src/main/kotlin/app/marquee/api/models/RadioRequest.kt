@@ -37,6 +37,8 @@ import kotlinx.serialization.Contextual
  * @param libraryId 
  * @param limit 
  * @param exclude Tracks already queued (to continue a station).
+ * @param skipped Tracks of this station the listener skipped quickly (in the first 30 s, before half way). The station steers away from their sound and holds back artists skipped twice (MUSIC-17). Send them when topping up a station, and top it up early after two quick skips in a row.
+ * @param finished Tracks of this station the listener played through. The station steers towards their sound.
  */
 @Serializable
 
@@ -62,7 +64,15 @@ data class RadioRequest (
 
     /* Tracks already queued (to continue a station). */
     @SerialName(value = "exclude")
-    val exclude: kotlin.collections.List<kotlin.Long>? = null
+    val exclude: kotlin.collections.List<kotlin.Long>? = null,
+
+    /* Tracks of this station the listener skipped quickly (in the first 30 s, before half way). The station steers away from their sound and holds back artists skipped twice (MUSIC-17). Send them when topping up a station, and top it up early after two quick skips in a row. */
+    @SerialName(value = "skipped")
+    val skipped: kotlin.collections.List<kotlin.Long>? = null,
+
+    /* Tracks of this station the listener played through. The station steers towards their sound. */
+    @SerialName(value = "finished")
+    val finished: kotlin.collections.List<kotlin.Long>? = null
 
 ) {
 

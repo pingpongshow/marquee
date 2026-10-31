@@ -30,9 +30,12 @@ import kotlinx.coroutines.withContext
  * music extras (M6.5): stations that keep going, the DJ, a sleep timer and ratings.
  */
 class MusicController(private val context: Context, private val marquee: Marquee) {
-    /** A queued track; dj names the DJ that wove it in. */
+    /**
+     * A queued track; dj names the DJ that wove it in. context is what it was started from, for
+     * the playlist statistics (MUSIC-17); radio marks a track the playing radio added itself.
+     */
     data class Now(val id: Long, val title: String, val artist: String, val album: String, val artwork: Uri?, val dj: String? = null, val albumId: Long? = null,
-        val audio: app.marquee.api.models.AudioFormat? = null, val favorite: Boolean? = null)
+        val audio: app.marquee.api.models.AudioFormat? = null, val favorite: Boolean? = null, val context: String? = null, val radio: Boolean = false)
 
     /** DJ modes (MUSIC-6): a pick every few of your own tracks. */
     enum class DJ(val label: String, val mode: MusicDJRequest.Mode, val blurb: String) {
@@ -93,6 +96,24 @@ class MusicController(private val context: Context, private val marquee: Marquee
     /** Set while a station plays: it asks for more before the queue runs out. */
     private var radio: RadioRequest? = null
     private var refilling = false
+    /** The playing station's context, which its top-ups keep (MUSIC-17). */
+    private var stationContext: String? = null
+    /** What the listener skipped and played through on the playing radio (MUSIC-17). */
+    private var steering = RadioSteering()
+    /** Set while an early top-up (after quick skips) is on its way. */
+    private var steeringNow = false
+    // Bumped when a new queue starts and when an early top-up begins: a top-up that was
+    // overtaken by either is dropped.
+    private var queueGen = 0
+    private var steerGen = 0
+    /** The playing track, how far it got and how long it is, and whether it counted as played through. */
+    private var playingNow: Now? = null
+    private var heardMs = 0L
+    private var heardDur = 0L
+    private var heardThrough = false
+    /** Why the player last moved to another track; and that the Cast receiver finished one. */
+    private var transitionReason = -1
+    private var castEnded = false
     private var djCount = 0
     private var djBusy = false
     private var lastId: Long? = null
@@ -117,6 +138,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
         c.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) = sync(player, events.contains(Player.EVENT_TIMELINE_CHANGED))
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
+                // Comes before onEvents, so sync knows how the last track left.
+                transitionReason = reason
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && _sleep.value == Sleep.EndOfTrack) {
                     c.pause()
                     _sleep.value = null
@@ -138,6 +161,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
             while (_playing.value || casting) {
                 if (casting) _position.value = marquee.cast.position.value
                 else controller?.let { _position.value = it.currentPosition to it.duration.coerceAtLeast(0) }
+                heard(_position.value.first, _position.value.second)
                 (_sleep.value as? Sleep.At)?.let {
                     if (System.currentTimeMillis() >= it.epochMs) {
                         if (casting) marquee.cast.pause() else controller?.pause()
@@ -153,11 +177,12 @@ class MusicController(private val context: Context, private val marquee: Marquee
         val m = item.mediaMetadata
         return Now(item.mediaId.toLongOrNull() ?: 0, m.title?.toString() ?: "", m.artist?.toString() ?: "", m.albumTitle?.toString() ?: "", m.artworkUri,
             m.extras?.getString("dj"), m.extras?.getLong("album", 0L)?.takeIf { it > 0 }, AudioQuality.from(m.extras),
-            m.extras?.takeIf { it.containsKey("favorite") }?.getBoolean("favorite"))
+            m.extras?.takeIf { it.containsKey("favorite") }?.getBoolean("favorite"), m.extras?.getString("context"), m.extras?.getBoolean("radio") == true)
     }
 
     private fun sync(p: Player, queueChanged: Boolean) {
         val cur = p.currentMediaItem?.let(::meta)
+        val prevIndex = _index.value
         _now.value = cur
         if (!casting) {
             _playing.value = p.isPlaying
@@ -171,8 +196,45 @@ class MusicController(private val context: Context, private val marquee: Marquee
         _repeat.value = p.repeatMode
         if (cur?.id != lastId) {
             lastId = cur?.id
+            left(p, prevIndex)
+            playingNow = cur
+            heardMs = 0
+            heardDur = p.currentMediaItem?.mediaMetadata?.durationMs ?: 0
+            heardThrough = false
             if (cur != null) onNewTrack(p, cur)
         }
+        // While casting, the receiver's position comes in through tick.
+        if (!casting) heard(p.currentPosition, p.duration.coerceAtLeast(0))
+    }
+
+    /** Keeps how far the playing track got, and counts a radio's track as played through at 80% (MUSIC-17). */
+    private fun heard(positionMs: Long, durationMs: Long) {
+        val cur = playingNow ?: return
+        // Just after a change of track the receiver may still report the last one: its length gives it away.
+        if (casting && heardDur > 0 && durationMs > 0 && kotlin.math.abs(durationMs - heardDur) > 2000) return
+        heardMs = positionMs
+        if (durationMs > 0) heardDur = durationMs
+        if (!heardThrough && cur.radio && radio != null && RadioSteering.playedThrough(heardMs, heardDur)) {
+            heardThrough = true
+            steering.finished(cur.id)
+        }
+    }
+
+    /**
+     * The radio's track that was playing has left the player: played through, or skipped
+     * quickly. Two quick skips in a row top the station up early. Going back, or a new queue,
+     * doesn't count.
+     */
+    private fun left(p: Player, prevIndex: Int) {
+        val prev = playingNow
+        val reason = transitionReason.also { transitionReason = -1 }
+        val natural = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || castEnded
+        castEnded = false
+        if (prev == null || !prev.radio || radio == null) return
+        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) return
+        val forward = natural || p.previousMediaItemIndex == prevIndex || (!p.shuffleModeEnabled && p.currentMediaItemIndex > prevIndex)
+        if (!forward) return
+        if (steering.left(prev.id, heardMs, heardDur, natural)) topUpEarly()
     }
 
     private fun onNewTrack(p: Player, cur: Now) {
@@ -197,23 +259,27 @@ class MusicController(private val context: Context, private val marquee: Marquee
         }
     }
 
-    private fun mediaItem(t: ItemSummary, dj: String? = null): MediaItem = trackItem(marquee, t, dj)
+    private fun mediaItem(t: ItemSummary, dj: String? = null, context: String? = null, radio: Boolean = false): MediaItem =
+        trackItem(marquee, t, dj, context, radio)
 
-    /** Plays tracks from start (at startMs into it); source names what's playing (an album or playlist). */
-    fun play(tracks: List<ItemSummary>, start: Int, source: String? = null, startMs: Long = 0) = start(tracks, start, source, null, startMs)
+    /**
+     * Plays tracks from start (at startMs into it); source names what's playing (an album or
+     * playlist). context is the station they came from, when they did (MUSIC-17).
+     */
+    fun play(tracks: List<ItemSummary>, start: Int, source: String? = null, startMs: Long = 0, context: String? = null) =
+        start(tracks, start, source, null, startMs, context)
 
     /** Plays a generated station; with a radio request it keeps topping itself up. */
-    fun playStation(station: Station, radio: RadioRequest? = null) = start(station.items, 0, station.title, radio)
+    fun playStation(station: Station, radio: RadioRequest? = null) = start(station.items, 0, station.title, radio, context = station.context)
 
-    private fun start(tracks: List<ItemSummary>, start: Int, source: String?, radio: RadioRequest?, startMs: Long = 0) {
+    private fun start(tracks: List<ItemSummary>, start: Int, source: String?, radio: RadioRequest?, startMs: Long = 0, context: String? = null) {
         if (tracks.isEmpty()) return
         _source.value = source
-        this.radio = radio
-        djCount = 0
+        newQueue(radio, context)
         scope.launch(Dispatchers.Main) {
             val c = connect()
             val index = start.coerceIn(0, tracks.size - 1)
-            c.setMediaItems(tracks.map { mediaItem(it) }, index, startMs.coerceAtLeast(0))
+            c.setMediaItems(tracks.map { mediaItem(it, context = context, radio = radio != null) }, index, startMs.coerceAtLeast(0))
             // While casting (or with a device connected and idle) the new queue plays there.
             if (casting || beginCasting()) castTrack(index, startMs.coerceAtLeast(0))
             else { c.prepare(); c.play() }
@@ -223,8 +289,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
     /** Plays the best match for a spoken or typed search (MusicLibrary resolves it). */
     fun playFromSearch(query: String) = with { c ->
         _source.value = null
-        radio = null
-        djCount = 0
+        newQueue(null, null)
         val item = MediaItem.Builder().setMediaId("search")
             .setRequestMetadata(MediaItem.RequestMetadata.Builder().setSearchQuery(query).build()).build()
         c.setMediaItems(listOf(item))
@@ -240,19 +305,62 @@ class MusicController(private val context: Context, private val marquee: Marquee
         playStation(st, r)
     }
 
-    /** Continues a station when fewer than five tracks are left. */
+    /** A new queue: its station (if any) and context, with nothing skipped or played on it yet. */
+    private fun newQueue(radio: RadioRequest?, context: String?) {
+        this.radio = radio
+        stationContext = context
+        steering = RadioSteering()
+        queueGen++
+        djCount = 0
+    }
+
+    /** Continues a station when fewer than five tracks are left, steered by what was skipped and played through. */
     private fun topUpRadio(p: Player) {
         val r = radio ?: return
-        if (refilling || p.mediaItemCount - p.currentMediaItemIndex > 5) return
+        if (refilling || steeringNow || p.mediaItemCount - p.currentMediaItemIndex > 5) return
         refilling = true
         val exclude = _queue.value.map { it.id }
-        val title = _source.value
+        val gens = queueGen to steerGen
         scope.launch {
-            val st = withContext(Dispatchers.IO) { runCatching { marquee.music.musicRadio(r.copy(exclude = exclude, limit = 25)) }.getOrNull() }
+            val st = withContext(Dispatchers.IO) { runCatching { marquee.music.musicRadio(steering.request(r, exclude)) }.getOrNull() }
             refilling = false
-            if (st == null || _source.value != title) return@launch
+            if (st == null || gens != queueGen to steerGen) return@launch
             val fresh = st.items.filter { it.id !in exclude }
-            if (fresh.isNotEmpty()) controller?.addMediaItems(fresh.map { mediaItem(it) })
+            if (fresh.isNotEmpty()) controller?.addMediaItems(fresh.map { mediaItem(it, context = stationContext ?: st.context, radio = true) })
+        }
+    }
+
+    /**
+     * After two quick skips in a row: asks the station again now, steered away from them, and
+     * puts its answer in place of the station's own tracks after the current one. Tracks queued
+     * by hand and DJ picks stay.
+     */
+    private fun topUpEarly() {
+        val r = radio ?: return
+        if (steeringNow) return
+        steeringNow = true
+        steerGen++
+        steering.toppedUp()
+        val exclude = _queue.value.map { it.id }
+        val gen = queueGen
+        scope.launch {
+            val st = withContext(Dispatchers.IO) { runCatching { marquee.music.musicRadio(steering.request(r, exclude)) }.getOrNull() }
+            steeringNow = false
+            val c = controller ?: return@launch
+            if (st == null || gen != queueGen) return@launch
+            val fresh = st.items.filter { it.id !in exclude }
+            if (fresh.isEmpty()) return@launch
+            // From the end back, removing each run of the station's entries in one go.
+            val at = c.currentMediaItemIndex
+            var i = c.mediaItemCount - 1
+            while (i > at) {
+                if (!meta(c.getMediaItemAt(i)).radio) { i--; continue }
+                var from = i
+                while (from - 1 > at && meta(c.getMediaItemAt(from - 1)).radio) from--
+                c.removeMediaItems(from, i + 1)
+                i = from - 1
+            }
+            c.addMediaItems(fresh.map { mediaItem(it, context = stationContext ?: st.context, radio = true) })
         }
     }
 
@@ -281,10 +389,9 @@ class MusicController(private val context: Context, private val marquee: Marquee
     fun attach() { scope.launch { connect() } }
 
     /** Takes over a queue started outside the app: its name and, for a station, how to continue it. */
-    fun adopt(source: String?, radio: RadioRequest?) = scope.launch {
+    fun adopt(source: String?, radio: RadioRequest?, context: String? = null) = scope.launch {
         _source.value = source
-        this@MusicController.radio = radio
-        djCount = 0
+        newQueue(radio, context)
     }
 
     private val _showQuality = MutableStateFlow(prefs.getBoolean("showQuality", false))
@@ -402,7 +509,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
         c.pause()
         marquee.cast.onFinished = {
             // The sleep timer's "end of track" stops the receiver here instead of moving on.
-            if (_sleep.value == Sleep.EndOfTrack) _sleep.value = null else castNext()
+            if (_sleep.value == Sleep.EndOfTrack) _sleep.value = null else castNext(ended = true)
         }
         tick()
         return true
@@ -413,15 +520,17 @@ class MusicController(private val context: Context, private val marquee: Marquee
         if (index !in 0 until c.mediaItemCount) return
         val t = meta(c.getMediaItemAt(index))
         scope.launch {
-            val error = marquee.cast.load(t.id, at, t.title, t.artist.ifBlank { null }, t.artwork?.toString(), music = true)
+            val error = marquee.cast.load(t.id, at, t.title, t.artist.ifBlank { null }, t.artwork?.toString(), music = true, context = t.context)
             if (error != null) android.widget.Toast.makeText(context, "Couldn't play on the Cast device: $error", android.widget.Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun castNext() {
+    /** Moves the receiver on; ended when it finished the track (so it counts as played through). */
+    private fun castNext(ended: Boolean = false) {
         val c = controller ?: return
         val n = c.nextMediaItemIndex
         if (n == C.INDEX_UNSET) { marquee.cast.pause(); return }
+        castEnded = ended
         c.seekTo(n, 0)
         castTrack(n, 0)
     }
@@ -435,7 +544,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
         }
     }
     fun stop() = with {
-        radio = null
+        newQueue(null, null)
         _sleep.value = null
         it.stop()
         it.clearMediaItems()

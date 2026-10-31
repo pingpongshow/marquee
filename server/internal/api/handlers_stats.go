@@ -46,6 +46,14 @@ func (h *Handlers) GetStats(ctx context.Context, req GetStatsRequestObject) (Get
 		People: list(r.People), Platforms: list(r.Platforms), Local: r.Local, Remote: r.Remote,
 	}
 	out.Methods.DirectPlay, out.Methods.DirectStream, out.Methods.Transcode = r.Methods["direct_play"], r.Methods["direct_stream"], r.Methods["transcode"]
+	if len(r.Playlists) > 0 {
+		pl := make([]PlaylistStats, len(r.Playlists))
+		for i, p := range r.Playlists {
+			pl[i] = PlaylistStats{Context: p.Context, Label: p.Label, Plays: p.Plays, Listeners: p.Listeners,
+				Finished: float32(p.Finished), Skipped: float32(p.Skipped), Favourited: p.Favourited}
+		}
+		out.Playlists = &pl
+	}
 	if !r.Since.IsZero() {
 		out.Since = &r.Since
 	}

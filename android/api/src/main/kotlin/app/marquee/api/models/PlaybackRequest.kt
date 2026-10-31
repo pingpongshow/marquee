@@ -44,6 +44,7 @@ import kotlinx.serialization.Contextual
  * @param preload Prepare the next item (gapless music) without ending this device's current session. It takes over when it first reports \"playing\".
  * @param subtitleOffsetMs Subtitle timing (PLAY-17), ms; positive shows subtitles later. Omit both offsets to use what this user last chose for this file; values sent are remembered.
  * @param audioOffsetMs Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play).
+ * @param context What the play was started from, for the music playlist statistics (MUSIC-17): a station's or mix's context (Station.context), or \"dj\" for a track the DJ wove in. Omit otherwise.
  */
 @Serializable
 
@@ -92,7 +93,11 @@ data class PlaybackRequest (
 
     /* Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play). */
     @SerialName(value = "audioOffsetMs")
-    val audioOffsetMs: kotlin.Int? = null
+    val audioOffsetMs: kotlin.Int? = null,
+
+    /* What the play was started from, for the music playlist statistics (MUSIC-17): a station's or mix's context (Station.context), or \"dj\" for a track the DJ wove in. Omit otherwise. */
+    @SerialName(value = "context")
+    val context: kotlin.String? = null
 
 ) {
 

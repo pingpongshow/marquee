@@ -28,7 +28,8 @@ export type { Levelling } from "./levelling";
 export type DJMode = "wander" | "superfan" | "deep_cuts" | "same_era";
 /** Older stored DJ mode names, carried over to the current ones. */
 const legacyDJ: Record<string, DJMode> = { stretch: "wander", groupie: "superfan", contempo: "same_era" };
-export type Source = { title: string; radio?: RadioRequest };
+/** context is the station's or mix's Station.context, sent with each play (MUSIC-17). */
+export type Source = { title: string; radio?: RadioRequest; context?: string };
 
 /** Player state that changes on track/queue/setting changes, not with the playhead. */
 type State = {
@@ -60,7 +61,7 @@ type Time = { time: number; duration: number };
 type Actions = {
   /** Plays a generated station; radios top themselves up as they play. */
   playStation: (
-    station: { title: string; items: ItemSummary[] },
+    station: { title: string; items: ItemSummary[]; context?: string },
     radio?: RadioRequest,
   ) => void;
   setCrossfade: (s: number) => void;
@@ -178,10 +179,17 @@ function stopSession(id: string | undefined) {
     }).catch(() => {});
 }
 
-async function openSession(item: ItemSummary, preload: boolean) {
+async function openSession(entry: Q.Entry, preload: boolean) {
+  const context = Q.playContext(entry);
   return unwrap(
     api.POST("/playback/sessions", {
-      body: { itemId: item.id, profile: deviceProfile(), startMs: 0, preload },
+      body: {
+        itemId: entry.item.id,
+        profile: deviceProfile(),
+        startMs: 0,
+        preload,
+        ...(context ? { context } : {}),
+      },
     }),
   );
 }
@@ -436,7 +444,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       const gen = ++loadGen.current[i]!;
       let s;
       try {
-        s = await openSession(entry.item, preload);
+        s = await openSession(entry, preload);
       } catch (e) {
         if (loadGen.current[i] !== gen) return false;
         throw e;
@@ -521,26 +529,71 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     // Volume is applied separately; only a track change restarts playback.
   }, [curKey, loadInto, unload, activeEl, ensureGraph, applyGain, skipFailed]);
 
-  // Stations keep going: fetch more when the end of the queue gets close.
+  // Steering (MUSIC-17): the station's tracks skipped quickly and played through so far,
+  // sent with every top-up so the station moves towards what's liked; two quick skips in a
+  // row top it up early, replacing what was coming.
   const refilling = useRef(false);
-  useEffect(() => {
-    const radio = source?.radio;
-    if (!radio || refilling.current || queue.entries.length - queue.index > 5)
-      return;
-    refilling.current = true;
-    const exclude = queue.entries.map((e) => e.item.id);
-    unwrap(api.POST("/music/radio", { body: { ...radio, exclude, limit: 25 } }))
-      .then((st) =>
-        setQueue((q) =>
-          Q.append(
-            q,
-            st.items.filter((t) => !exclude.includes(t.id)),
-          ),
-        ),
+  const steer = useRef({ skipped: [] as number[], finished: [] as number[], inARow: 0 });
+  const resetSteer = () => (steer.current = { skipped: [], finished: [], inARow: 0 });
+  const refill = useCallback(
+    (replace: boolean) => {
+      const radio = source?.radio;
+      if (!radio || refilling.current) return;
+      refilling.current = true;
+      const q = queueRef.current;
+      const exclude = q.entries.map((e) => e.item.id);
+      const { skipped, finished } = steer.current;
+      const ctx = source?.context ?? "";
+      unwrap(
+        api.POST("/music/radio", {
+          body: {
+            ...radio,
+            exclude,
+            limit: 25,
+            skipped: skipped.slice(-100),
+            finished: finished.slice(-100),
+          },
+        }),
       )
-      .catch(() => {})
-      .finally(() => (refilling.current = false));
-  }, [queue, source]);
+        .then((st) => {
+          const fresh = st.items.filter((t) => !exclude.includes(t.id));
+          if (replace) {
+            unload(1 - active.current); // the preloaded next track is being replaced
+            setQueue((cq) => Q.replaceUpcoming(cq, fresh, ctx));
+          } else setQueue((cq) => Q.append(cq, fresh, ctx || undefined));
+        })
+        .catch(() => {})
+        .finally(() => (refilling.current = false));
+    },
+    [source, unload],
+  );
+  // Stations keep going: fetch more when the end of the queue gets close.
+  useEffect(() => {
+    if (!source?.radio || queue.entries.length - queue.index > 5) return;
+    refill(false);
+  }, [queue, source, refill]);
+  // How the last station track went, read when the listener moves on from it. Declared
+  // before the progress effect below, so it still sees the previous track's progress.
+  const progress = useRef<{ entry?: Q.Entry; time: number; duration: number }>({ time: 0, duration: 0 });
+  useEffect(() => {
+    const { entry, time: t, duration: d } = progress.current;
+    if (!source?.radio || !entry || entry.key === curKey || entry.dj || !entry.ctx) return;
+    const how = Q.departure(t, d);
+    const st = steer.current;
+    if (how === "finished") {
+      st.finished.push(entry.item.id);
+      st.inARow = 0;
+    } else if (how === "skipped") {
+      st.skipped.push(entry.item.id);
+      if (++st.inARow >= 2) {
+        st.inARow = 0;
+        refill(true);
+      }
+    }
+  }, [curKey, source, refill]);
+  useEffect(() => {
+    progress.current = { entry: cur, time, duration };
+  }, [cur, time, duration]);
 
   // DJ: after every few of your tracks, weave one in from the DJ.
   const djCount = useRef(0);
@@ -650,6 +703,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     preloadFailed.current.clear();
     setQueue(Q.emptyQueue);
     setSource(undefined);
+    resetSteer();
     setSleep(null);
     setExpanded(false);
     setPlaying(false);
@@ -841,8 +895,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     () => ({
       playStation: (station, radio) => {
         unload(1 - active.current);
-        setSource({ title: station.title, radio });
-        setQueue((q) => Q.load(q, station.items, 0));
+        resetSteer();
+        setSource({ title: station.title, radio, context: station.context });
+        setQueue((q) => Q.load(q, station.items, 0, false, Math.random, station.context));
       },
       setCrossfade: (s) => {
         setCrossfadeState(s);
@@ -869,6 +924,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       play: (tracks, start = 0, opts) => {
         unload(1 - active.current);
         setSource(opts?.source ? { title: opts.source } : undefined);
+        resetSteer();
         setQueue((q) => Q.load(q, tracks, start, opts?.shuffle));
       },
       playNext: (tracks) => {

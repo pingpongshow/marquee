@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  * @param items 
  * @param id 
  * @param description 
+ * @param context What kind of station or mix this is (e.g. mix:daily, radio:mood, muse). Send it back as PlaybackRequest.context when playing its tracks, for the music playlist statistics (MUSIC-17).
  */
 @Serializable
 
@@ -51,7 +52,11 @@ data class Station (
     val id: kotlin.String? = null,
 
     @SerialName(value = "description")
-    val description: kotlin.String? = null
+    val description: kotlin.String? = null,
+
+    /* What kind of station or mix this is (e.g. mix:daily, radio:mood, muse). Send it back as PlaybackRequest.context when playing its tracks, for the music playlist statistics (MUSIC-17). */
+    @SerialName(value = "context")
+    val context: kotlin.String? = null
 
 ) {
 

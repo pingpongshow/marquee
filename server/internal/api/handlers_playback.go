@@ -78,6 +78,9 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 	set(&r.StartMS, b.StartMs)
 	set(&r.Preload, b.Preload)
 	r.NightMode = nightMode(b.NightMode, u.Preferences)
+	if b.Context != nil {
+		r.Context = playContext(*b.Context)
+	}
 	r.SubtitleOffsetMS, r.AudioOffsetMS = b.SubtitleOffsetMs, b.AudioOffsetMs
 	set(&r.Quality.RequestedKbps, b.MaxBitrateKbps)
 	set(&r.Quality.MeasuredKbps, b.MeasuredKbps)

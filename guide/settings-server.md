@@ -290,7 +290,9 @@ Each task shows its schedule, when it last ran, its last result, and a **Running
 | Fetch movie and show details | Every day | Fetches keywords, countries, original language and TMDB's recommendations for titles matched before Marquee stored them. New matches get them straight away. |
 | Enrich anime from AniList | Daily in the maintenance window | Adds the names anime is known by (romaji, English, Japanese, all searchable), studios, genres and AniList scores. |
 | Update collections | Every 7 days | Groups movies into their film series (TMDB collections). |
-| Soundprint analysis | Every hour | Analyses new tracks so radios, similar music, mixes and Muse include them. Also runs right after a music scan. |
+| Soundprint analysis | Every hour | Analyses new tracks so radios, similar music, mixes and Muse include them: how they sound and what they're like (happy, sad, danceable, sung…). Also reads the language of their lyrics, and tries another sound model on the library when one is chosen in Settings → Music. Also runs right after a music scan. |
+| Learn from listening | Daily in the maintenance window | Pairs the tracks people play in one sitting or keep in one playlist, so radios and mixes play them together. |
+| Similar artists and tags | Every day | With similar artists and tags on, looks up which artists listeners consider alike and how they tag artists and tracks, on ListenBrainz and, with a Last.fm API key, Last.fm, a few requests a second. The first run covers the library and continues where it stopped; later runs cover new music and refresh old lookups. |
 | Index movies and shows | Daily in the maintenance window | Reads the descriptions of new and changed movies and shows so Muse, recommendations and related items include them. Also runs after a video scan. |
 | Measure music loudness | Daily in the maintenance window | Reads ReplayGain tags and measures the loudness of tracks without them, so volume levelling works for everything. |
 | Make seek previews | Daily in the maintenance window | Makes the thumbnails shown while seeking. A large library takes a few nights; it continues where it stopped. |
@@ -357,6 +359,15 @@ Each backup in the list has:
 - **Person:** Everyone, or one person.
 
 You get totals (plays, hours watched and listened, number of people or hours per day), plays per day, the top movies, shows, artists, albums, tracks, people and apps, and **How it played**: the share of direct play, direct stream and transcode, and how much was at home versus away.
+
+**Music playlists** lists each kind of radio and mix played from, such as Daily Mixes, Discovery Mix, Mood radios or Muse playlists. For each it shows:
+
+- **Plays**
+- **To the end:** the share listened to at least 80% of the way.
+- **Skipped:** the share skipped in the first 30 seconds.
+- **Favourited:** tracks favourited within a week of playing from it.
+
+A high skip rate shows a kind that isn't working. Plays count here once the apps are updated to report where a play started.
 
 Each person sees their own statistics under **Account**.
 

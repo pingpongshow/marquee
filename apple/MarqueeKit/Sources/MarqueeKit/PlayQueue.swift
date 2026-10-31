@@ -9,6 +9,12 @@ public struct PlayQueue: Sendable, Equatable {
         public let item: Item
         /// Set for tracks the DJ wove in (MUSIC-6).
         public var dj: String? = nil
+        /// The station or mix it came from (Station.context), for the playlist statistics.
+        public var context: String? = nil
+        /// Came from the station playing (not queued by hand): a radio may replace it.
+        public var fromStation = false
+        /// What the play is reported as started from (MUSIC-17): "dj" for the DJ's picks.
+        public var playContext: String? { dj != nil ? "dj" : context }
         public static func == (a: Entry, b: Entry) -> Bool { a.id == b.id }
     }
     public enum Repeat: Sendable { case off, all, one }
@@ -25,12 +31,22 @@ public struct PlayQueue: Sendable, Equatable {
     public var current: Entry? { entries.indices.contains(index) ? entries[index] : nil }
     public var upcoming: ArraySlice<Entry> { index >= 0 && index + 1 <= entries.count ? entries[(index + 1)...] : [] }
 
-    private mutating func wrap(_ items: [Item], dj: String? = nil) -> [Entry] {
-        items.map { item in defer { nextKey += 1 }; return Entry(id: nextKey, item: item, dj: dj) }
+    /// Marks tracks a station queued: their plays are reported with its context (nil when
+    /// the server sent none), and a radio can replace them.
+    public struct FromStation: Sendable, Equatable {
+        public var context: String?
+        public init(context: String?) { self.context = context }
     }
 
-    public mutating func load(_ items: [Item], start: Int = 0, shuffle: Bool = false) {
-        let e = wrap(items)
+    private mutating func wrap(_ items: [Item], dj: String? = nil, from station: FromStation? = nil) -> [Entry] {
+        items.map { item in
+            defer { nextKey += 1 }
+            return Entry(id: nextKey, item: item, dj: dj, context: station?.context, fromStation: station != nil)
+        }
+    }
+
+    public mutating func load(_ items: [Item], start: Int = 0, shuffle: Bool = false, from station: FromStation? = nil) {
+        let e = wrap(items, from: station)
         original = nil
         shuffled = false
         guard !e.isEmpty else { entries = []; index = -1; return }
@@ -76,11 +92,29 @@ public struct PlayQueue: Sendable, Equatable {
         }
     }
 
-    public mutating func append(_ items: [Item]) {
-        guard index >= 0 else { load(items); return }
-        let add = wrap(items)
+    public mutating func append(_ items: [Item], from station: FromStation? = nil) {
+        guard index >= 0 else { load(items, from: station); return }
+        let add = wrap(items, from: station)
         entries += add
         original? += add
+    }
+
+    /// Replaces the station's tracks still to come with `items` (a radio steered away from
+    /// what was skipped); tracks queued by hand and the DJ's picks stay. The new tracks go
+    /// where the first of the old ones was, so "play next" picks still come first.
+    public mutating func replaceUpcomingStation(with items: [Item], from station: FromStation) {
+        guard index >= 0, !items.isEmpty else { return }
+        let gone = Set(upcoming.filter(\.fromStation).map(\.id))
+        let at = entries.indices.first { $0 > index && gone.contains(entries[$0].id) } ?? entries.count
+        let add = wrap(items, from: station)
+        entries.removeAll { gone.contains($0.id) }
+        // Only upcoming entries went, all at or after `at`: the current track keeps its index.
+        entries.insert(contentsOf: add, at: min(at, entries.count))
+        if var o = original, let cur = current {
+            o.removeAll { gone.contains($0.id) }
+            o.insert(contentsOf: add, at: (o.firstIndex(of: cur) ?? o.count - 1) + 1)
+            original = o
+        }
     }
 
     /// Removes an entry. Removing the current track moves on to the one that took its place;

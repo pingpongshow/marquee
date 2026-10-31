@@ -454,6 +454,8 @@ struct MoodStyleView: View {
     let kind: Kind
     let name: String
     @State private var tracks: [Item] = []
+    /// The station's context, sent with plays from its track list (MUSIC-17).
+    @State private var tracksContext: String?
     @State private var albums: [Item] = []
     @State private var error: String?
     @State private var loaded = false
@@ -482,7 +484,7 @@ struct MoodStyleView: View {
                         Text("Tracks").font(.title3.bold()).padding(.bottom, 8)
                         ForEach(Array(tracks.enumerated()), id: \.element.id) { i, t in
                             HStack(spacing: 4) {
-                                Button { music.play(tracks, start: i, source: name) } label: {
+                                Button { music.play(tracks, start: i, source: name, context: tracksContext) } label: {
                                     HStack {
                                         Text("\(i + 1)").font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 24, alignment: .trailing)
                                         VStack(alignment: .leading) {
@@ -540,7 +542,9 @@ struct MoodStyleView: View {
             if kind == .style {
                 albums = try await app.items(library: libraryID, sort: ._hyphen_rating, limit: 40, genre: name, type: .album).items
             }
-            tracks = try await app.radio(request).items
+            let station = try await app.radio(request)
+            tracks = station.items
+            tracksContext = station.context
             if kind == .mood {
                 // The station's albums, in order of appearance.
                 var seen = Set<Int64>()

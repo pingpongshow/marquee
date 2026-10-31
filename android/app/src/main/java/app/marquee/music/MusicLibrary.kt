@@ -154,22 +154,25 @@ class MusicLibrary(private val marquee: Marquee, private val ownPackage: String,
             }.toMutableList()
         }
 
-    private fun withUri(item: MediaItem) = item.buildUpon().setUri("marquee://track/${item.mediaId}").build()
+    // The play context travels in the metadata extras (URIs don't cross to the session) and back into the URI here.
+    private fun withUri(item: MediaItem) = item.buildUpon()
+        .setUri(item.mediaId.toLongOrNull()?.let { trackUri(it, playContext(item)) } ?: "marquee://track/${item.mediaId}").build()
 
     /** Turns a browse id into a queue and the index to start at. */
     private fun expand(mediaId: String): Pair<List<MediaItem>, Int> {
         val (listId, trackId) = mediaId.split("/").let { it[0] to it.getOrNull(1)?.toLongOrNull() }
         val parts = listId.split(":")
         val ui = music()
-        fun queue(tracks: List<ItemSummary>, title: String?, radio: RadioRequest? = null): Pair<List<MediaItem>, Int> {
-            ui.adopt(title, radio)
-            return tracks.map { trackItem(marquee, it) } to (tracks.indexOfFirst { it.id == trackId }.takeIf { it >= 0 } ?: 0)
+        // A station's tracks carry its context for the playlist statistics (MUSIC-17).
+        fun queue(tracks: List<ItemSummary>, title: String?, radio: RadioRequest? = null, context: String? = null): Pair<List<MediaItem>, Int> {
+            ui.adopt(title, radio, context)
+            return tracks.map { trackItem(marquee, it, context = context, radio = radio != null) } to (tracks.indexOfFirst { it.id == trackId }.takeIf { it >= 0 } ?: 0)
         }
         return when (parts[0]) {
             "mix" -> {
                 val m = mixes[listId] ?: marquee.music.musicMixes(musicLibraries().firstOrNull()?.id).getOrNull(parts[1].toInt())
                     ?: throw IllegalStateException("mix gone")
-                queue(m.items, m.title)
+                queue(m.items, m.title, context = m.context)
             }
             "radio" -> {
                 val lib = musicLibraries().firstOrNull()?.id
@@ -180,7 +183,7 @@ class MusicLibrary(private val marquee: Marquee, private val ownPackage: String,
                     else -> RadioRequest(RadioRequest.Seed.LIBRARY, libraryId = lib, limit = 50)
                 }
                 val st = marquee.music.musicRadio(req)
-                queue(st.items, st.title, req)
+                queue(st.items, st.title, req, st.context)
             }
             "playlist" -> queue(tracksOf(listId), runCatching { marquee.playlists.getPlaylist(parts[1].toLong()).title }.getOrNull())
             "album" -> queue(tracksOf(listId), runCatching { marquee.items.getItem(parts[1].toLong()).title }.getOrNull())

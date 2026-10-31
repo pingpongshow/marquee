@@ -4,12 +4,15 @@ import {
   append,
   current,
   cycleRepeat,
+  departure,
   emptyQueue,
   followingIndex,
   load,
   move,
+  playContext,
   playNext,
   remove,
+  replaceUpcoming,
   skipIndex,
   toggleShuffle,
 } from "./queue";
@@ -82,5 +85,34 @@ describe("queue", () => {
     expect(skipIndex(q)).toBe(0);
     q = append(q, [track(3)]);
     expect(ids(q)).toEqual([1, 2, 3]);
+  });
+});
+
+describe("stations (MUSIC-17)", () => {
+  it("tags a station's tracks with its context, the DJ's picks with dj", () => {
+    let q = load(emptyQueue, [track(1), track(2)], 0, false, Math.random, "radio:mood");
+    q = append(q, [track(3)], "radio:mood");
+    q = playNext(q, [track(9)], "wander");
+    q = append(q, [track(8)]);
+    expect(q.entries.map(playContext)).toEqual(["radio:mood", "dj", "radio:mood", "radio:mood", undefined]);
+  });
+
+  it("replaces only the station's upcoming tracks when it's steered", () => {
+    let q = load(emptyQueue, [track(1), track(2), track(3)], 0, false, Math.random, "radio:item");
+    q = append(q, [track(7)]); // queued by hand
+    q = { ...q, index: 1 };
+    const next = replaceUpcoming(q, [track(4), track(5)], "radio:item");
+    expect(ids(next)).toEqual([1, 2, 7, 4, 5]);
+    expect(current(next)?.item.id).toBe(2);
+    expect(next.entries.at(-1)?.ctx).toBe("radio:item");
+  });
+
+  it("tells a quick skip from a track played through", () => {
+    expect(departure(10, 240)).toBe("skipped");
+    expect(departure(200, 240)).toBe("finished");
+    expect(departure(239, 240)).toBe("finished");
+    expect(departure(90, 240)).toBeNull();
+    expect(departure(25, 30)).toBe("finished"); // 80% of a short track
+    expect(departure(10, 30)).toBe("skipped"); // before half way
   });
 });

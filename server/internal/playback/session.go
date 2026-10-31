@@ -54,6 +54,9 @@ type Request struct {
 	SubtitleStyle SubtitleStyle
 	// NightMode converts the audio with a dialogue boost and compression (video only).
 	NightMode bool
+	// Context is what the play was started from (a mix, a station…), for the music playlist
+	// statistics; "" when not from one.
+	Context string
 }
 
 // Session is an active playback.
@@ -395,9 +398,9 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 	}
 
 	res, err := m.DB.ExecContext(ctx, `INSERT INTO play_history(user_id, item_id, device_id, item_title, started_at, position_ms,
-		network_class, decision, bitrate_kbps) VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?, ?, ?)`,
+		network_class, decision, bitrate_kbps, context) VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?, ?, ?, ?)`,
 		s.UserID, s.ItemID, s.DeviceID, s.Title, s.StartMS, map[bool]string{true: "remote", false: "local"}[s.Remote],
-		string(s.Decision.Method), s.BitrateKbps())
+		string(s.Decision.Method), s.BitrateKbps(), nullStr(r.Context))
 	if err == nil {
 		s.historyID, _ = res.LastInsertId()
 	}

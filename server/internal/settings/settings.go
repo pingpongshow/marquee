@@ -388,6 +388,12 @@ type Music struct {
 	LoudnessAnalysis   bool `json:"loudnessAnalysis"`
 	// ArtistDetails looks artists and albums up on MusicBrainz (and bios on Wikipedia).
 	ArtistDetails bool `json:"artistDetails"`
+	// SoundModel is the Soundprint sound model wanted: "general" or "music". Another than the
+	// one in use is tried on the library and compared before switching (MUSIC-1).
+	SoundModel string `json:"soundModel"`
+	// CommunityData fetches similar artists and tags from ListenBrainz (and Last.fm with an
+	// API key) for radios, mixes, moods and Muse (MUSIC-15).
+	CommunityData bool `json:"communityData"`
 }
 
 type Security struct {
@@ -510,7 +516,7 @@ func Defaults() Settings {
 		},
 		Metadata: Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
 		Tasks:    Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
-		Music:    Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true, ArtistDetails: true},
+		Music:    Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true, ArtistDetails: true, SoundModel: "general", CommunityData: true},
 		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3, Commercials: CommercialsOff, DVRQuotaAction: DVRQuotaBlock,
 			VODAutoRefresh: true, VODRefreshHours: 6},
 		Notifications: Notifications{SMTPPort: 587, SMTPSecurity: "starttls", FromName: "Marquee",

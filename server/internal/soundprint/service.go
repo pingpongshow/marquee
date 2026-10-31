@@ -29,12 +29,24 @@ type Service struct {
 	// Learn reports the "learn from skips and ratings" setting (nil = off): Avoid then uses
 	// Negatives instead of the older fixed rules.
 	Learn func() bool
+	// Model is the sound model chosen in Settings (ModelGeneral or ModelMusic; nil = the one
+	// in use): another than the one in use is tried on the library first (see models.go).
+	Model func() string
 
 	mu      sync.Mutex
 	running bool
+	phase   string // what the run is doing ("" = analysing new tracks)
 	done    int
 	total   int
 	model   string
+
+	// What listeners do (coplays.go) and say elsewhere (community.go), loaded from the
+	// database and replaced whole when rebuilt.
+	learnMu   sync.RWMutex
+	coplays   map[int64]map[int64]float64
+	similar   map[int64]map[int64]float64 // artist → similar artist → 0–1
+	tags      map[int64]map[string]float64
+	tagsByArt map[int64]map[string]float64
 }
 
 // Status is what Settings and the activity indicator show.
@@ -42,8 +54,15 @@ type Status struct {
 	Enabled, Available, Running bool
 	Model, Device               string
 	Analyzed, Total, Failed     int
-	Progress                    int // tracks done in the current run
-	RunTotal                    int
+	Progress                    int    // tracks done in the current stage of the run
+	RunTotal                    int    // tracks in that stage
+	Phase                       string // the stage ("" = analysing new tracks)
+	// SoundModel is the model in use (ModelGeneral or ModelMusic); Trial the one being
+	// tried, when another is chosen in Settings.
+	SoundModel string
+	Trial      *Trial
+	// Traits and Languages count the analysed tracks with traits and with a language.
+	Traits, Languages int
 }
 
 func (s *Service) Status(ctx context.Context) Status {
@@ -52,11 +71,37 @@ func (s *Service) Status(ctx context.Context) Status {
 		st.Available, st.Model, st.Device = true, h.Model, h.Device
 	}
 	s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM items WHERE type = 'track'`).Scan(&st.Total)
-	s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE embedding IS NOT NULL), COUNT(*) FILTER (WHERE error IS NOT NULL) FROM soundprint`).Scan(&st.Analyzed, &st.Failed)
+	s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE embedding IS NOT NULL), COUNT(*) FILTER (WHERE error IS NOT NULL),
+		COUNT(*) FILTER (WHERE embedding IS NOT NULL AND traits IS NOT NULL), COUNT(*) FILTER (WHERE embedding IS NOT NULL AND language != '')
+		FROM soundprint`).Scan(&st.Analyzed, &st.Failed, &st.Traits, &st.Languages)
+	st.SoundModel, st.Trial = s.ActiveModel(ctx), s.Trial(ctx)
 	s.mu.Lock()
-	st.Running, st.Progress, st.RunTotal = s.running, s.done, s.total
+	st.Running, st.Progress, st.RunTotal, st.Phase = s.running, s.done, s.total, s.phase
 	s.mu.Unlock()
 	return st
+}
+
+// Progress reports the running stage's progress (the task's activity indicator).
+func (s *Service) Progress() (int, int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.running {
+		return 0, 0
+	}
+	return s.done, s.total
+}
+
+// setPhase starts a stage of the run over total tracks.
+func (s *Service) setPhase(phase string, total int) {
+	s.mu.Lock()
+	s.phase, s.done, s.total = phase, 0, total
+	s.mu.Unlock()
+}
+
+func (s *Service) setDone(n int) {
+	s.mu.Lock()
+	s.done = n
+	s.mu.Unlock()
 }
 
 type pending struct {
@@ -64,8 +109,10 @@ type pending struct {
 	path           string
 }
 
-// Analyze embeds every track that isn't analysed yet (or whose file changed). It runs as
-// a scheduled task; report receives progress.
+// Analyze embeds every track that isn't analysed yet (or whose file changed) with the sound
+// model in use, then measures what tracks are like (traits), reads their languages from
+// their lyrics, and tries the model chosen in Settings when it isn't the one in use. It runs
+// as a scheduled task.
 func (s *Service) Analyze(ctx context.Context) (string, error) {
 	if !s.Enabled() {
 		return "Soundprint analysis is turned off", nil
@@ -88,17 +135,24 @@ func (s *Service) Analyze(ctx context.Context) (string, error) {
 		s.mu.Unlock()
 		return "Already running", nil
 	}
-	s.running, s.done, s.model = true, 0, h.Model
+	active := s.ActiveModel(ctx)
+	id := h.ModelID(active)
+	if id == "" {
+		s.mu.Unlock()
+		return "", fmt.Errorf("%w: it doesn't offer the %s sound model in use (update the Soundprint container)", ErrUnavailable, active)
+	}
+	s.running, s.done, s.model, s.phase = true, 0, id, ""
 	s.mu.Unlock()
 	defer func() {
 		s.mu.Lock()
-		s.running = false
+		s.running, s.phase = false, ""
 		s.mu.Unlock()
 	}()
 
 	var summary []string
 	for pass := 0; pass < 5; pass++ {
-		msg, n, err := s.analyzePass(ctx, h)
+		s.setPhase("", 0)
+		msg, n, err := s.analyzePass(ctx, active, id)
 		if err != nil {
 			return "", err
 		}
@@ -110,19 +164,34 @@ func (s *Service) Analyze(ctx context.Context) (string, error) {
 			break
 		}
 	}
+	if msg, err := s.traitsPass(ctx, h); err != nil {
+		return "", err
+	} else if msg != "" {
+		summary = append(summary, msg)
+	}
+	if n, err := s.languagePass(ctx); err != nil {
+		return "", err
+	} else if n > 0 {
+		summary = append(summary, fmt.Sprintf("read the language of %d tracks' lyrics", n))
+	}
+	if msg, err := s.trialPass(ctx, h); err != nil {
+		return "", err
+	} else if msg != "" {
+		summary = append(summary, msg)
+	}
 	return strings.Join(summary, "; "), nil
 }
 
 // analyzePass analyses everything pending now; tracks added meanwhile are picked up by the
 // next pass, so a scan that finishes during a run isn't missed.
-func (s *Service) analyzePass(ctx context.Context, h Health) (string, int, error) {
+func (s *Service) analyzePass(ctx context.Context, active, modelID string) (string, int, error) {
 	var todo []pending
 	rows, err := s.DB.QueryContext(ctx, `SELECT i.id, f.id, f.path FROM items i
 		JOIN media_versions v ON v.item_id = i.id JOIN media_files f ON f.version_id = v.id AND f.part_index = 0
 		LEFT JOIN soundprint s ON s.item_id = i.id
 		WHERE i.type = 'track' AND f.available = 1
 		  AND (s.item_id IS NULL OR s.file_id != f.id OR (s.model != ? AND s.error IS NULL))
-		GROUP BY i.id ORDER BY i.id`, h.Model)
+		GROUP BY i.id ORDER BY i.id`, modelID)
 	if err != nil {
 		return "", 0, err
 	}
@@ -141,7 +210,7 @@ func (s *Service) analyzePass(ctx context.Context, h Health) (string, int, error
 	if len(todo) == 0 {
 		return fmt.Sprintf("All %d tracks analysed", s.Index.Len()), 0, nil
 	}
-	slog.Info("soundprint analysis starting", "tracks", len(todo), "model", h.Model, "device", h.Device)
+	slog.Info("soundprint analysis starting", "tracks", len(todo), "model", modelID)
 	start := time.Now()
 	analysed, failed := 0, 0
 	const batch = 32
@@ -157,7 +226,7 @@ func (s *Service) analyzePass(ctx context.Context, h Health) (string, int, error
 		for j, p := range chunk {
 			paths[j] = p.path
 		}
-		model, results, err := s.analyzeBatch(ctx, paths)
+		model, results, err := s.analyzeBatch(ctx, paths, active)
 		if err != nil {
 			return "", 0, fmt.Errorf("after %d tracks: %w", analysed, err)
 		}
@@ -199,8 +268,8 @@ func (s *Service) analyzePass(ctx context.Context, h Health) (string, int, error
 // analyzeBatch analyses paths together, and if the batch fails (one bad file can break
 // it), one at a time so a single file can't stall the whole library. It only fails when
 // the sidecar itself is unreachable.
-func (s *Service) analyzeBatch(ctx context.Context, paths []string) (string, []Analysis, error) {
-	model, results, err := s.Client.Analyze(ctx, paths)
+func (s *Service) analyzeBatch(ctx context.Context, paths []string, active string) (string, []Analysis, error) {
+	model, results, err := s.Client.Analyze(ctx, paths, active, true)
 	if err == nil || len(paths) == 1 || ctx.Err() != nil {
 		return model, results, err
 	}
@@ -208,7 +277,7 @@ func (s *Service) analyzeBatch(ctx context.Context, paths []string) (string, []A
 	results = make([]Analysis, len(paths))
 	ok := false
 	for i, p := range paths {
-		m, r, err := s.Client.Analyze(ctx, []string{p})
+		m, r, err := s.Client.Analyze(ctx, []string{p}, active, true)
 		if err != nil || len(r) == 0 {
 			if _, herr := s.Client.Health(ctx); herr != nil {
 				return "", nil, herr // the sidecar went away: don't mark files as unreadable
@@ -245,10 +314,13 @@ func (s *Service) indexOne(ctx context.Context, itemID int64, r Analysis) {
 	if r.Mode != nil {
 		t.Mode = *r.Mode
 	}
-	var title string
-	s.DB.QueryRowContext(ctx, `SELECT COALESCE(i.parent_id, 0), COALESCE(i.grandparent_id, 0), i.library_id, COALESCE(i.year, a.year, 0), COALESCE(i.title, '')
-		FROM items i LEFT JOIN items a ON a.id = i.parent_id WHERE i.id = ?`, itemID).Scan(&t.AlbumID, &t.ArtistID, &t.LibraryID, &t.Year, &title)
-	t.Copy = CopyKey(title, t.ArtistID)
+	var d trackDetails
+	var traits string
+	s.DB.QueryRowContext(ctx, `SELECT `+trackColumns+`, COALESCE(s.traits, ''), COALESCE(s.language, '')
+		FROM items i LEFT JOIN items a ON a.id = i.parent_id LEFT JOIN soundprint s ON s.item_id = i.id WHERE i.id = ?`, itemID).
+		Scan(append(d.dest(t), &traits, &t.Language)...)
+	d.apply(t)
+	t.Traits = parseTraits(traits)
 	s.Index.Put(t)
 }
 
@@ -375,12 +447,25 @@ func TrackIDs(ts []*Track) []int64 {
 type Station struct {
 	Title string
 	IDs   []int64
+	// Context says what kind of station or mix it is (mix:daily, radio:mood…): the apps send
+	// it back with each play, for the playlist statistics (MUSIC-17).
+	Context string
 	// Query is a Muse playlist's query as it ran: without the filters that had to be relaxed
 	// for it to find enough tracks.
 	Query MusicQuery
 }
 
-// RadioFromItem starts an endless-feeling station from a track, album or artist.
+// Lifts in an item's radio: tracks played together with the seeds, and tracks by artists
+// listeners call similar to the seeds' (each up to this much).
+const (
+	seedCoplayAffinity  = 0.15
+	seedSimilarAffinity = 0.12
+)
+
+// RadioFromItem starts an endless-feeling station from a track, album or artist: it plays
+// what sounds like the seeds, lifting what's played together with them and artists listeners
+// call similar, in the seeds' languages (and the listener's) and with the seeds' kinds of
+// asides (a live album's radio plays live tracks).
 func (s *Service) RadioFromItem(ctx context.Context, itemID int64, title string, o Options) (Station, error) {
 	ts, typ, err := s.tracksOf(ctx, itemID)
 	if err != nil {
@@ -391,7 +476,66 @@ func (s *Service) RadioFromItem(ctx context.Context, itemID int64, title string,
 	if typ == "track" {
 		first = ts[0]
 	}
+	o.AllowAside |= allowAside(ts)
+	if seedLangs := LanguagesOf(ts); seedLangs != nil {
+		o.Languages = mergeLanguages(o.Languages, seedLangs)
+	} else if typ == "track" && ts[0].Language != "" {
+		o.Languages = mergeLanguages(o.Languages, Languages{ts[0].Language: 1})
+	}
+	artists := map[int64]bool{}
+	for _, t := range ts {
+		if t.ArtistID != 0 {
+			artists[t.ArtistID] = true
+		}
+	}
+	o.Affinity = addAffinity(o.Affinity, s.coplayWith(ts), seedCoplayAffinity)
+	o.Affinity = addAffinity(o.Affinity, s.similarArtistBoost(artists, 1, o.Keep), seedSimilarAffinity)
+	if o.CoPlay == nil {
+		o.CoPlay = s.CoPlay
+	}
 	return Station{Title: title + " Radio", IDs: TrackIDs(s.Index.Flow(anchor, first, o))}, nil
+}
+
+// CoPlay is how strongly two tracks are played together (0–1).
+func (s *Service) CoPlay(a, b int64) float64 {
+	return s.coplayed()[a][b]
+}
+
+// addAffinity adds lifts (0–1 each) scaled by weight to an affinity map (a new one when nil).
+func addAffinity(into, add map[int64]float64, weight float64) map[int64]float64 {
+	if len(add) == 0 {
+		return into
+	}
+	out := make(map[int64]float64, len(into)+len(add))
+	for id, w := range into {
+		out[id] = w
+	}
+	for id, w := range add {
+		out[id] += weight * w
+	}
+	return out
+}
+
+// mergeLanguages allows the languages of either (the stronger weight of each); with no
+// listener languages (a), the seeds' (b) lead.
+func mergeLanguages(a, b Languages) Languages {
+	if a == nil {
+		return b
+	}
+	out := Languages{}
+	for l, w := range a {
+		out[l] = w
+	}
+	for l, w := range b {
+		out[l] = max(out[l], w)
+	}
+	return out
+}
+
+// ListenerLanguages are the languages someone's liked music is sung in (nil when it's
+// mixed or too little says), for the stations made for them.
+func (s *Service) ListenerLanguages(ctx context.Context, userID int64) Languages {
+	return LanguagesOf(s.Liked(ctx, userID))
 }
 
 // RadioFromVector starts a station from any sound (a genre's average, a mood prompt…).
@@ -399,9 +543,9 @@ func (s *Service) RadioFromVector(v []float32, title string, o Options) Station 
 	return Station{Title: title, IDs: TrackIDs(s.Index.Flow(v, nil, o))}
 }
 
-// TextVector embeds a prompt (Muse, moods).
+// TextVector embeds a prompt (Muse, moods) with the sound model in use.
 func (s *Service) TextVector(ctx context.Context, prompt string) ([]float32, error) {
-	vs, err := s.Client.EmbedText(ctx, []string{prompt})
+	vs, err := s.Client.EmbedText(ctx, []string{prompt}, s.ActiveModel(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
@@ -439,7 +583,24 @@ type mixCacheKey struct {
 var (
 	mixMu    sync.Mutex
 	mixCache = map[mixCacheKey][]Mix{}
+	// timeCache holds the time-of-day mix, made again when the part of the day changes.
+	timeCache = map[timeCacheKey]*Mix{}
 )
+
+type timeCacheKey struct {
+	mixCacheKey
+	slot string
+}
+
+// forgetMixes drops the mixes made so far (the sound model changed), so they're made again.
+func forgetMixes() {
+	mixMu.Lock()
+	mixCache, timeCache = map[mixCacheKey][]Mix{}, map[timeCacheKey]*Mix{}
+	mixMu.Unlock()
+	recentMu.Lock()
+	recentMixes = map[mixHistoryKey]map[string][]int64{}
+	recentMu.Unlock()
+}
 
 // DailyMixes clusters the listener's taste into up to four groups and builds a 25-track
 // mix around each, mixing favourites with similar tracks they haven't played lately, then
@@ -447,7 +608,12 @@ var (
 //
 // scope names what keep allows (e.g. the library id), so different filters get their own mixes.
 func (s *Service) DailyMixes(ctx context.Context, userID int64, scope string, keep Filter) []Mix {
-	return s.dailyMixes(ctx, userID, scope, keep, time.Now())
+	now := time.Now()
+	mixes := s.dailyMixes(ctx, userID, scope, keep, now)
+	if m := s.timeMix(ctx, userID, scope, keep, now, mixes); m != nil {
+		mixes = append(append([]Mix{}, mixes...), *m)
+	}
+	return mixes
 }
 
 // mixJitter varies daily picks: enough to change most of a mix from day to day while the
@@ -592,8 +758,12 @@ func (s *Service) dailyMixes(ctx context.Context, userID int64, scope string, ke
 	var mixes []Mix
 	used := newTaken()
 	favour := s.Favour(ctx, userID)
-	for i, c := range Clusters(keepLiked, k, r) {
-		o := Options{Keep: keep, Avoid: avoid, Rand: r, Jitter: mixJitter, Favour: favour}
+	centres := Clusters(keepLiked, k, r)
+	members := clusterMembers(keepLiked, centres)
+	for i, c := range centres {
+		// Each mix keeps to its cluster's languages and lifts what's played with its tracks.
+		o := Options{Keep: keep, Avoid: avoid, Rand: r, Jitter: mixJitter, Favour: favour, Arc: true,
+			Languages: LanguagesOf(members[i]), Affinity: addAffinity(nil, s.coplayWith(members[i]), mixCoplayAffinity)}
 		ts := s.pick(dayCentre(c, keepLiked, r), 25, 0, o, used)
 		mixes = append(mixes, Mix{Station: Station{Title: fmt.Sprintf("Daily Mix %d", i+1), IDs: TrackIDs(ts)}, ID: fmt.Sprintf("daily-%d", i+1)})
 	}
@@ -624,6 +794,26 @@ func (s *Service) dailyMixes(ctx context.Context, userID int64, scope string, ke
 	mixCache[key] = mixes
 	mixMu.Unlock()
 	return mixes
+}
+
+// mixCoplayAffinity is how much a mix lifts what's played together with its seeds.
+const mixCoplayAffinity = 0.12
+
+// clusterMembers groups tracks by their nearest centre.
+func clusterMembers(ts []*Track, centres [][]float32) [][]*Track {
+	out := make([][]*Track, len(centres))
+	for _, t := range ts {
+		best := -1
+		for c := range centres {
+			if best < 0 || dot(t.Vec, centres[c]) > dot(t.Vec, centres[best]) {
+				best = c
+			}
+		}
+		if best >= 0 {
+			out[best] = append(out[best], t)
+		}
+	}
+	return out
 }
 
 // dayCentre moves a taste cluster's centre towards a few of its favourites drawn at random
@@ -669,15 +859,19 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		rows.Close()
 	}
 	allowed := func(t *Track) bool { return keep == nil || keep(t) }
+	langs := LanguagesOf(liked)
 	var out []Mix
 
-	// Discovery: unplayed, near their taste; artists they've played a lot count against.
-	disc := Options{Keep: func(t *Track) bool { return allowed(t) && !played[t.ItemID] }, Avoid: map[int64]float64{}, Rand: r, Jitter: mixJitter}
+	// Discovery: unplayed, near their taste; artists they've played a lot count against, and
+	// artists listeners call similar to the ones they love are lifted.
+	disc := Options{Keep: func(t *Track) bool { return allowed(t) && !played[t.ItemID] }, Avoid: map[int64]float64{}, Rand: r, Jitter: mixJitter,
+		Arc: true, Languages: langs}
 	for _, t := range s.Index.Where(disc.Keep) {
 		if n := artistPlays[t.ArtistID]; n > 0 {
 			disc.Avoid[t.ItemID] = min(0.8, float64(n)/40)
 		}
 	}
+	disc.Affinity = addAffinity(nil, s.similarArtistBoost(lovedArtists(liked, artistPlays), 1, disc.Keep), discoverySimilarAffinity)
 	if ts := s.pick(taste, 25, 10, disc, used); len(ts) >= 10 {
 		out = append(out, Mix{Station: Station{Title: "Discovery Mix", IDs: TrackIDs(ts)}, ID: "discovery",
 			Description: "Tracks in your library you haven't played yet, close to what you love"})
@@ -713,7 +907,7 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		}
 		old = spreadOut(free, 25, mixPerArtist)
 		used.add(old)
-		out = append(out, Mix{Station: Station{Title: "Rediscover", IDs: TrackIDs(orderApart(old, Mean(old)))}, ID: "rediscover",
+		out = append(out, Mix{Station: Station{Title: "Rediscover", IDs: TrackIDs(arcOrder(old, Mean(old), true))}, ID: "rediscover",
 			Description: "Favourites you haven't played in a while"})
 	}
 
@@ -730,7 +924,8 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		rows.Close()
 	}
 	if len(fresh) >= 10 {
-		o := Options{Keep: func(t *Track) bool { return allowed(t) && fresh[t.ItemID] }, Avoid: avoid, Rand: r, Jitter: mixJitter, Favour: favour}
+		o := Options{Keep: func(t *Track) bool { return allowed(t) && fresh[t.ItemID] }, Avoid: avoid, Rand: r, Jitter: mixJitter, Favour: favour,
+			Arc: true, Languages: langs}
 		if ts := s.pick(taste, 25, 10, o, used); len(ts) >= 10 {
 			out = append(out, Mix{Station: Station{Title: "New Music Mix", IDs: TrackIDs(ts)}, ID: "new",
 				Description: "Recently added music that fits your taste"})
@@ -751,7 +946,8 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		}
 	}
 	if n >= 10 {
-		o := Options{Keep: func(t *Track) bool { return allowed(t) && t.Year/10*10 == best }, Avoid: avoid, Rand: r, Jitter: mixJitter, Favour: favour}
+		o := Options{Keep: func(t *Track) bool { return allowed(t) && t.Year/10*10 == best }, Avoid: avoid, Rand: r, Jitter: mixJitter, Favour: favour,
+			Arc: true, Languages: langs}
 		var inDecade []*Track
 		for _, t := range liked {
 			if t.Year/10*10 == best {
@@ -768,4 +964,120 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		}
 	}
 	return out
+}
+
+// discoverySimilarAffinity is how much Discovery lifts artists similar to the ones loved.
+const discoverySimilarAffinity = 0.2
+
+// lovedArtists are the artists of someone's favourite and most-played tracks (the 20 they
+// play most, and every artist of a favourite).
+func lovedArtists(liked []*Track, artistPlays map[int64]int) map[int64]bool {
+	out := map[int64]bool{}
+	for _, t := range liked {
+		if t.ArtistID != 0 && len(out) < 40 {
+			out[t.ArtistID] = true
+		}
+	}
+	type ap struct {
+		id int64
+		n  int
+	}
+	var list []ap
+	for id, n := range artistPlays {
+		if id != 0 {
+			list = append(list, ap{id, n})
+		}
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].n > list[j].n || (list[i].n == list[j].n && list[i].id < list[j].id)
+	})
+	for _, a := range list[:min(20, len(list))] {
+		out[a.id] = true
+	}
+	return out
+}
+
+// Parts of the day for the time-of-day mix, by the server's local hour.
+var daySlots = []struct {
+	id, title, desc string
+	from, to        int // hours, [from, to)
+}{
+	{"morning", "Your Morning Mix", "What you play in the mornings, with more like it", 5, 11},
+	{"afternoon", "Your Afternoon Mix", "What you play in the afternoons, with more like it", 11, 17},
+	{"evening", "Your Evening Mix", "What you play in the evenings, with more like it", 17, 22},
+	{"night", "Your Late Night Mix", "What you play late at night, with more like it", 22, 29},
+}
+
+func slotOf(hour int) int {
+	for i, sl := range daySlots {
+		if (hour >= sl.from && hour < sl.to) || (hour+24 >= sl.from && hour+24 < sl.to) {
+			return i
+		}
+	}
+	return 0
+}
+
+// timeMix is a mix of what someone plays at this time of day (played through in this part of
+// the day over the last four months), with more like it: made again when the part of the day
+// changes, and taking nothing the day's other mixes have.
+func (s *Service) timeMix(ctx context.Context, userID int64, scope string, keep Filter, now time.Time, others []Mix) *Mix {
+	slot := daySlots[slotOf(now.Hour())]
+	key := timeCacheKey{mixCacheKey{userID, now.Format("2006-01-02"), scope}, slot.id}
+	mixMu.Lock()
+	if m, ok := timeCache[key]; ok {
+		mixMu.Unlock()
+		return m
+	}
+	mixMu.Unlock()
+	// The hour each play started, in the server's time zone.
+	rows, err := s.DB.QueryContext(ctx, `SELECT h.item_id, h.started_at FROM play_history h JOIN items i ON i.id = h.item_id AND i.type = 'track'
+		WHERE h.user_id = ? AND h.started_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-120 days')
+		  AND COALESCE(h.position_ms, 0) >= MIN(30000, COALESCE(i.duration_ms, 60000) / 2)`, userID)
+	var inSlot []*Track
+	if err == nil {
+		seen := map[int64]bool{}
+		for rows.Next() {
+			var id int64
+			var at string
+			if rows.Scan(&id, &at) != nil {
+				continue
+			}
+			t, err := time.Parse(time.RFC3339Nano, at)
+			if err != nil || seen[id] {
+				continue
+			}
+			if h := t.In(now.Location()).Hour(); slotOf(h) == slotOf(now.Hour()) {
+				if tr := s.Index.Get(id); tr != nil && (keep == nil || keep(tr)) {
+					seen[id] = true
+					inSlot = append(inSlot, tr)
+				}
+			}
+		}
+		rows.Close()
+	}
+	var m *Mix
+	if len(inSlot) >= 10 {
+		used := newTaken()
+		for _, o := range others {
+			for _, id := range o.IDs {
+				used.ids[id] = true
+			}
+		}
+		seed := uint64(userID)*7919 + uint64(now.YearDay())*31 + uint64(slotOf(now.Hour()))
+		r := rand.New(rand.NewPCG(seed, seed^0x51ed270b))
+		o := Options{Keep: keep, Avoid: s.Avoid(ctx, userID), Rand: r, Jitter: mixJitter, Favour: s.Favour(ctx, userID), Arc: true,
+			Languages: LanguagesOf(inSlot), Affinity: addAffinity(nil, s.coplayWith(inSlot), mixCoplayAffinity)}
+		if ts := s.pick(Mean(inSlot), 25, 10, o, used); len(ts) >= 10 {
+			m = &Mix{Station: Station{Title: slot.title, IDs: TrackIDs(ts)}, ID: "time", Description: slot.desc}
+		}
+	}
+	mixMu.Lock()
+	for k := range timeCache {
+		if k.day != key.day || (k.user == key.user && k.scope == key.scope && k.slot != key.slot) {
+			delete(timeCache, k)
+		}
+	}
+	timeCache[key] = m
+	mixMu.Unlock()
+	return m
 }
