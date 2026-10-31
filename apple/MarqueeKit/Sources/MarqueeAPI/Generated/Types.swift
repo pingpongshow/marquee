@@ -637,7 +637,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /library-health/{checkId}/ignored/{itemId}`.
     /// - Remark: Generated from `#/paths//library-health/{checkId}/ignored/{itemId}/delete(unignoreHealthIssue)`.
     func unignoreHealthIssue(_ input: Operations.UnignoreHealthIssue.Input) async throws -> Operations.UnignoreHealthIssue.Output
-    /// Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file's timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again.
+    /// Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file's timing rewritten; nothing is re-encoded, and the original goes to the media trash. Two repairs run at a time. Files already waiting are skipped; failed repairs are tried again.
     ///
     /// - Remark: HTTP `POST /library-health/frameTiming/repairs`.
     /// - Remark: Generated from `#/paths//library-health/frameTiming/repairs/post(repairFrameTiming)`.
@@ -2980,7 +2980,7 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file's timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again.
+    /// Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file's timing rewritten; nothing is re-encoded, and the original goes to the media trash. Two repairs run at a time. Files already waiting are skipped; failed repairs are tried again.
     ///
     /// - Remark: HTTP `POST /library-health/frameTiming/repairs`.
     /// - Remark: Generated from `#/paths//library-health/frameTiming/repairs/post(repairFrameTiming)`.

@@ -123,3 +123,55 @@ func TestQueueRepairs(t *testing.T) {
 		t.Error("cancel left it waiting")
 	}
 }
+
+// Repair all works down Library Health's list, by title (not the order the files were
+// found in); a repair asked for later waits for those.
+func TestQueueOrder(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	d, err := db.Open(ctx, filepath.Join(dir, "t.db"), filepath.Join(dir, "b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	lib, err := library.NewStore(d).Create(ctx, "Movies", library.Movies, []string{dir}, library.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	add := func(title, sort string) int64 {
+		r, _ := d.Exec(`INSERT INTO items (library_id, type, title, sort_title) VALUES (?, 'movie', ?, ?)`, lib.ID, title, sort)
+		item, _ := r.LastInsertId()
+		r, _ = d.Exec(`INSERT INTO media_versions (item_id) VALUES (?)`, item)
+		v, _ := r.LastInsertId()
+		r, err := d.Exec(`INSERT INTO media_files (version_id, library_id, path, size, mtime, container, timing_checked_at, timing_error)
+			VALUES (?, ?, ?, 1, 1, 'mov,mp4,m4a,3gp,3g2,mj2', '2026-01-01T00:00:00Z', 'Frames are timed in decode order')`, v, lib.ID, filepath.Join(dir, title+".mp4"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, _ := r.LastInsertId()
+		return id
+	}
+	battle, aviator, abyss := add("Battleship", "Battleship"), add("The Aviator", "Aviator"), add("The Abyss", "Abyss")
+	s := &Service{DB: d}
+	if _, err := s.Queue(ctx, []int64{aviator, battle}); err != nil {
+		t.Fatal(err)
+	}
+	d.Exec(`UPDATE timing_repairs SET created_at = '2026-01-01T00:00:00.000Z'`)
+	s.Queue(ctx, []int64{abyss})
+	if got := s.queued(ctx); len(got) != 3 || got[0] != aviator || got[1] != battle || got[2] != abyss {
+		t.Errorf("queue order %v, want %v", got, []int64{aviator, battle, abyss})
+	}
+
+	// Two workers take the first two files, never the same one; a playing file is passed over.
+	s.Playing = func(id int64) bool { return id == battle }
+	first, second := s.claim(ctx), s.claim(ctx)
+	if first != aviator || second != abyss {
+		t.Errorf("claimed %d and %d, want %d and %d", first, second, aviator, abyss)
+	}
+	if _, ok := s.Live(aviator); !ok || s.claim(ctx) != 0 {
+		t.Error("a running repair isn't live, or was claimed again")
+	}
+	if st, _ := s.States(ctx, []int64{aviator, abyss, battle}); st[aviator].State != StateRunning || st[abyss].State != StateRunning || st[battle].State != StateQueued {
+		t.Errorf("states %+v", st)
+	}
+}

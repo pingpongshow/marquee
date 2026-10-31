@@ -229,7 +229,7 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
                     Text(title.ifBlank { "Issues" }, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     if (total >= 0) Text(if (total == 1) "1 issue" else "$total issues", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (repairable && total > 0) OutlinedButton({ repair(null) }, Modifier.padding(top = 8.dp).focusRing().testTag("repairAll")) { Text("Repair all") }
-                    if (repairing > 0) Text("$repairing ${if (repairing == 1) "repair" else "repairs"} waiting or running, one at a time.",
+                    if (repairing > 0) Text("$repairing ${if (repairing == 1) "repair" else "repairs"} waiting or running, two at a time.",
                         Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodySmall, color = Gold)
                 }
             }

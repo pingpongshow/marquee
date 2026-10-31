@@ -30,7 +30,11 @@ const (
 // an MP4 or MOV file.
 var ErrNotRepairable = errors.New("the file has no frame timing error that can be repaired")
 
-// Service works through the repairs asked for in Library Health, one at a time: it works out
+// Workers is how many repairs run at once. Each decodes a whole film, which keeps about a
+// quarter of a 24-thread CPU busy (at low priority), so two leave room for transcodes.
+const Workers = 2
+
+// Service works through the repairs asked for in Library Health, Workers at a time: it works out
 // the frame order (Order), writes a repaired copy beside the file (Rewrite), checks it, and
 // puts it in the file's place, the original going to the media trash. The library keeps its
 // record (the item keeps its id, history and metadata); the rescan reads the new file, and
@@ -50,20 +54,21 @@ type Service struct {
 	wakeOnce sync.Once
 	wake     chan struct{}
 	mu       sync.Mutex
-	running  int64
-	progress float64
+	running  map[int64]float64 // file → progress, of the repairs running now
 }
 
 func (s *Service) wakeCh() chan struct{} {
-	s.wakeOnce.Do(func() { s.wake = make(chan struct{}, 1) })
+	s.wakeOnce.Do(func() { s.wake = make(chan struct{}, Workers) })
 	return s.wake
 }
 
-// Wake starts the next repair now rather than at the next minute.
+// Wake starts the next repairs now rather than at the next minute.
 func (s *Service) Wake() {
-	select {
-	case s.wakeCh() <- struct{}{}:
-	default:
+	for range Workers {
+		select {
+		case s.wakeCh() <- struct{}{}:
+		default:
+		}
 	}
 }
 
@@ -128,11 +133,12 @@ func (s *Service) States(ctx context.Context, ids []int64) (map[int64]State, err
 	return States(ctx, s.DB, ids, s.Live)
 }
 
-// Live is the running repair's progress, when it's this file's.
+// Live is this file's repair progress, when it's running.
 func (s *Service) Live(fileID int64) (float64, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.progress, s.running == fileID && fileID != 0
+	p, ok := s.running[fileID]
+	return p, ok
 }
 
 // States reads the repairs of these files; live (when set) gives a running repair's progress.
@@ -174,10 +180,22 @@ func (s *Service) Waiting(ctx context.Context) int {
 	return n
 }
 
-// Run works through the queue until ctx ends: a repair interrupted by a restart starts
-// again, and leftovers of one are removed.
+// Run works through the queue until ctx ends, Workers repairs at a time: a repair
+// interrupted by a restart starts again, and leftovers of one are removed.
 func (s *Service) Run(ctx context.Context) {
 	s.DB.ExecContext(ctx, `UPDATE timing_repairs SET state = 'queued', progress = 0 WHERE state = 'running'`)
+	var wg sync.WaitGroup
+	for range Workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.work(ctx)
+		}()
+	}
+	wg.Wait()
+}
+
+func (s *Service) work(ctx context.Context) {
 	tick := time.NewTicker(time.Minute)
 	defer tick.Stop()
 	for {
@@ -192,15 +210,49 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 
-// next repairs the oldest queued file that isn't playing; false when there was none.
+// next repairs the first queued file that isn't playing or being repaired by another
+// worker; false when there was none.
 func (s *Service) next(ctx context.Context) bool {
 	if ctx.Err() != nil {
 		return false
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT file_id FROM timing_repairs WHERE state = 'queued' ORDER BY created_at, file_id`)
-	if err != nil {
+	id := s.claim(ctx)
+	if id == 0 {
 		return false
 	}
+	s.repairOne(ctx, id)
+	return true
+}
+
+// claim takes the next file for a worker: marked running, so no other worker takes it.
+func (s *Service) claim(ctx context.Context) int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, id := range s.queued(ctx) {
+		if _, taken := s.running[id]; taken || (s.Playing != nil && s.Playing(id)) {
+			continue
+		}
+		if s.running == nil {
+			s.running = map[int64]float64{}
+		}
+		s.running[id] = 0
+		s.DB.ExecContext(ctx, `UPDATE timing_repairs SET state = 'running', progress = 0, error = '' WHERE file_id = ?`, id)
+		return id
+	}
+	return 0
+}
+
+// queued are the files waiting for a repair, in the order they were asked for and then as
+// Library Health lists them (by title), so the queue works down the list.
+func (s *Service) queued(ctx context.Context) []int64 {
+	rows, err := s.DB.QueryContext(ctx, `SELECT r.file_id FROM timing_repairs r
+		LEFT JOIN media_files f ON f.id = r.file_id LEFT JOIN media_versions v ON v.id = f.version_id
+		LEFT JOIN items i ON i.id = v.item_id
+		WHERE r.state = 'queued' ORDER BY r.created_at, i.sort_title COLLATE NOCASE, i.id, r.file_id`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
 	var ids []int64
 	for rows.Next() {
 		var id int64
@@ -208,29 +260,19 @@ func (s *Service) next(ctx context.Context) bool {
 			ids = append(ids, id)
 		}
 	}
-	rows.Close()
-	for _, id := range ids {
-		if s.Playing != nil && s.Playing(id) {
-			continue
-		}
-		s.repairOne(ctx, id)
-		return true
-	}
-	return false
-}
-
-func (s *Service) setProgress(id int64, p float64) {
-	s.mu.Lock()
-	s.running, s.progress = id, p
-	s.mu.Unlock()
+	return ids
 }
 
 func (s *Service) repairOne(ctx context.Context, id int64) {
-	s.DB.ExecContext(ctx, `UPDATE timing_repairs SET state = 'running', progress = 0, error = '' WHERE file_id = ?`, id)
-	s.setProgress(id, 0)
-	defer s.setProgress(0, 0)
+	defer func() {
+		s.mu.Lock()
+		delete(s.running, id)
+		s.mu.Unlock()
+	}()
 	err := s.Repair(ctx, id, func(p float64) {
-		s.setProgress(id, p)
+		s.mu.Lock()
+		s.running[id] = p
+		s.mu.Unlock()
 	})
 	wctx := context.WithoutCancel(ctx)
 	switch {

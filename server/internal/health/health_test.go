@@ -261,3 +261,29 @@ func TestMissingSubtitles(t *testing.T) {
 		t.Errorf("unreachable: %+v", c)
 	}
 }
+
+// The file being repaired heads the Frame timing errors list; the rest follow by title.
+func TestFrameTimingRepairFirst(t *testing.T) {
+	e := newEnv(t)
+	var files []int64
+	for _, title := range []string{"Abyss", "Aviator", "Battleship"} {
+		f := e.file(e.movie(title), "/m/"+title+".mp4", 1920, 1080, 8000, "h264")
+		e.exec(`UPDATE media_files SET timing_error = 'Frames are timed in decode order' WHERE id = ?`, f)
+		files = append(files, f)
+	}
+	e.exec(`INSERT INTO timing_repairs (file_id, state, created_at) VALUES (?, 'running', 'x'), (?, 'queued', 'x')`, files[2], files[0])
+	list, _, err := (&Service{DB: e.db}).Issues(context.Background(), "frameTiming", 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []int64
+	for _, is := range list {
+		got = append(got, is.FileID)
+	}
+	if len(got) != 3 || got[0] != files[2] || got[1] != files[0] || got[2] != files[1] {
+		t.Errorf("list order %v, want %v", got, []int64{files[2], files[0], files[1]})
+	}
+	if list[0].Repair == nil || list[0].Repair.State != "running" {
+		t.Errorf("first row's repair: %+v", list[0].Repair)
+	}
+}

@@ -1602,7 +1602,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
 
     /**
      * POST /library-health/frameTiming/repairs
-     * Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file&#39;s timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again.
+     * Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file&#39;s timing rewritten; nothing is re-encoded, and the original goes to the media trash. Two repairs run at a time. Files already waiting are skipped; failed repairs are tried again.
      * 
      * @param frameTimingRepairRequest 
      * @return RepairFrameTiming202Response
@@ -1634,7 +1634,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
 
     /**
      * POST /library-health/frameTiming/repairs
-     * Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file&#39;s timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again.
+     * Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file&#39;s timing rewritten; nothing is re-encoded, and the original goes to the media trash. Two repairs run at a time. Files already waiting are skipped; failed repairs are tried again.
      * 
      * @param frameTimingRepairRequest 
      * @return ApiResponse<RepairFrameTiming202Response?>

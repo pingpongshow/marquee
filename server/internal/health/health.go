@@ -100,8 +100,11 @@ var checks = []check{
 				OR NOT EXISTS (SELECT 1 FROM streams s WHERE s.file_id = f.id AND s.kind IN ('video', 'audio')))`},
 	{id: "frameTiming", title: "Frame timing errors", severity: "warning",
 		description: "Video files whose frames are timed in the order they're decoded instead of the order they're shown. Played as they are, the picture stutters, so Marquee converts them while playing. Repair puts the timing right without re-encoding anything (MP4 and MOV files); the original goes to the media trash.",
-		query: `SELECT i.id AS item_id, f.id AS file_id, f.path AS path, f.timing_error AS detail, 0 AS rank
+		// The file being repaired comes first; the queue then works down the list (by title).
+		query: `SELECT i.id AS item_id, f.id AS file_id, f.path AS path, f.timing_error AS detail,
+			CASE WHEN r.state = 'running' THEN 1 ELSE 0 END AS rank
 		FROM media_files f CROSS JOIN media_versions v ON v.id = f.version_id CROSS JOIN items i ON i.id = v.item_id
+		LEFT JOIN timing_repairs r ON r.file_id = f.id
 		WHERE f.timing_error IS NOT NULL AND f.available = 1 AND i.extra_type IS NULL`},
 	{id: "playbackErrors", title: "Playback errors", severity: "error",
 		description: "Titles that failed to play in the last 30 days.",

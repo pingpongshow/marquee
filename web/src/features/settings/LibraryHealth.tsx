@@ -190,7 +190,7 @@ function CheckIssues({ check, onBack }: { check: HealthCheck; onBack: () => void
       <p className="text-sm text-muted">{check.description}</p>
       {!!check.repairing && (
         <p className="text-sm text-accent" role="status">
-          {check.repairing.toLocaleString()} {check.repairing === 1 ? "repair" : "repairs"} waiting or running, one at a time. Each takes a few minutes for a film.
+          {check.repairing.toLocaleString()} {check.repairing === 1 ? "repair" : "repairs"} waiting or running, two at a time. Each takes a few minutes for a film.
         </p>
       )}
       {issues.isPending && <Spinner />}

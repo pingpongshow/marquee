@@ -95,7 +95,7 @@ struct HealthIssuesView: View {
                         .accessibilityIdentifier("repairAll")
                 }
                 if repairing > 0 {
-                    Text("\(repairing.formatted()) \(repairing == 1 ? "repair" : "repairs") waiting or running, one at a time.")
+                    Text("\(repairing.formatted()) \(repairing == 1 ? "repair" : "repairs") waiting or running, two at a time.")
                         .font(.footnote).foregroundStyle(.orange)
                 }
             }

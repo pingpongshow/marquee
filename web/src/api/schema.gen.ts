@@ -1776,7 +1776,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file's timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again. */
+        /** Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file's timing rewritten; nothing is re-encoded, and the original goes to the media trash. Two repairs run at a time. Files already waiting are skipped; failed repairs are tried again. */
         post: operations["repairFrameTiming"];
         delete?: never;
         options?: never;

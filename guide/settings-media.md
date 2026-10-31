@@ -343,7 +343,7 @@ Damaged files are found only among movies, episodes and personal videos added (o
 
 ### Repairing frame timing errors
 
-Files in **Frame timing errors** have **Repair**, and the check has **Repair all**. A repair works out the order the frames are shown in from the video itself and writes it into the file: nothing is re-encoded, so the picture and sound are exactly as they were. It reads the whole video once, which takes a few minutes for a film, at low priority, one file at a time; the list shows each repair's progress. The repaired file is checked before it replaces the original, which goes to the media trash. A file that's playing waits until it stops. Once repaired, the file leaves the list and plays as it is again (direct play).
+Files in **Frame timing errors** have **Repair**, and the check has **Repair all**. A repair works out the order the frames are shown in from the video itself and writes it into the file: nothing is re-encoded, so the picture and sound are exactly as they were. It reads the whole video once, which takes a few minutes for a film, at low priority, two files at a time; the files being repaired head the list, with their progress, and the rest are repaired in the order listed. The repaired file is checked before it replaces the original, which goes to the media trash. A file that's playing waits until it stops. Once repaired, the file leaves the list and plays as it is again (direct play).
 
 Only MP4 and MOV files can be repaired. Other files with this problem stay in the list and keep being converted while playing; replacing them with a good copy clears them. AVI files aren't checked, since AVI doesn't store when frames are shown.
 
