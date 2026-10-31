@@ -712,6 +712,7 @@ struct VodMovieView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("TMDB score \(String(format: "%.1f", r))")
             }
+            VodRatingStars(id: m.id, series: false, rating: m.info.userRating)
             if let t = m.info.tagline, !t.isEmpty { Text(t).font(.callout.italic()).foregroundStyle(.secondary) }
             actions(m, isWatched: isWatched, resumeMs: resumeMs).padding(.top, 6)
         }
@@ -1275,5 +1276,31 @@ private struct VodPlayerController: UIViewControllerRepresentable {
             }
         }
         #endif
+    }
+}
+
+/// Your rating of a film or series on demand: shown at once, reverted if the server refuses it.
+struct VodRatingStars: View {
+    @Environment(AppSession.self) private var app
+    let id: Int64
+    let series: Bool
+    /// The rating the server sent.
+    let rating: Double?
+    /// This page's change, until the page reloads (.some(nil) = cleared).
+    @State private var local: Double??
+
+    var body: some View {
+        let current = local ?? rating
+        HStack(spacing: 10) {
+            Text("Your rating").font(.callout).foregroundStyle(.secondary)
+            StarPicker(current: current, labelPrefix: "Rate ") { next in
+                local = .some(next)
+                Task {
+                    do { try await app.rateVod(id, series: series, next) } catch { local = .some(current) }
+                }
+            }
+        }
+        .accessibilityIdentifier("vod.rating")
+        .onChange(of: rating) { local = nil }
     }
 }

@@ -146,9 +146,33 @@ func TestEmbeddingsAndRecommendations(t *testing.T) {
 	}
 
 	// Recommended: near the (rating-weighted) centroid, nothing started.
-	rec, err := s.Recommended(ctx, acc, idx, nil, 20)
+	rec, err := s.Recommended(ctx, acc, idx, nil, 20, VODTaste{})
 	if err != nil || len(rec) != 3 || rec[0].ID != wall {
 		t.Fatalf("recommended: %s %v", ids(rec), err)
+	}
+
+	// Someone who has only watched on demand: a film they liked there that the library has is
+	// a seed (and not recommended), one they saw isn't recommended, and TMDB's recommendations
+	// for what they liked move up even with nothing near it.
+	vee := Access{UserID: mustExec(t, d, `INSERT INTO users(username, display_name) VALUES ('vee', 'Vee')`)}
+	for id, tm := range map[int64]string{wall: "501", notebook: "502", heat: "503", moon: "504"} {
+		mustExec(t, d, `INSERT INTO external_ids(item_id, provider, value) VALUES (?, 'tmdb', ?)`, id, tm)
+	}
+	if rec, err = s.Recommended(ctx, vee, idx, nil, 20, VODTaste{}); err != nil || len(rec) != 0 {
+		t.Fatalf("no history at all: %s %v", ids(rec), err)
+	}
+	taste := VODTaste{
+		Seen:  []TMDBRef{{"movie", 501}, {"movie", 504}},
+		Liked: []VODLike{{TMDBRef: TMDBRef{"movie", 501}, Weight: 1}},
+	}
+	rec, err = s.Recommended(ctx, vee, idx, nil, 20, taste)
+	if err != nil || len(rec) == 0 || rec[0].ID != notebook || strings.Contains(ids(rec), "WALL-E") || strings.Contains(ids(rec), "Moon") {
+		t.Fatalf("from a film liked on demand that the library has: %s %v", ids(rec), err)
+	}
+	// Liked only titles the library doesn't have: their TMDB recommendations alone.
+	rec, err = s.Recommended(ctx, vee, idx, nil, 20, VODTaste{Liked: []VODLike{{TMDBRef: TMDBRef{"movie", 999}, Weight: 1, Recs: []int{503, 502}}}})
+	if err != nil || ids(rec) != "Heat,The Notebook" {
+		t.Fatalf("from VOD recommendations only: %s %v", ids(rec), err)
 	}
 
 	// Muse for movies: constraints filter, the vector ranks.

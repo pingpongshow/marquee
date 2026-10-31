@@ -3587,6 +3587,28 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /livetv/vod/movies/{movieId}/rating:
+    parameters:
+      - { name: movieId, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [livetv]
+      operationId: rateVodMovie
+      summary: "Your rating of a film on demand, 0–10 (half stars; 10 = loved), or null to clear it. It's kept with the title (its TMDB id, else its title and year), not the source's entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating: { type: number, minimum: 0, maximum: 10, nullable: true }
+      responses:
+        "204": { description: Saved. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /livetv/vod/movies/{movieId}/play:
     parameters:
       - { name: movieId, in: path, required: true, schema: { type: integer, format: int64 } }
@@ -3842,6 +3864,28 @@ paths:
       summary: Take a series on demand off your watchlist.
       responses:
         "204": { description: Removed (or wasn't there). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/series/{seriesId}/rating:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [livetv]
+      operationId: rateVodSeries
+      summary: "Your rating of a series on demand, 0–10 (half stars; 10 = loved), or null to clear it. It's kept with the title (its TMDB id, else its title and year), not the source's entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating: { type: number, minimum: 0, maximum: 10, nullable: true }
+      responses:
+        "204": { description: Saved. }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -6303,6 +6347,7 @@ components:
               items: { $ref: "#/components/schemas/VodSaveDestinationRef" }
             save: { $ref: "#/components/schemas/VodSaveState" }
             library: { $ref: "#/components/schemas/VodLibraryMatch" }
+            userRating: { type: number, description: "Your rating, 0–10 (PUT /livetv/vod/movies/{id}/rating)." }
             libraryItemId: { type: integer, format: int64, description: "The library's copy of this film (its best, in a library the caller can see; matched by TMDB id, else by title and year). The apps play it first, the stream on demand second." }
             watchlisted: { type: boolean, description: "On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist." }
 
@@ -6413,6 +6458,7 @@ components:
               description: "Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both)."
               items: { $ref: "#/components/schemas/VodSaveDestinationRef" }
             library: { $ref: "#/components/schemas/VodLibraryRollup" }
+            userRating: { type: number, description: "Your rating, 0–10 (PUT /livetv/vod/series/{id}/rating)." }
             libraryItemId: { type: integer, format: int64, description: "The library's copy of this show (in a library the caller can see): the apps open it first. Each episode the library has carries its own libraryItemId." }
             watchlisted: { type: boolean, description: "On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist." }
 

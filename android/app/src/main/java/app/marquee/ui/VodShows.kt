@@ -235,6 +235,7 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
                             Text("${if (s.matched) "TMDB " else ""}${"%.1f".format(it)}", Modifier.clip(RoundedCornerShape(6.dp)).background(Surface2).padding(horizontal = 8.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                         }
+                        VodRating(s.id, series = true, rating = s.userRating)
                         FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             // The library's copy comes first.
                             val library = s.libraryItemId

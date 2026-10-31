@@ -203,12 +203,12 @@ func (s *Service) current(ctx context.Context, u User) (*entry, error) {
 	return e, nil
 }
 
-// vodTasteVersion changes when uid watches a film or episode on demand.
+// vodTasteVersion changes when uid watches a film or episode on demand, or rates one.
 func (s *Service) vodTasteVersion(ctx context.Context, uid int64) string {
 	var a, b sql.NullString
 	s.DB.QueryRowContext(ctx, `SELECT MAX(updated_at) FROM vod_progress WHERE user_id=?`, uid).Scan(&a)
 	s.DB.QueryRowContext(ctx, `SELECT MAX(updated_at) FROM vod_episode_progress WHERE user_id=?`, uid).Scan(&b)
-	return "|" + a.String + "|" + b.String
+	return "|" + a.String + "|" + b.String + "|" + vod.MemoryVersion(ctx, s.DB, uid)
 }
 
 // exclusions are the titles not to suggest to someone right now.
@@ -262,6 +262,21 @@ func (s *Service) exclusions(ctx context.Context, u User, cat *catalog) (*exclus
 	if err := add(Series, `SELECT DISTINCT series_id FROM vod_episode_progress WHERE user_id=?`); err != nil {
 		return nil, err
 	}
+	// What they watched or rated, remembered by TMDB id: a title that left its source and came
+	// back under another id isn't suggested again either.
+	mem, err := s.DB.QueryContext(ctx, `SELECT kind, tmdb_id FROM vod_memory WHERE user_id=? AND tmdb_id IS NOT NULL
+		AND (rating IS NOT NULL OR finished=1 OR episodes>0)`, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	for mem.Next() {
+		var kind string
+		var tmdb int
+		if mem.Scan(&kind, &tmdb) == nil {
+			x.tmdb[key{kind, tmdb}] = true
+		}
+	}
+	mem.Close()
 	rows, err := s.DB.QueryContext(ctx, `SELECT kind, vod_id FROM vod_suggestion_hidden WHERE user_id=?`, u.ID)
 	if err != nil {
 		return nil, err
@@ -283,51 +298,62 @@ func (s *Service) exclusions(ctx context.Context, u User, cat *catalog) (*exclus
 	return x, rows.Err()
 }
 
-// vodSeeds are the films and series on demand u watched: a film to the end, a series with
-// three episodes watched (or all of them; fewer counts for less).
-func (s *Service) vodSeeds(ctx context.Context, u User, cat *catalog) ([]seed, []*title, error) {
-	var out []seed
-	var missing []*title
-	add := func(kind string, id int64, finished bool) {
-		t := cat.get(kind, id)
-		if t == nil {
-			return
-		}
-		if t.recs == nil {
-			missing = append(missing, t)
-		}
-		w := 1.0
-		if !finished {
-			w = 0.6
-		}
-		out = append(out, seed{name: t.name, kind: kind, tmdb: t.tmdb, weight: w, finished: finished, genres: t.genres,
-			keywords: t.keywords, year: t.year, recs: t.recs})
-	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT movie_id FROM vod_progress WHERE user_id=? AND watched=1 ORDER BY updated_at DESC LIMIT 50`, u.ID)
+// vodSeeds are the films and series on demand u watched or rated, from what's remembered of
+// them (vod_memory), so titles that have left their source still count. Liked: rated 5/10 or
+// more (counting by the rating), else a film watched to the end, a series with three episodes
+// watched (or all of them; fewer counts for less). Disliked: rated below 5/10.
+func (s *Service) vodSeeds(ctx context.Context, u User, cat *catalog) (liked, disliked []seed, missing []*title, err error) {
+	mems, err := vod.Memories(ctx, s.DB, u.ID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	for rows.Next() {
-		var id int64
-		if rows.Scan(&id) == nil {
-			add(Movie, id, true)
+	for _, m := range mems {
+		kind := Movie
+		if m.Kind == "series" {
+			kind = Series
+		}
+		sd := seed{name: m.Title, kind: kind, tmdb: m.TMDBID, rating: m.Rating, genres: lower(m.Genres), keywords: lower(m.Keywords),
+			year: m.Year, recs: m.Recs}
+		// A copy still on demand fills in what wasn't known yet (TMDB's recommendations come
+		// after the match).
+		if m.TMDBID > 0 && (sd.recs == nil || len(sd.keywords) == 0) && cat != nil {
+			if copies := cat.byTMDB[key{kind, m.TMDBID}]; len(copies) > 0 {
+				t := copies[0]
+				if sd.recs == nil {
+					sd.recs = t.recs
+					if t.recs == nil {
+						missing = append(missing, t)
+					}
+				}
+				if len(sd.keywords) == 0 {
+					sd.keywords = t.keywords
+				}
+			}
+		}
+		started := false
+		sd.finished = m.Finished
+		if kind == Series {
+			sd.finished = m.Episodes >= 3 || (m.Total > 0 && m.Episodes >= m.Total)
+			started = m.Episodes > 0
+		}
+		switch {
+		case m.Rating > 0 && m.Rating < 5:
+			disliked = append(disliked, sd)
+			continue
+		case m.Rating > 0:
+			sd.weight = m.Rating / 7
+		case sd.finished:
+			sd.weight = 1
+		case started:
+			sd.weight = 0.6
+		default:
+			continue
+		}
+		if len(liked) < 100 {
+			liked = append(liked, sd)
 		}
 	}
-	rows.Close()
-	rows, err = s.DB.QueryContext(ctx, `SELECT p.series_id, COUNT(*), (SELECT COUNT(*) FROM vod_episodes e WHERE e.series_id=p.series_id)
-		FROM vod_episode_progress p WHERE p.user_id=? AND p.watched=1 GROUP BY p.series_id ORDER BY MAX(p.updated_at) DESC LIMIT 50`, u.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-	for rows.Next() {
-		var id int64
-		var watched, all int
-		if rows.Scan(&id, &watched, &all) == nil {
-			add(Series, id, watched >= 3 || (all > 0 && watched >= all))
-		}
-	}
-	rows.Close()
-	return out, missing, nil
+	return liked, disliked, missing, nil
 }
 
 // profile is u's taste as a profile.
@@ -337,12 +363,12 @@ func (s *Service) profile(ctx context.Context, u User, cat *catalog) (*profile, 
 		return nil, nil, err
 	}
 	liked := librarySeeds(taste.Liked)
-	vodLiked, missing, err := s.vodSeeds(ctx, u, cat)
+	vodLiked, vodDisliked, missing, err := s.vodSeeds(ctx, u, cat)
 	if err != nil {
 		return nil, nil, err
 	}
 	liked = append(liked, vodLiked...)
-	return buildProfile(liked, librarySeeds(taste.Disliked)), missing, nil
+	return buildProfile(liked, append(librarySeeds(taste.Disliked), vodDisliked...)), missing, nil
 }
 
 // build works out u's suggestions.

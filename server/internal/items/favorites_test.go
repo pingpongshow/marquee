@@ -37,14 +37,14 @@ func TestFavoritesInRecommendations(t *testing.T) {
 	acc := Access{UserID: uid}
 
 	// Without favourites the 5-star love story leads the taste.
-	recs, err := s.Recommended(ctx, acc, idx, nil, 2)
+	recs, err := s.Recommended(ctx, acc, idx, nil, 2, VODTaste{})
 	if err != nil || ids(recs) != "Titanic,Gravity" {
 		t.Fatalf("before favourites: %s %v", ids(recs), err)
 	}
 	if err := s.SetFavorite(ctx, uid, alien, true); err != nil {
 		t.Fatal(err)
 	}
-	recs, err = s.Recommended(ctx, acc, idx, nil, 2)
+	recs, err = s.Recommended(ctx, acc, idx, nil, 2, VODTaste{})
 	if err != nil || ids(recs) != "Gravity,Titanic" {
 		t.Fatalf("a favourite should outweigh a 5-star rating: %s %v", ids(recs), err)
 	}

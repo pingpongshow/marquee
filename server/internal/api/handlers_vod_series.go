@@ -291,6 +291,9 @@ func (h *Handlers) GetVodSeries(ctx context.Context, req GetVodSeriesRequestObje
 	if on, err := h.VOD.Watchlisted(ctx, s.User.ID, true, m.ID); err == nil {
 		out.Watchlisted = ptr(on)
 	}
+	if r, err := h.VOD.Rating(ctx, s.User.ID, "series", m.ID); err == nil && r > 0 {
+		out.UserRating = ptr(float32(r))
+	}
 	return GetVodSeries200JSONResponse(out), nil
 }
 

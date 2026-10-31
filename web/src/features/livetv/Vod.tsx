@@ -11,6 +11,7 @@ import { useRemoveVodFromContinue } from "@/features/home/ContinueWatching";
 import { Alert, Button, Input, Select, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "@/features/browse/format";
 import { Poster } from "@/features/browse/Poster";
+import { Rating } from "@/features/music/Rating";
 import { deviceProfile } from "@/features/player/deviceProfile";
 import {
   type VodFilters,
@@ -496,6 +497,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
   const watched = useVodWatched(movieId);
   const watchlist = useVodWatchlist();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   if (movie.isPending) return <Spinner />;
   if (movie.isError)
     return (
@@ -591,6 +593,18 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
                 {listed ? <BookmarkCheck className="size-4 text-accent" /> : <Bookmark className="size-4" />} {listed ? "On watchlist" : "Watchlist"}
               </Button>
               {m.canSave && <SaveMovieButton movieId={m.id} save={m.save} library={m.library} targets={m} />}
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-sm text-muted">
+              <span>Your rating</span>
+              <Rating
+                key={m.id}
+                value={m.userRating}
+                testId="vod-rating"
+                save={(rating) =>
+                  unwrap(api.PUT("/livetv/vod/movies/{movieId}/rating", { params: { path: { movieId: m.id } }, body: { rating } }))
+                }
+                onChange={() => void qc.invalidateQueries({ queryKey: ["vod"] })}
+              />
             </div>
             {m.libraryItemId && (
               <p className="mt-3 text-sm text-muted">

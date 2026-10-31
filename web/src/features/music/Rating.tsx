@@ -10,6 +10,7 @@ import { api, unwrap } from "@/api/client";
  */
 export function Rating({
   itemId,
+  save,
   value,
   size = "md",
   label = "Your rating",
@@ -17,7 +18,10 @@ export function Rating({
   testId,
   onChange,
 }: {
-  itemId: number;
+  /** The library item rated (PUT /items/{itemId}/rating), unless save is given. */
+  itemId?: number;
+  /** Saves the rating somewhere else (a film or series on demand). */
+  save?: (rating: number | null) => Promise<unknown>;
   value?: number;
   size?: "xs" | "sm" | "md";
   /** The group's accessible name, or a function of the current value. */
@@ -38,13 +42,16 @@ export function Rating({
   }
   const rate = useMutation({
     mutationFn: (rating: number | null) =>
-      unwrap(
-        api.PUT("/items/{itemId}/rating", {
-          params: { path: { itemId } },
-          body: { rating },
-        }),
-      ),
+      save
+        ? save(rating)
+        : unwrap(
+            api.PUT("/items/{itemId}/rating", {
+              params: { path: { itemId: itemId ?? 0 } },
+              body: { rating },
+            }),
+          ),
     onSuccess: () => {
+      if (save) return;
       void qc.invalidateQueries({ queryKey: ["items"] });
       // Library grids and lists (Songs, My rating sort, Rated 4★+) show it too.
       void qc.invalidateQueries({ queryKey: ["libraries"] });

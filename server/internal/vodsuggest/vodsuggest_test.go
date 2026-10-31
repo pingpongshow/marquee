@@ -10,6 +10,7 @@ import (
 
 	"marquee/internal/db"
 	"marquee/internal/items"
+	"marquee/internal/vod"
 	"marquee/internal/vodsave"
 )
 
@@ -297,13 +298,17 @@ func TestFavouriteOutranksRating(t *testing.T) {
 	}
 }
 
-// Films watched on demand count too, through their TMDB recommendations.
+// Films watched on demand count too, through their TMDB recommendations, and keep counting
+// once they've left their source.
 func TestWatchedOnDemand(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
+	v := &vod.Service{DB: e.db}
 	seen := e.vodMovie("Seen", 10, `["Western"]`, "")
 	e.exec(`UPDATE vod_movies SET tmdb_recs='[11]' WHERE id=?`, seen)
-	e.exec(`INSERT INTO vod_progress(user_id, movie_id, watched, updated_at) VALUES (?, ?, 1, '2026-01-01T00:00:00Z')`, e.uid, seen)
+	if err := v.SetWatched(ctx, e.uid, seen, true); err != nil {
+		t.Fatal(err)
+	}
 	e.vodMovie("Next", 11, `["Drama"]`, "")
 	list, err := e.svc.For(ctx, e.user(), "", 10)
 	if err != nil {
@@ -312,7 +317,76 @@ func TestWatchedOnDemand(t *testing.T) {
 	if got := titles(t, e, list); len(got) != 1 || got[0] != "Next" || list[0].Reason != "Because you watched Seen" {
 		t.Errorf("from a film watched on demand: %v %+v", got, list)
 	}
+	e.exec(`DELETE FROM vod_movies WHERE id=?`, seen) // gone from the source, and its watched mark with it
+	e.svc.Forget(e.uid)
+	if list, err = e.svc.For(ctx, e.user(), "", 10); err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(t, e, list); len(got) != 1 || got[0] != "Next" || list[0].Reason != "Because you watched Seen" {
+		t.Errorf("after it left the source: %v %+v", got, list)
+	}
+	// Back under another id: still watched, so not suggested.
+	e.vodMovie("Seen", 10, `["Western"]`, "")
+	e.svc.Forget(e.uid)
+	if list, err = e.svc.For(ctx, e.user(), "", 10); err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(t, e, list); len(got) != 1 || got[0] != "Next" {
+		t.Errorf("after it came back: %v", got)
+	}
 }
+
+// A rating on demand is kept with the title: a high one is a strong like, a low one a dislike
+// whose recommendations are steered away from; it's there again when the title comes back.
+func TestRatedOnDemand(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	v := &vod.Service{DB: e.db}
+	loved := e.vodMovie("Loved", 20, `["Drama"]`, "")
+	hated := e.vodMovie("Hated", 30, `["Drama"]`, "")
+	e.exec(`UPDATE vod_movies SET tmdb_recs='[21]' WHERE id=?`, loved)
+	e.exec(`UPDATE vod_movies SET tmdb_recs='[31]' WHERE id=?`, hated)
+	e.vodMovie("Liked's pick", 21, `["Drama"]`, "")
+	e.vodMovie("Disliked's pick", 31, `["Drama"]`, "")
+	nine, two := 9.0, 2.0
+	if err := v.SetRating(ctx, e.uid, "movie", loved, &nine); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.SetRating(ctx, e.uid, "movie", hated, &two); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.SetRating(ctx, e.uid, "movie", loved, ptrTo(11.0)); err == nil {
+		t.Error("a rating of 11 was taken")
+	}
+	list, err := e.svc.For(ctx, e.user(), "", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := titles(t, e, list)
+	if len(got) == 0 || got[0] != "Liked's pick" || list[0].Reason != "Because you loved Loved" {
+		t.Errorf("from ratings: %v %+v", got, list)
+	}
+	for i, g := range got {
+		if g == "Disliked's pick" && i == 0 {
+			t.Errorf("a disliked film's recommendation came first: %v", got)
+		}
+	}
+	// The rating outlives the film's row and comes back with it.
+	e.exec(`DELETE FROM vod_movies WHERE id=?`, loved)
+	again := e.vodMovie("Loved", 20, `["Drama"]`, "")
+	if r, err := v.Rating(ctx, e.uid, "movie", again); err != nil || r != 9 {
+		t.Errorf("the rating after it came back: %v %v", r, err)
+	}
+	// Cleared.
+	if err := v.SetRating(ctx, e.uid, "movie", again, nil); err != nil {
+		t.Fatal(err)
+	}
+	if r, _ := v.Rating(ctx, e.uid, "movie", again); r != 0 {
+		t.Errorf("cleared, but %v", r)
+	}
+}
+
+func ptrTo[T any](v T) *T { return &v }
 
 // Someone with no taste yet gets well-rated, popular titles they may see ("Popular on
 // VOD"), spread over genres; library-owned, watched, hidden and poorly rated titles stay out.

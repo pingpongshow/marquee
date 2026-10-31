@@ -2843,6 +2843,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livetv/vod/movies/{movieId}/rating": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Your rating of a film on demand, 0–10 (half stars; 10 = loved), or null to clear it. It's kept with the title (its TMDB id, else its title and year), not the source's entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back. */
+        put: operations["rateVodMovie"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/livetv/vod/movies/{movieId}/play": {
         parameters: {
             query?: never;
@@ -3064,6 +3083,25 @@ export interface paths {
         post?: never;
         /** Take a series on demand off your watchlist. */
         delete: operations["removeVodSeriesFromWatchlist"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/series/{seriesId}/rating": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Your rating of a series on demand, 0–10 (half stars; 10 = loved), or null to clear it. It's kept with the title (its TMDB id, else its title and year), not the source's entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back. */
+        put: operations["rateVodSeries"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5285,6 +5323,8 @@ export interface components {
             saveDestinations?: components["schemas"]["VodSaveDestinationRef"][];
             save?: components["schemas"]["VodSaveState"];
             library?: components["schemas"]["VodLibraryMatch"];
+            /** @description Your rating, 0–10 (PUT /livetv/vod/movies/{id}/rating). */
+            userRating?: number;
             /**
              * Format: int64
              * @description The library's copy of this film (its best, in a library the caller can see; matched by TMDB id, else by title and year). The apps play it first, the stream on demand second.
@@ -5403,6 +5443,8 @@ export interface components {
             /** @description Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both). */
             saveDestinations?: components["schemas"]["VodSaveDestinationRef"][];
             library?: components["schemas"]["VodLibraryRollup"];
+            /** @description Your rating, 0–10 (PUT /livetv/vod/series/{id}/rating). */
+            userRating?: number;
             /**
              * Format: int64
              * @description The library's copy of this show (in a library the caller can see): the apps open it first. Each episode the library has carries its own libraryItemId.
@@ -13179,6 +13221,36 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    rateVodMovie: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    rating?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     playVodMovie: {
         parameters: {
             query?: never;
@@ -13581,6 +13653,36 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    rateVodSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    rating?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

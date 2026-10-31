@@ -201,6 +201,7 @@ struct VodSeriesView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Rating \(String(format: "%.1f", r))")
             }
+            VodRatingStars(id: s.id, series: true, rating: s.info.userRating)
             actions(s).padding(.top, 6)
             VodFollowControl(show: s) // new episodes saved automatically
         }

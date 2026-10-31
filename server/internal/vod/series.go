@@ -1113,14 +1113,24 @@ func (s *Service) SetEpisodeProgress(ctx context.Context, userID, episodeID, pos
 
 // SetEpisodeWatched marks an episode watched, or unwatched (forgetting its progress).
 func (s *Service) SetEpisodeWatched(ctx context.Context, userID, episodeID int64, watched bool) error {
+	var err error
 	if !watched {
-		_, err := s.DB.ExecContext(ctx, "DELETE FROM vod_episode_progress WHERE user_id=? AND episode_id=?", userID, episodeID)
-		return err
+		_, err = s.DB.ExecContext(ctx, "DELETE FROM vod_episode_progress WHERE user_id=? AND episode_id=?", userID, episodeID)
+	} else {
+		_, err = s.DB.ExecContext(ctx, `INSERT INTO vod_episode_progress(user_id, episode_id, series_id, position_ms, watched, updated_at)
+			SELECT ?, id, series_id, 0, 1, ? FROM vod_episodes WHERE id=?
+			ON CONFLICT(user_id, episode_id) DO UPDATE SET position_ms=0, watched=1, updated_at=excluded.updated_at`,
+			userID, now(), episodeID)
 	}
-	_, err := s.DB.ExecContext(ctx, `INSERT INTO vod_episode_progress(user_id, episode_id, series_id, position_ms, watched, updated_at)
-		SELECT ?, id, series_id, 0, 1, ? FROM vod_episodes WHERE id=?
-		ON CONFLICT(user_id, episode_id) DO UPDATE SET position_ms=0, watched=1, updated_at=excluded.updated_at`,
-		userID, now(), episodeID)
+	if err == nil {
+		s.remember(ctx, func() error {
+			var series int64
+			if err := s.DB.QueryRowContext(ctx, "SELECT series_id FROM vod_episodes WHERE id=?", episodeID).Scan(&series); err != nil {
+				return err
+			}
+			return s.rememberSeries(ctx, userID, series)
+		})
+	}
 	return err
 }
 
@@ -1134,6 +1144,9 @@ func (s *Service) SetSeriesWatched(ctx context.Context, userID, seriesID int64, 
 	if !watched {
 		_, err := s.DB.ExecContext(ctx, "DELETE FROM vod_episode_progress WHERE user_id=? AND episode_id IN (SELECT id FROM vod_episodes WHERE "+
 			cond+")", append([]any{userID}, args...)...)
+		if err == nil {
+			s.remember(ctx, func() error { return s.rememberSeries(ctx, userID, seriesID) })
+		}
 		return err
 	}
 	// Later episodes get later times, so the last one counts as the most recently finished.
@@ -1162,7 +1175,11 @@ func (s *Service) SetSeriesWatched(ctx context.Context, userID, seriesID int64, 
 			return err
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.remember(ctx, func() error { return s.rememberSeries(ctx, userID, seriesID) })
+	return nil
 }
 
 // EpisodePlayLink is the link an episode streams from (it holds the password: never

@@ -211,7 +211,20 @@ struct RatingStars: View {
     /// Put before each star's spoken name ("Rate 3 stars" on item pages).
     var labelPrefix = ""
 
-    private var current: Double? { RatingStore.shared.rating(itemID, rating) }
+    var body: some View {
+        let current = RatingStore.shared.rating(itemID, rating)
+        StarPicker(current: current, labelPrefix: labelPrefix) { next in
+            RatingStore.shared.rate(itemID, next, was: current, app: app)
+        }
+    }
+}
+
+/// Five stars in half-star steps (0–10), drawn and picked as RatingStars does, saved by pick
+/// (nil clears the rating).
+struct StarPicker: View {
+    let current: Double?
+    var labelPrefix = ""
+    let pick: (Double?) -> Void
 
     var body: some View {
         HStack(spacing: 6) {
@@ -228,13 +241,13 @@ struct RatingStars: View {
                         GeometryReader { g in
                             Color.clear.contentShape(Rectangle())
                                 .onTapGesture(coordinateSpace: .local) { p in
-                                    pick(p.x < g.size.width / 2 ? Double(star * 2 - 1) : Double(star * 2))
+                                    choose(p.x < g.size.width / 2 ? Double(star * 2 - 1) : Double(star * 2))
                                 }
                         }
                     }
                     .accessibilityAddTraits(.isButton)
                     .accessibilityLabel("\(labelPrefix)\(star) star\(star == 1 ? "" : "s")")
-                    .accessibilityAction { pick(Double(star * 2)) }
+                    .accessibilityAction { choose(Double(star * 2)) }
                 #endif
             }
         }
@@ -243,7 +256,7 @@ struct RatingStars: View {
         .accessibilityValue(current.map { String(format: "%.1f stars", $0 / 2) } ?? "Not rated")
         .accessibilityAdjustableAction { dir in
             let r = current ?? 0
-            pick(min(10, max(0, r + (dir == .increment ? 1 : -1))))
+            choose(min(10, max(0, r + (dir == .increment ? 1 : -1))))
         }
     }
 
@@ -252,10 +265,8 @@ struct RatingStars: View {
     }
 
     /// Sets a rating (0–10); choosing the current value again clears it.
-    private func pick(_ v: Double) {
-        let old = current
-        let next: Double? = (v == old || v == 0) ? nil : v
-        RatingStore.shared.rate(itemID, next, was: old, app: app)
+    private func choose(_ v: Double) {
+        pick((v == current || v == 0) ? nil : v)
     }
 
     private func symbol(_ star: Int) -> String {
@@ -269,9 +280,7 @@ struct RatingStars: View {
     /// makes it a half; pressing the half clears the rating.
     private func set(_ star: Int) {
         let full = Double(star * 2)
-        let old = current
-        let next: Double? = old == full ? full - 1 : old == full - 1 ? nil : full
-        RatingStore.shared.rate(itemID, next, was: old, app: app)
+        pick(current == full ? full - 1 : current == full - 1 ? nil : full)
     }
 }
 

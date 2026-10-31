@@ -335,6 +335,9 @@ func (h *Handlers) GetVodMovie(ctx context.Context, req GetVodMovieRequestObject
 	if on, err := h.VOD.Watchlisted(ctx, s.User.ID, false, m.ID); err == nil {
 		out.Watchlisted = ptr(on)
 	}
+	if r, err := h.VOD.Rating(ctx, s.User.ID, "movie", m.ID); err == nil && r > 0 {
+		out.UserRating = ptr(float32(r))
+	}
 	return GetVodMovie200JSONResponse(out), nil
 }
 

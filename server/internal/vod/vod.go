@@ -130,10 +130,12 @@ func (s *Service) Run(ctx context.Context, wake <-chan struct{}) {
 	}
 	t := time.NewTicker(tick)
 	defer t.Stop()
+	s.BackfillMemory(ctx)
 	start := true
 	for {
 		if s.due(ctx, start) {
 			s.Refresh(ctx, false)
+			s.fillMemory(ctx)
 		}
 		start = false
 		select {
@@ -143,6 +145,7 @@ func (s *Service) Run(ctx context.Context, wake <-chan struct{}) {
 		case <-wake:
 			if s.Enabled() {
 				s.Refresh(ctx, false)
+				s.fillMemory(ctx)
 			}
 		}
 	}
@@ -852,6 +855,9 @@ func (s *Service) SetWatched(ctx context.Context, userID, movieID int64, watched
 	_, err := s.DB.ExecContext(ctx, `INSERT INTO vod_progress(user_id, movie_id, position_ms, watched, updated_at) VALUES(?,?,0,?,?)
 		ON CONFLICT(user_id, movie_id) DO UPDATE SET position_ms=0, watched=excluded.watched, updated_at=excluded.updated_at`,
 		userID, movieID, watched, now())
+	if err == nil {
+		s.remember(ctx, func() error { return s.rememberFilm(ctx, userID, movieID, watched) })
+	}
 	return err
 }
 

@@ -37,6 +37,7 @@ import app.marquee.api.models.LiveTvStatus
 import app.marquee.api.models.PlayLiveChannelRequest
 import app.marquee.api.models.PlayVodEpisodeRequest
 import app.marquee.api.models.PlayVodMovieRequest
+import app.marquee.api.models.RateVodMovieRequest
 import app.marquee.api.models.Recording
 import app.marquee.api.models.RecordingRule
 import app.marquee.api.models.ReportVodPlaybackRequest
@@ -3394,6 +3395,156 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/livetv/vod/movies/{movieId}/play".replace("{"+"movieId"+"}", encodeURIComponent(movieId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /livetv/vod/movies/{movieId}/rating
+     * Your rating of a film on demand, 0–10 (half stars; 10 &#x3D; loved), or null to clear it. It&#39;s kept with the title (its TMDB id, else its title and year), not the source&#39;s entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back.
+     * 
+     * @param movieId 
+     * @param rateVodMovieRequest 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun rateVodMovie(movieId: kotlin.Long, rateVodMovieRequest: RateVodMovieRequest) : Unit {
+        val localVarResponse = rateVodMovieWithHttpInfo(movieId = movieId, rateVodMovieRequest = rateVodMovieRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /livetv/vod/movies/{movieId}/rating
+     * Your rating of a film on demand, 0–10 (half stars; 10 &#x3D; loved), or null to clear it. It&#39;s kept with the title (its TMDB id, else its title and year), not the source&#39;s entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back.
+     * 
+     * @param movieId 
+     * @param rateVodMovieRequest 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun rateVodMovieWithHttpInfo(movieId: kotlin.Long, rateVodMovieRequest: RateVodMovieRequest) : ApiResponse<Unit?> {
+        val localVariableConfig = rateVodMovieRequestConfig(movieId = movieId, rateVodMovieRequest = rateVodMovieRequest)
+
+        return request<RateVodMovieRequest, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation rateVodMovie
+     *
+     * @param movieId 
+     * @param rateVodMovieRequest 
+     * @return RequestConfig
+     */
+    fun rateVodMovieRequestConfig(movieId: kotlin.Long, rateVodMovieRequest: RateVodMovieRequest) : RequestConfig<RateVodMovieRequest> {
+        val localVariableBody = rateVodMovieRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/livetv/vod/movies/{movieId}/rating".replace("{"+"movieId"+"}", encodeURIComponent(movieId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /livetv/vod/series/{seriesId}/rating
+     * Your rating of a series on demand, 0–10 (half stars; 10 &#x3D; loved), or null to clear it. It&#39;s kept with the title (its TMDB id, else its title and year), not the source&#39;s entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back.
+     * 
+     * @param seriesId 
+     * @param rateVodMovieRequest 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun rateVodSeries(seriesId: kotlin.Long, rateVodMovieRequest: RateVodMovieRequest) : Unit {
+        val localVarResponse = rateVodSeriesWithHttpInfo(seriesId = seriesId, rateVodMovieRequest = rateVodMovieRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /livetv/vod/series/{seriesId}/rating
+     * Your rating of a series on demand, 0–10 (half stars; 10 &#x3D; loved), or null to clear it. It&#39;s kept with the title (its TMDB id, else its title and year), not the source&#39;s entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back.
+     * 
+     * @param seriesId 
+     * @param rateVodMovieRequest 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun rateVodSeriesWithHttpInfo(seriesId: kotlin.Long, rateVodMovieRequest: RateVodMovieRequest) : ApiResponse<Unit?> {
+        val localVariableConfig = rateVodSeriesRequestConfig(seriesId = seriesId, rateVodMovieRequest = rateVodMovieRequest)
+
+        return request<RateVodMovieRequest, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation rateVodSeries
+     *
+     * @param seriesId 
+     * @param rateVodMovieRequest 
+     * @return RequestConfig
+     */
+    fun rateVodSeriesRequestConfig(seriesId: kotlin.Long, rateVodMovieRequest: RateVodMovieRequest) : RequestConfig<RateVodMovieRequest> {
+        val localVariableBody = rateVodMovieRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/livetv/vod/series/{seriesId}/rating".replace("{"+"seriesId"+"}", encodeURIComponent(seriesId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

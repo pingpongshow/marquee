@@ -237,6 +237,18 @@ Suggestions appear in several places:
 - **Muse:** tick **Include VOD** under the search box in Muse for movies to get VOD titles that fit your description beside the library's.
 - **Discover:** a title that isn't in your library but is on VOD shows **Watch now on VOD**, on its tile and in its request dialog, so you can watch it instead of requesting it. Administrators, and people allowed **Can download from VOD** (Settings → Users), also see **Download** beside it when the title can be saved (an Xtream Codes source, with a download folder set). It queues the film, or a show's episodes the library doesn't have, in the download tool's default folder; a film already queued or saved shows that instead.
 
+### Ratings and watch history
+
+Rate any VOD film or show from its page (**Your rating**, five stars in halves), on the web, iPhone, iPad, Apple TV and Android. Choose the same rating again to clear it.
+
+Your ratings and what you've watched on VOD are kept with you, by the title (its TMDB match, or its title and year), not by the provider's entry. So if a film or show leaves your provider, or comes back under a new entry or from another source:
+
+- Your rating stays, and shows again on its page when it's back.
+- It still counts towards your suggestions: titles you rated 5/10 or more (or watched) are likes, ratings below 5/10 steer suggestions away from similar titles, and titles you've watched or rated aren't suggested again.
+- It also feeds the library's **Recommended for You**. A VOD title you liked that your library also has counts like a library favourite, TMDB's recommendations for VOD titles you liked move library titles up, and library copies of what you've already watched on VOD aren't recommended.
+
+What you watched on VOD before this was added is picked up the first time the updated server starts.
+
 ### The Recommended page
 
 The Recommended page (Movies or Shows) goes deeper, in rows that each take a different angle:

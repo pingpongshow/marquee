@@ -212,6 +212,16 @@ public extension AppSession {
     }
 
     /// Puts a show on demand on the watchlist or takes it off (USER-8).
+    /// Rates a film (series false) or series on demand, 0–10 in half stars; nil clears it. It's
+    /// kept with the title, so it stays if the title leaves its source.
+    func rateVod(_ id: Int64, series: Bool, _ rating: Double?) async throws {
+        if series {
+            _ = try await vodAPI.rateVodSeries(path: .init(seriesId: id), body: .json(.init(rating: rating))).noContent
+        } else {
+            _ = try await vodAPI.rateVodMovie(path: .init(movieId: id), body: .json(.init(rating: rating))).noContent
+        }
+    }
+
     func setVodSeriesWatchlisted(_ id: Int64, _ on: Bool) async throws {
         if on {
             _ = try await vodAPI.addVodSeriesToWatchlist(path: .init(seriesId: id)).noContent

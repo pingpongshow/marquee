@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -213,10 +215,39 @@ func scoredIDs(list []Scored, n int) []int64 {
 	return out
 }
 
+// VODTaste is what the person watched and rated on demand (LIVE-6), for the library's
+// recommendations: what they've seen there isn't recommended from the library, what they liked
+// counts as a seed where the library has it too, and TMDB's recommendations for it move library
+// titles up. It's kept by TMDB id, so titles that left their source still count.
+type VODTaste struct {
+	Seen  []TMDBRef
+	Liked []VODLike
+}
+
+// TMDBRef is a movie or show by its TMDB id (TMDB numbers films and series separately).
+type TMDBRef struct {
+	Type string // movie, show
+	ID   int
+}
+
+// VODLike is a title liked on demand: its weight as a seed (as for the library's: a 7/10 1,
+// finished 1) and TMDB's recommendations for it, best first.
+type VODLike struct {
+	TMDBRef
+	Weight float64
+	Recs   []int
+}
+
+// vodRecWeight is the boost for rank 1 of TMDB's recommendations for a title liked on demand
+// (times its weight, falling by 2% per rank), as for "Because you watched": what's known of a
+// title watched on demand is mostly what TMDB recommends for it.
+const vodRecWeight = relatedRecWeight
+
 // Recommended ranks the movies and shows the person hasn't started by cosine to the centroid
 // of their favourites and last 20 completed ones, weighted by their rating where they gave
-// one (a favourite counts most), then moves up titles close to a favourite.
-func (s *Store) Recommended(ctx context.Context, acc Access, idx *VideoIndex, libIDs []int64, n int) ([]Summary, error) {
+// one (a favourite counts most), then moves up titles close to a favourite. What they watched
+// and liked on demand (vod) counts too.
+func (s *Store) Recommended(ctx context.Context, acc Access, idx *VideoIndex, libIDs []int64, n int, vod VODTaste) ([]Summary, error) {
 	if idx.Len() == 0 || acc.UserID == 0 {
 		return nil, nil
 	}
@@ -224,8 +255,11 @@ func (s *Store) Recommended(ctx context.Context, acc Access, idx *VideoIndex, li
 	if err != nil {
 		return nil, err
 	}
-	if seeds, err = s.withFavorites(ctx, acc.UserID, seeds, 20); err != nil || len(seeds) == 0 {
+	if seeds, err = s.withFavorites(ctx, acc.UserID, seeds, 20); err != nil {
 		return nil, err
+	}
+	if len(seeds) == 0 && len(vod.Liked) == 0 {
+		return nil, nil
 	}
 	ids := make([]int64, len(seeds))
 	weights := make([]float64, len(seeds))
@@ -240,24 +274,120 @@ func (s *Store) Recommended(ctx context.Context, acc Access, idx *VideoIndex, li
 			weights[i] = sd.Rating / 7 // 7/10 counts as usual, 10 a little more, 2 barely
 		}
 	}
-	c := idx.Centroid(ids, weights)
-	if c == nil {
-		return nil, nil
+	lib, err := s.itemsByTMDB(ctx, vod.refs())
+	if err != nil {
+		return nil, err
+	}
+	// Liked on demand and in the library too: a seed like the library's own.
+	isSeed := map[int64]bool{}
+	for _, id := range ids {
+		isSeed[id] = true
+	}
+	for _, l := range vod.Liked {
+		for _, id := range lib[l.TMDBRef] {
+			if !isSeed[id] {
+				isSeed[id] = true
+				ids, weights = append(ids, id), append(weights, l.Weight)
+			}
+		}
 	}
 	started, err := s.started(ctx, acc.UserID)
 	if err != nil {
 		return nil, err
 	}
+	for _, r := range vod.Seen {
+		for _, id := range lib[r] {
+			started[id] = true
+		}
+	}
+	// TMDB's recommendations for what they liked on demand.
+	boost := map[int64]float64{}
+	for _, l := range vod.Liked {
+		for rank, tm := range l.Recs {
+			if rank == 40 {
+				break
+			}
+			b := vodRecWeight * min(l.Weight, favoriteWeight) * max(0.2, 1-0.02*float64(rank))
+			for _, id := range lib[TMDBRef{l.Type, tm}] {
+				boost[id] = max(boost[id], b)
+			}
+		}
+	}
 	acc = within(acc, libIDs)
 	inLib := libraryKeep(acc.LibraryIDs)
-	ranked := idx.Nearest(c, func(v *VideoVec) bool { return !started[v.ItemID] && inLib(v) }, 400)
+	keep := func(v *VideoVec) bool { return !started[v.ItemID] && inLib(v) }
+	var ranked []Scored
+	if c := idx.Centroid(ids, weights); c != nil {
+		ranked = idx.Nearest(c, keep, 400)
+	} else {
+		// Nothing of theirs is in the library: what TMDB recommends for their VOD titles.
+		for id := range boost {
+			if v := idx.Get(id); v != nil && keep(v) {
+				ranked = append(ranked, Scored{ItemID: id})
+			}
+		}
+		if len(ranked) == 0 {
+			return nil, nil
+		}
+	}
 	neg, err := s.disliked(ctx, acc.UserID)
 	if err != nil {
 		return nil, err
 	}
 	ranked = PenaliseSimilar(ranked, idx, neg)
+	ranked = Boosted(ranked, boost)
 	ranked = FavourSimilar(ranked, idx, favs)
 	return s.visibleTop(ctx, acc, scoredIDs(ranked, 400), n)
+}
+
+// refs are every title the taste needs found in the library: seen, liked and recommended.
+func (v VODTaste) refs() []TMDBRef {
+	out := append([]TMDBRef{}, v.Seen...)
+	for _, l := range v.Liked {
+		out = append(out, l.TMDBRef)
+		for i, tm := range l.Recs {
+			if i == 40 {
+				break
+			}
+			out = append(out, TMDBRef{l.Type, tm})
+		}
+	}
+	return out
+}
+
+// itemsByTMDB finds the library's movies and shows with these TMDB ids.
+func (s *Store) itemsByTMDB(ctx context.Context, refs []TMDBRef) (map[TMDBRef][]int64, error) {
+	out := map[TMDBRef][]int64{}
+	want := map[string]bool{}
+	var values []any
+	for _, r := range refs {
+		v := strconv.Itoa(r.ID)
+		if r.ID > 0 && !want[v] {
+			want[v] = true
+			values = append(values, v)
+		}
+	}
+	for start := 0; start < len(values); start += 500 {
+		chunk := values[start:min(start+500, len(values))]
+		err := eachRow(ctx, s.db, `SELECT i.id, i.type, x.value FROM external_ids x JOIN items i ON i.id = x.item_id
+			AND i.type IN ('movie', 'show') AND i.extra_type IS NULL
+			WHERE x.provider = 'tmdb' AND x.value IN (?`+strings.Repeat(",?", len(chunk)-1)+`)`, chunk, func(r *sql.Rows) error {
+			var id int64
+			var typ, v string
+			if err := r.Scan(&id, &typ, &v); err != nil {
+				return err
+			}
+			if tm, err := strconv.Atoi(v); err == nil {
+				k := TMDBRef{typ, tm}
+				out[k] = append(out[k], id)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // RelatedByEmbedding returns the items most like id by meaning (same library and type), or

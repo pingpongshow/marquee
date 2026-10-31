@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Bookmark, BookmarkCheck, Check, ChevronRight, Library, Play, RotateCcw, Tv } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -7,6 +7,7 @@ import { toast } from "@/components/Toast";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "@/features/browse/format";
 import { Poster } from "@/features/browse/Poster";
+import { Rating } from "@/features/music/Rating";
 import { deviceProfile } from "@/features/player/deviceProfile";
 import { VodVideo, showPosterItem, store, stored } from "./Vod";
 import { FollowControls } from "./VodFollow";
@@ -44,6 +45,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
   const watchlist = useVodWatchlist();
   const episodeWatched = useVodEpisodeWatched();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const seasonKey = `marquee.vod.shows.season.${seriesId}`;
   const [season, setSeason] = useState<number | null>(() => {
     const v = stored(seasonKey);
@@ -161,6 +163,18 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
               </Button>
               {s.canSave && <SaveSeriesButton seriesId={s.id} label="Save show" library={s.library} targets={s} />}
               <FollowControls show={s} />
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-sm text-muted">
+              <span>Your rating</span>
+              <Rating
+                key={s.id}
+                value={s.userRating}
+                testId="vod-rating"
+                save={(rating) =>
+                  unwrap(api.PUT("/livetv/vod/series/{seriesId}/rating", { params: { path: { seriesId: s.id } }, body: { rating } }))
+                }
+                onChange={() => void qc.invalidateQueries({ queryKey: ["vod"] })}
+              />
             </div>
             {s.overview && <p className="mt-5 max-w-3xl leading-relaxed text-text/90">{s.overview}</p>}
             {s.cast.length > 0 && (

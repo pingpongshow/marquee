@@ -479,6 +479,33 @@ private fun Modifier.layoutOffset(inset: Dp): Modifier = this.then(
 )
 
 /**
+ * Your rating of a film or series on demand (half stars, 0–10): it shows at once and goes back if
+ * the server refuses. It's kept with the title, so it stays if the title leaves its source.
+ */
+@Composable
+internal fun VodRating(id: Long, series: Boolean, rating: Double?) {
+    val marquee = LocalMarquee.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var local by remember(id, rating) { mutableStateOf(rating) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Your rating", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        app.marquee.music.RatingStars(local, { next ->
+            val before = local
+            local = next
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        val body = app.marquee.api.models.RateVodMovieRequest(next)
+                        if (series) marquee.livetv.rateVodSeries(id, body) else marquee.livetv.rateVodMovie(id, body)
+                    }
+                }.onFailure { local = before; toast(context, serverMessage(it, "Couldn't save the rating")) }
+            }
+        }, size = 22)
+    }
+}
+
+/**
  * The watchlist (USER-8) for a film or series on demand, as a library title's: it shows at once,
  * goes back if the server refuses, and Home's Your Watchlist row follows.
  */
@@ -564,6 +591,7 @@ fun VodMovieScreen(nav: NavHostController, movieId: Long) {
                             Text("TMDB ${"%.1f".format(it)}", Modifier.clip(RoundedCornerShape(6.dp)).background(Surface2).padding(horizontal = 8.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                         }
+                        VodRating(m.id, series = false, rating = m.userRating)
                         // The library's copy comes first; the stream on demand stays a tap away.
                         val library = m.libraryItemId
                         if (library != null) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {

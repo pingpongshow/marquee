@@ -3928,6 +3928,10 @@ extension Components {
                 public var save: Components.Schemas.VodSaveState?
                 /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/library`.
                 public var library: Components.Schemas.VodLibraryMatch?
+                /// Your rating, 0–10 (PUT /livetv/vod/movies/{id}/rating).
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/userRating`.
+                public var userRating: Swift.Double?
                 /// The library's copy of this film (its best, in a library the caller can see; matched by TMDB id, else by title and year). The apps play it first, the stream on demand second.
                 ///
                 /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/libraryItemId`.
@@ -3953,6 +3957,7 @@ extension Components {
                 ///   - saveDestinations: Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both).
                 ///   - save:
                 ///   - library:
+                ///   - userRating: Your rating, 0–10 (PUT /livetv/vod/movies/{id}/rating).
                 ///   - libraryItemId: The library's copy of this film (its best, in a library the caller can see; matched by TMDB id, else by title and year). The apps play it first, the stream on demand second.
                 ///   - watchlisted: On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist.
                 public init(
@@ -3970,6 +3975,7 @@ extension Components {
                     saveDestinations: [Components.Schemas.VodSaveDestinationRef]? = nil,
                     save: Components.Schemas.VodSaveState? = nil,
                     library: Components.Schemas.VodLibraryMatch? = nil,
+                    userRating: Swift.Double? = nil,
                     libraryItemId: Swift.Int64? = nil,
                     watchlisted: Swift.Bool? = nil
                 ) {
@@ -3987,6 +3993,7 @@ extension Components {
                     self.saveDestinations = saveDestinations
                     self.save = save
                     self.library = library
+                    self.userRating = userRating
                     self.libraryItemId = libraryItemId
                     self.watchlisted = watchlisted
                 }
@@ -4005,6 +4012,7 @@ extension Components {
                     case saveDestinations
                     case save
                     case library
+                    case userRating
                     case libraryItemId
                     case watchlisted
                 }
@@ -4453,6 +4461,10 @@ extension Components {
                 public var saveDestinations: [Components.Schemas.VodSaveDestinationRef]?
                 /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/library`.
                 public var library: Components.Schemas.VodLibraryRollup?
+                /// Your rating, 0–10 (PUT /livetv/vod/series/{id}/rating).
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/userRating`.
+                public var userRating: Swift.Double?
                 /// The library's copy of this show (in a library the caller can see): the apps open it first. Each episode the library has carries its own libraryItemId.
                 ///
                 /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/libraryItemId`.
@@ -4478,6 +4490,7 @@ extension Components {
                 ///   - saveDefault: Admins: saving without a destination works (vodSave.showsFolder is set).
                 ///   - saveDestinations: Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both).
                 ///   - library:
+                ///   - userRating: Your rating, 0–10 (PUT /livetv/vod/series/{id}/rating).
                 ///   - libraryItemId: The library's copy of this show (in a library the caller can see): the apps open it first. Each episode the library has carries its own libraryItemId.
                 ///   - watchlisted: On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist.
                 public init(
@@ -4495,6 +4508,7 @@ extension Components {
                     saveDefault: Swift.Bool? = nil,
                     saveDestinations: [Components.Schemas.VodSaveDestinationRef]? = nil,
                     library: Components.Schemas.VodLibraryRollup? = nil,
+                    userRating: Swift.Double? = nil,
                     libraryItemId: Swift.Int64? = nil,
                     watchlisted: Swift.Bool? = nil
                 ) {
@@ -4512,6 +4526,7 @@ extension Components {
                     self.saveDefault = saveDefault
                     self.saveDestinations = saveDestinations
                     self.library = library
+                    self.userRating = userRating
                     self.libraryItemId = libraryItemId
                     self.watchlisted = watchlisted
                 }
@@ -4530,6 +4545,7 @@ extension Components {
                     case saveDefault
                     case saveDestinations
                     case library
+                    case userRating
                     case libraryItemId
                     case watchlisted
                 }

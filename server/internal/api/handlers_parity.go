@@ -211,7 +211,7 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow, n 
 				if idx.Len() == 0 {
 					return nil, nil
 				}
-				return h.Items.Recommended(ctx, acc, idx, home, n)
+				return h.Items.Recommended(ctx, acc, idx, home, n, h.vodTaste(ctx, acc.UserID))
 			}},
 			homeRow{id: "because-you-watched", title: "Because You Watched", expand: func() ([]homeRow, error) {
 				idx := h.videoIndex()

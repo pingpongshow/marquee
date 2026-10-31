@@ -60,6 +60,7 @@ import kotlinx.serialization.Contextual
  * @param saveDestinations Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both).
  * @param save 
  * @param library 
+ * @param userRating Your rating, 0–10 (PUT /livetv/vod/movies/{id}/rating).
  * @param libraryItemId The library's copy of this film (its best, in a library the caller can see; matched by TMDB id, else by title and year). The apps play it first, the stream on demand second.
  * @param watchlisted On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist.
  */
@@ -151,6 +152,10 @@ data class VodMovieDetail (
 
     @SerialName(value = "library")
     val library: VodLibraryMatch? = null,
+
+    /* Your rating, 0–10 (PUT /livetv/vod/movies/{id}/rating). */
+    @SerialName(value = "userRating")
+    val userRating: kotlin.Double? = null,
 
     /* The library's copy of this film (its best, in a library the caller can see; matched by TMDB id, else by title and year). The apps play it first, the stream on demand second. */
     @SerialName(value = "libraryItemId")

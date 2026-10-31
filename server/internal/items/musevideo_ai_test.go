@@ -78,7 +78,7 @@ func TestMuseVideoAIFieldsAndDislikes(t *testing.T) {
 	mustExec(t, d, `INSERT INTO user_item_state(user_id, item_id, play_count, last_viewed_at) VALUES (?, ?, 1, ?)`, uid, gravity, isoUTC(time.Now().Add(-time.Hour)))
 	mustExec(t, d, `INSERT INTO user_item_state(user_id, item_id, play_count, last_viewed_at) VALUES (?, ?, 1, ?)`, uid, notebook, isoUTC(time.Now().Add(-2*time.Hour)))
 	mustExec(t, d, `INSERT INTO user_item_state(user_id, item_id, view_offset_ms, last_viewed_at) VALUES (?, ?, 600000, ?)`, uid, aliens, isoUTC(time.Now().AddDate(0, 0, -21)))
-	before, _ := s.Recommended(ctx, acc, idx, nil, 10)
+	before, _ := s.Recommended(ctx, acc, idx, nil, 10, VODTaste{})
 	if len(before) == 0 || before[0].ID != alien {
 		t.Fatalf("without learning: %s", ids(before))
 	}
@@ -87,7 +87,7 @@ func TestMuseVideoAIFieldsAndDislikes(t *testing.T) {
 	if err != nil || len(neg) != 1 || neg[0] != aliens {
 		t.Fatalf("disliked %v %v", neg, err)
 	}
-	after, _ := s.Recommended(ctx, acc, idx, nil, 10)
+	after, _ := s.Recommended(ctx, acc, idx, nil, 10, VODTaste{})
 	if len(after) == 0 || after[0].ID != titanic {
 		t.Fatalf("learning should push the abandoned film's near-copy down: %s", ids(after))
 	}

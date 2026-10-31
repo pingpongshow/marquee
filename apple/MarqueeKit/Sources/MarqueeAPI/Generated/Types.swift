@@ -987,6 +987,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /livetv/vod/movies/{movieId}/watchlist`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watchlist/delete(removeVodMovieFromWatchlist)`.
     func removeVodMovieFromWatchlist(_ input: Operations.RemoveVodMovieFromWatchlist.Input) async throws -> Operations.RemoveVodMovieFromWatchlist.Output
+    /// Your rating of a film on demand, 0–10 (half stars; 10 = loved), or null to clear it. It's kept with the title (its TMDB id, else its title and year), not the source's entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/movies/{movieId}/rating`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/rating/put(rateVodMovie)`.
+    func rateVodMovie(_ input: Operations.RateVodMovie.Input) async throws -> Operations.RateVodMovie.Output
     /// Start watching a film. Returns a seekable HLS session: an M3U source's own HLS passed through, or (Xtream Codes sources, whose films are files) the file made into HLS by the server, video copied when the device plays it and audio converted when needed.
     ///
     /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/play`.
@@ -1062,6 +1067,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /livetv/vod/series/{seriesId}/watchlist`.
     /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watchlist/delete(removeVodSeriesFromWatchlist)`.
     func removeVodSeriesFromWatchlist(_ input: Operations.RemoveVodSeriesFromWatchlist.Input) async throws -> Operations.RemoveVodSeriesFromWatchlist.Output
+    /// Your rating of a series on demand, 0–10 (half stars; 10 = loved), or null to clear it. It's kept with the title (its TMDB id, else its title and year), not the source's entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/rating`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/rating/put(rateVodSeries)`.
+    func rateVodSeries(_ input: Operations.RateVodSeries.Input) async throws -> Operations.RateVodSeries.Output
     /// Mark every episode of a series (or of one season) watched.
     ///
     /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/watched`.
@@ -3815,6 +3825,21 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Your rating of a film on demand, 0–10 (half stars; 10 = loved), or null to clear it. It's kept with the title (its TMDB id, else its title and year), not the source's entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/movies/{movieId}/rating`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/rating/put(rateVodMovie)`.
+    public func rateVodMovie(
+        path: Operations.RateVodMovie.Input.Path,
+        headers: Operations.RateVodMovie.Input.Headers = .init(),
+        body: Operations.RateVodMovie.Input.Body
+    ) async throws -> Operations.RateVodMovie.Output {
+        try await rateVodMovie(Operations.RateVodMovie.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
     /// Start watching a film. Returns a seekable HLS session: an M3U source's own HLS passed through, or (Xtream Codes sources, whose films are files) the file made into HLS by the server, video copied when the device plays it and audio converted when needed.
     ///
     /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/play`.
@@ -3996,6 +4021,21 @@ extension APIProtocol {
         try await removeVodSeriesFromWatchlist(Operations.RemoveVodSeriesFromWatchlist.Input(
             path: path,
             headers: headers
+        ))
+    }
+    /// Your rating of a series on demand, 0–10 (half stars; 10 = loved), or null to clear it. It's kept with the title (its TMDB id, else its title and year), not the source's entry: it stays, and keeps shaping your suggestions, if the title leaves its source, and shows again if it comes back.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/rating`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/rating/put(rateVodSeries)`.
+    public func rateVodSeries(
+        path: Operations.RateVodSeries.Input.Path,
+        headers: Operations.RateVodSeries.Input.Headers = .init(),
+        body: Operations.RateVodSeries.Input.Body
+    ) async throws -> Operations.RateVodSeries.Output {
+        try await rateVodSeries(Operations.RateVodSeries.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// Mark every episode of a series (or of one season) watched.
