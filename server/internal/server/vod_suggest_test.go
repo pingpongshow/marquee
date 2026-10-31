@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -187,8 +188,10 @@ func TestVodSuggestionsAPI(t *testing.T) {
 		Results []struct {
 			TmdbId int64
 			Vod    *struct {
-				Kind string
-				Id   int64
+				Kind    string
+				Id      int64
+				CanSave bool
+				Save    *struct{ State string }
 			}
 		}
 	}
@@ -206,6 +209,34 @@ func TestVodSuggestionsAPI(t *testing.T) {
 	}
 	if page.Results[2].Vod != nil {
 		t.Errorf("Elsewhere isn't on demand: %+v", page.Results[2].Vod)
+	}
+	if v := page.Results[0].Vod; v == nil || v.CanSave {
+		t.Errorf("an M3U film can't be downloaded: %+v", v)
+	}
+
+	// Download from VOD: with an Xtream Codes source and save folders, an admin can queue
+	// the film or the show's missing episodes; a queued film says so.
+	h.db.Exec(`UPDATE vod_movies SET source_key = 'xtream:' || source_key`)
+	h.store.Update(ctx, func(s *settings.Settings) error {
+		s.Integrations.VODSources[0].Kind, s.Integrations.VODSources[0].Username, s.Integrations.VODSources[0].Password = settings.VODKindXtream, "u", "p"
+		s.Integrations.VODSources[0].URL = "http://127.0.0.1:1"
+		s.VODSave.MoviesFolder, s.VODSave.ShowsFolder = h.media+"/video/Movies", h.media+"/video/Shows"
+		return nil
+	})
+	h.do("GET", "/requests/search?q=x", nil, &page)
+	if v := page.Results[0].Vod; v == nil || !v.CanSave || v.Save != nil {
+		t.Errorf("Ronin can be downloaded: %+v", v)
+	}
+	if v := page.Results[1].Vod; v == nil || !v.CanSave {
+		t.Errorf("1899 can be downloaded: %+v", v)
+	}
+	var queuedRaw json.RawMessage
+	if code := h.do("POST", fmt.Sprintf("/livetv/vod/movies/%d/save", ronin), nil, &queuedRaw); code != 200 {
+		t.Fatalf("queue Ronin: %d %s", code, queuedRaw)
+	}
+	h.do("GET", "/requests/search?q=x", nil, &page)
+	if v := page.Results[0].Vod; v == nil || v.Save == nil || v.Save.State != "queued" {
+		t.Errorf("Ronin queued: %+v", v)
 	}
 
 	// A profile without Live TV: no row, 403 from the endpoints, nothing on Discover.

@@ -2,10 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { Alert, Button, Dialog, Spinner } from "@/components/ui";
-import { availabilityLabel, type DiscoverItem, useRequestAction } from "./api";
+import { availabilityLabel, type DiscoverItem, requestsStatusQuery, useRequestAction } from "./api";
+import { DownloadFromVod } from "./DownloadFromVod";
 import { WatchOnVod } from "./WatchOnVod";
 
-/** Ask for a movie, or chosen seasons of a show. An admin approves it before it goes to Seerr. */
+/** Ask for a movie, or chosen seasons of a show. An admin approves it before it goes to Seerr,
+ * unless the person's requests are approved automatically. */
 export function RequestDialog({
   item,
   onClose,
@@ -13,6 +15,7 @@ export function RequestDialog({
   item: DiscoverItem;
   onClose: () => void;
 }) {
+  const status = useQuery(requestsStatusQuery);
   const show = useQuery({
     queryKey: ["requests", "tv", item.tmdbId],
     queryFn: () =>
@@ -86,10 +89,13 @@ export function RequestDialog({
             <div className="flex flex-wrap items-center gap-3 rounded-md bg-accent/10 p-3">
               <span>It's on VOD now: no need to wait.</span>
               <WatchOnVod item={item} />
+              <DownloadFromVod item={item} />
             </div>
           )}
           <p className="text-faint">
-            An admin approves requests before they're downloaded.
+            {status.data?.autoApproved
+              ? "Requests go straight to Seerr to be downloaded."
+              : "An admin approves requests before they're downloaded."}
           </p>
         </div>
       </div>

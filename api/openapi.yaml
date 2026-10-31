@@ -5553,6 +5553,8 @@ components:
         allowRemote: { type: boolean, description: May stream from outside the home network. Default true. }
         remoteQualityKbps: { type: integer, minimum: 0, description: Cap for remote streams. 0 = server default. }
         canRequest: { type: boolean, description: "May request titles through Seerr (REQ-1). Default false; admins always may." }
+        autoApproveRequests: { type: boolean, description: "This user's requests go straight to Seerr without an admin approving them (with canRequest). Default false; admins' own requests always do." }
+        canDownloadVod: { type: boolean, description: "May queue films and episodes on demand in the VOD download tool, into the library's download folders. Default false; admins always may. Managing the queue and upgrades that replace the library's copies stay with admins." }
         canRecord: { type: boolean, description: "Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent." }
         canRecordDVR: { type: boolean, description: "May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused." }
         canViewDVR: { type: boolean, description: "May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may." }
@@ -6370,6 +6372,8 @@ components:
       properties:
         kind: { type: string, enum: [movie, series] }
         id: { type: integer, format: int64, description: "The film's or series' id (GET /livetv/vod/movies/{id} or /livetv/vod/series/{id})." }
+        canSave: { type: boolean, description: "The caller (an admin) can queue it in the VOD download tool, to its default folder (POST /livetv/vod/movies/{id}/save, or /livetv/vod/series/{id}/save for the episodes the library lacks). Set on Discover's results only." }
+        save: { $ref: "#/components/schemas/VodSaveState" }
 
     VodSeriesDetail:
       allOf:
@@ -6619,6 +6623,7 @@ components:
       properties:
         enabled: { type: boolean, description: Seerr is configured. }
         canRequest: { type: boolean, description: The caller may make requests (admins always; others when granted). }
+        autoApproved: { type: boolean, description: "The caller's requests go straight to Seerr without waiting for an admin (admins always; others when set to)." }
         pendingApprovals: { type: integer, description: Requests waiting for approval (admins; 0 for others). }
 
     Availability:

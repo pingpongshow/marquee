@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.VodSaveState
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -33,6 +34,8 @@ import kotlinx.serialization.Contextual
  *
  * @param kind 
  * @param id The film's or series' id (GET /livetv/vod/movies/{id} or /livetv/vod/series/{id}).
+ * @param canSave The caller (an admin) can queue it in the VOD download tool, to its default folder (POST /livetv/vod/movies/{id}/save, or /livetv/vod/series/{id}/save for the episodes the library lacks). Set on Discover's results only.
+ * @param save 
  */
 @Serializable
 
@@ -43,7 +46,14 @@ data class VodRef (
 
     /* The film's or series' id (GET /livetv/vod/movies/{id} or /livetv/vod/series/{id}). */
     @SerialName(value = "id")
-    val id: kotlin.Long
+    val id: kotlin.Long,
+
+    /* The caller (an admin) can queue it in the VOD download tool, to its default folder (POST /livetv/vod/movies/{id}/save, or /livetv/vod/series/{id}/save for the episodes the library lacks). Set on Discover's results only. */
+    @SerialName(value = "canSave")
+    val canSave: kotlin.Boolean? = null,
+
+    @SerialName(value = "save")
+    val save: VodSaveState? = null
 
 ) {
 

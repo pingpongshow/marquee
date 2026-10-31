@@ -297,8 +297,8 @@ func (h *Handlers) GetVodMovie(ctx context.Context, req GetVodMovieRequestObject
 	if m.HasBackdrop {
 		out.BackdropUrl = ptr(vodImageURL(m.ID, "backdrop"))
 	}
-	// Admins see whether it's saved into the library.
-	if s.User.IsAdmin && h.VODSaves != nil {
+	// Admins (and users allowed VOD downloads) see whether it's saved into the library.
+	if (s.User.IsAdmin || s.User.Restrictions.VODDownloads) && h.VODSaves != nil {
 		movies, _ := h.VODSaves.Configured()
 		dests := h.saveDestinationRefs("movie")
 		out.CanSave = ptr((movies || len(dests) > 0) && h.VOD.Savable(m.SourceID))

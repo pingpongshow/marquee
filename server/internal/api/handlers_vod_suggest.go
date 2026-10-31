@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"marquee/internal/auth"
 	"marquee/internal/items"
@@ -308,6 +309,35 @@ func (h *Handlers) markOnDemand(ctx context.Context, page *DiscoverPage) {
 			}
 		} else if id, ok := m[d.TmdbId]; ok {
 			page.Results[i].Vod = &VodRef{Kind: VodRefKindMovie, Id: id}
+		}
+		if v := page.Results[i].Vod; v != nil {
+			h.markSavable(ctx, v)
+		}
+	}
+}
+
+// markSavable tells an admin (or a user allowed VOD downloads) whether Discover's title on
+// demand can be queued in the VOD download tool, to its default folder (a film's latest save
+// shows its state).
+func (h *Handlers) markSavable(ctx context.Context, v *VodRef) {
+	s, ok := session(ctx)
+	if !ok || !(s.User.IsAdmin || s.User.Restrictions.VODDownloads) || h.VODSaves == nil || h.VOD == nil {
+		return
+	}
+	movies, shows := h.VODSaves.Configured()
+	table, configured := "vod_movies", movies
+	if v.Kind == VodRefKindSeries {
+		table, configured = "vod_series", shows
+	}
+	var source, key string
+	if !configured || h.DB.QueryRowContext(ctx, `SELECT source_id, source_key FROM `+table+` WHERE id = ?`, v.Id).Scan(&source, &key) != nil {
+		return
+	}
+	// As the download tool checks: an Xtream Codes source, and for a film one of its own.
+	v.CanSave = ptr(h.VOD.Savable(source) && (v.Kind == VodRefKindSeries || strings.HasPrefix(key, "xtream:")))
+	if *v.CanSave && v.Kind == VodRefKindMovie {
+		if st, err := h.VODSaves.MovieState(ctx, v.Id); err == nil {
+			v.Save = toAPIVodSaveState(st)
 		}
 	}
 }

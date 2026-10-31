@@ -4453,6 +4453,10 @@ export interface components {
             remoteQualityKbps?: number;
             /** @description May request titles through Seerr (REQ-1). Default false; admins always may. */
             canRequest?: boolean;
+            /** @description This user's requests go straight to Seerr without an admin approving them (with canRequest). Default false; admins' own requests always do. */
+            autoApproveRequests?: boolean;
+            /** @description May queue films and episodes on demand in the VOD download tool, into the library's download folders. Default false; admins always may. Managing the queue and upgrades that replace the library's copies stay with admins. */
+            canDownloadVod?: boolean;
             /** @description Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent. */
             canRecord?: boolean;
             /** @description May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused. */
@@ -5364,6 +5368,9 @@ export interface components {
              * @description The film's or series' id (GET /livetv/vod/movies/{id} or /livetv/vod/series/{id}).
              */
             id: number;
+            /** @description The caller (an admin) can queue it in the VOD download tool, to its default folder (POST /livetv/vod/movies/{id}/save, or /livetv/vod/series/{id}/save for the episodes the library lacks). Set on Discover's results only. */
+            canSave?: boolean;
+            save?: components["schemas"]["VodSaveState"];
         };
         VodSeriesDetail: components["schemas"]["VodSeries"] & {
             overview?: string;
@@ -5678,6 +5685,8 @@ export interface components {
             enabled: boolean;
             /** @description The caller may make requests (admins always; others when granted). */
             canRequest: boolean;
+            /** @description The caller's requests go straight to Seerr without waiting for an admin (admins always; others when set to). */
+            autoApproved?: boolean;
             /** @description Requests waiting for approval (admins; 0 for others). */
             pendingApprovals: number;
         };

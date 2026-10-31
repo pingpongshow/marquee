@@ -12,7 +12,8 @@ import (
 	"marquee/internal/vodsave"
 )
 
-// Saving films and episodes on demand into the library (admins only).
+// Saving films and episodes on demand into the library (admins, and users allowed VOD
+// downloads; the queue and upgrades are for admins).
 
 var errVodSaveUnavailable = apiErr("unavailable", "Saving to the library isn't available on this server.")
 
@@ -22,6 +23,20 @@ func (h *Handlers) vodSaveAdmin(ctx context.Context) (authed, admin, available b
 	authed, admin = isAdmin(ctx)
 	return authed, admin, h.VODSaves != nil && h.VOD != nil
 }
+
+// canSaveVod: the user may queue saves (admins always; others when allowed VOD downloads
+// and on demand at all).
+func (h *Handlers) canSaveVod(ctx context.Context) (authed, allowed, admin, available bool) {
+	s, _, authed, vod := h.vodSession(ctx)
+	if !authed {
+		return false, false, false, false
+	}
+	admin = s.User.IsAdmin
+	return true, admin || (vod && s.User.Restrictions.VODDownloads), admin, h.VODSaves != nil && h.VOD != nil
+}
+
+// errUpgradeAdmin: replacing the library's copy is for admins.
+var errUpgradeAdmin = apiErr("forbidden", "Only an admin can replace the library's copy.")
 
 func toAPIVodSaveSettings(v settings.VODSave) *VodSaveSettings {
 	return &VodSaveSettings{
@@ -271,11 +286,13 @@ func vodSaveErr(err error) (code, msg string) {
 
 func (h *Handlers) SaveVodMovie(ctx context.Context, req SaveVodMovieRequestObject) (SaveVodMovieResponseObject, error) {
 	s, _ := session(ctx)
-	switch authed, admin, ok := h.vodSaveAdmin(ctx); {
+	switch authed, allowed, admin, ok := h.canSaveVod(ctx); {
 	case !authed:
 		return SaveVodMovie401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
-	case !admin:
+	case !allowed:
 		return SaveVodMovie403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	case !admin && req.Params.Upgrade != nil && *req.Params.Upgrade:
+		return SaveVodMovie403JSONResponse{ForbiddenJSONResponse(errUpgradeAdmin)}, nil
 	case !ok:
 		return SaveVodMovie503JSONResponse{ServiceUnavailableJSONResponse(errVodSaveUnavailable)}, nil
 	}
@@ -296,11 +313,13 @@ func (h *Handlers) SaveVodMovie(ctx context.Context, req SaveVodMovieRequestObje
 
 func (h *Handlers) SaveVodEpisode(ctx context.Context, req SaveVodEpisodeRequestObject) (SaveVodEpisodeResponseObject, error) {
 	s, _ := session(ctx)
-	switch authed, admin, ok := h.vodSaveAdmin(ctx); {
+	switch authed, allowed, admin, ok := h.canSaveVod(ctx); {
 	case !authed:
 		return SaveVodEpisode401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
-	case !admin:
+	case !allowed:
 		return SaveVodEpisode403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	case !admin && req.Params.Upgrade != nil && *req.Params.Upgrade:
+		return SaveVodEpisode403JSONResponse{ForbiddenJSONResponse(errUpgradeAdmin)}, nil
 	case !ok:
 		return SaveVodEpisode503JSONResponse{ServiceUnavailableJSONResponse(errVodSaveUnavailable)}, nil
 	}
@@ -321,11 +340,13 @@ func (h *Handlers) SaveVodEpisode(ctx context.Context, req SaveVodEpisodeRequest
 
 func (h *Handlers) SaveVodSeries(ctx context.Context, req SaveVodSeriesRequestObject) (SaveVodSeriesResponseObject, error) {
 	s, _ := session(ctx)
-	switch authed, admin, ok := h.vodSaveAdmin(ctx); {
+	switch authed, allowed, admin, ok := h.canSaveVod(ctx); {
 	case !authed:
 		return SaveVodSeries401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
-	case !admin:
+	case !allowed:
 		return SaveVodSeries403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	case !admin && req.Params.IncludeUpgrades != nil && *req.Params.IncludeUpgrades:
+		return SaveVodSeries403JSONResponse{ForbiddenJSONResponse(errUpgradeAdmin)}, nil
 	case !ok:
 		return SaveVodSeries503JSONResponse{ServiceUnavailableJSONResponse(errVodSaveUnavailable)}, nil
 	}

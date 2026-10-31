@@ -14,6 +14,11 @@ import (
 
 func canRequest(s auth.Session) bool { return s.User.IsAdmin || s.User.Restrictions.CanRequest }
 
+// autoApproved: the user's requests go straight to Seerr (admins', and those of users set to).
+func autoApproved(s auth.Session) bool {
+	return s.User.IsAdmin || (s.User.Restrictions.CanRequest && s.User.Restrictions.AutoApproveRequests)
+}
+
 func toAPIDiscover(items []requests.Item, page, total int) DiscoverPage {
 	out := DiscoverPage{Results: make([]DiscoverItem, len(items)), Page: page, TotalPages: total}
 	for i, it := range items {
@@ -61,7 +66,7 @@ func (h *Handlers) RequestsStatus(ctx context.Context, _ RequestsStatusRequestOb
 	if !ok {
 		return RequestsStatus401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	out := RequestsStatus{Enabled: h.Requests.Enabled(), CanRequest: canRequest(s)}
+	out := RequestsStatus{Enabled: h.Requests.Enabled(), CanRequest: canRequest(s), AutoApproved: ptr(autoApproved(s))}
 	if s.User.IsAdmin {
 		out.PendingApprovals = h.Requests.PendingCount(ctx)
 	}
@@ -215,13 +220,14 @@ func (h *Handlers) CreateRequest(ctx context.Context, req CreateRequestRequestOb
 	case err != nil:
 		return CreateRequest400JSONResponse{BadRequestJSONResponse(apiErr("invalid", err.Error()))}, nil
 	}
-	// An admin's own request needs no approval: it goes to Seerr straight away. If Seerr
-	// refuses it, it stays pending and can be approved again from the queue.
-	if s.User.IsAdmin {
+	// An admin's own request, or one from a user whose requests are approved automatically,
+	// needs no approval: it goes to Seerr straight away. If Seerr refuses it, it stays
+	// pending and can be approved again from the queue.
+	if autoApproved(s) {
 		if approved, err := h.Requests.Approve(ctx, r.ID, s.User.ID, h.seerrUser(ctx)); err == nil {
 			r = approved
 		} else {
-			slog.Warn("admin request left pending", "title", r.Title, "err", err)
+			slog.Warn("request left pending", "title", r.Title, "err", err)
 		}
 	}
 	return CreateRequest201JSONResponse(toAPIRequest(r)), nil

@@ -18,6 +18,7 @@ import {
   requestsStatusQuery,
 } from "./api";
 import { RequestDialog } from "./RequestDialog";
+import { DownloadFromVod } from "./DownloadFromVod";
 import { WatchOnVod } from "./WatchOnVod";
 
 const categories = [
@@ -321,6 +322,7 @@ function DetailsDialog({
             </Link>
           ) : null}
           <WatchOnVod item={item} />
+          <DownloadFromVod item={item} />
           {requestable(item) && (
             <Button variant={item.vod ? "secondary" : "primary"} onClick={onRequest}>
               Request
@@ -529,6 +531,7 @@ function Card({
       {(item.vod || requestable(item)) && (
         <div className="flex flex-col gap-1 pt-0.5">
           <WatchOnVod item={item} size="xs" />
+          <DownloadFromVod item={item} size="xs" />
           {requestable(item) && (
             <button
               type="button"

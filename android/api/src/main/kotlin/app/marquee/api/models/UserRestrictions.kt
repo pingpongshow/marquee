@@ -36,6 +36,8 @@ import kotlinx.serialization.Contextual
  * @param allowRemote May stream from outside the home network. Default true.
  * @param remoteQualityKbps Cap for remote streams. 0 = server default.
  * @param canRequest May request titles through Seerr (REQ-1). Default false; admins always may.
+ * @param autoApproveRequests This user's requests go straight to Seerr without an admin approving them (with canRequest). Default false; admins' own requests always do.
+ * @param canDownloadVod May queue films and episodes on demand in the VOD download tool, into the library's download folders. Default false; admins always may. Managing the queue and upgrades that replace the library's copies stay with admins.
  * @param canRecord Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent.
  * @param canRecordDVR May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused.
  * @param canViewDVR May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may.
@@ -72,6 +74,14 @@ data class UserRestrictions (
     /* May request titles through Seerr (REQ-1). Default false; admins always may. */
     @SerialName(value = "canRequest")
     val canRequest: kotlin.Boolean? = null,
+
+    /* This user's requests go straight to Seerr without an admin approving them (with canRequest). Default false; admins' own requests always do. */
+    @SerialName(value = "autoApproveRequests")
+    val autoApproveRequests: kotlin.Boolean? = null,
+
+    /* May queue films and episodes on demand in the VOD download tool, into the library's download folders. Default false; admins always may. Managing the queue and upgrades that replace the library's copies stay with admins. */
+    @SerialName(value = "canDownloadVod")
+    val canDownloadVod: kotlin.Boolean? = null,
 
     /* Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent. */
     @SerialName(value = "canRecord")

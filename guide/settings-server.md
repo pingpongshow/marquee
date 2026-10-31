@@ -63,15 +63,17 @@ Press **Add user** and choose what kind of account it is:
 
 ### Access and limits
 
-These appear when you add or edit anyone who isn't an administrator, and when you invite a friend. Some only appear when the feature they control is set up.
+These appear when you add or edit anyone who isn't an administrator, and (most of them) when you invite a friend. Some only appear when the feature they control is set up. Administrators always have every permission here.
 
 | Setting | Default | What it does |
 |---|---|---|
 | Access to all libraries | On | Includes libraries added later. Turn it off to tick the libraries this person may see. |
 | Maximum content rating | No limit | Hides movies and shows rated higher, **and unrated ones**. Choices: TV-Y (all children), G / TV-G, PG / TV-PG, PG-13 / TV-14, R / TV-MA. Music isn't affected. |
-| Can request movies and shows | Off | Lets them request titles through Seerr. Every request still needs an administrator's approval. Shown only when Seerr is connected ([Requests](settings-media.md#requests)). |
+| Can request movies and shows | Off | Lets them request titles through Seerr. Each request needs an administrator's approval unless **Approve their requests automatically** is on. Shown only when Seerr is connected ([Requests](settings-media.md#requests)). |
+| Approve their requests automatically | Off | Their requests go straight to Seerr, the way an administrator's own do, instead of waiting in the approval queue. If Seerr refuses one, it waits in the queue to be approved again. Shown when **Can request** is on. |
 | Request as Seerr user | Seerr's admin (the API key) | The Seerr user their requests appear under in Seerr. Shown when **Can request** is on. |
 | Can watch Live TV | On | Live TV and the guide. The same switch also controls films and shows on demand (VOD). Shown only when Live TV is set up. |
+| Can download from VOD | Off | Lets them queue films and episodes on demand in the VOD download tool, into the library's download folders: **Save** on a film's or show's VOD page, and **Download** on Discover. The pages show how each of their downloads is going. Managing the download queue (pausing, reordering, clearing) and upgrades that replace a copy already in the library stay with administrators. Needs **Can watch Live TV**. Shown only when VOD is set up. Not on invites. |
 | Can record Live TV | On | Lets them schedule recordings and series. When off, their series are paused (kept) and nothing new is recorded for them. Shown when the DVR is available. |
 | Can watch recordings | On | Lets them see and play the household's recordings, within their rating limit: the Recordings tab and the Recorded TV and Recorded Movies libraries. |
 | Recording quota | Use the default | How much space their recordings may take. **Use the default** follows the server-wide quota; **No limit**; or **A set amount** in GB. Recordings in progress always finish. |

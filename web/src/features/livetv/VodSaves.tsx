@@ -32,7 +32,9 @@ import {
   type VodSaveState,
 } from "./vodApi";
 
-// Saving films and episodes on demand into the library (admins only; invisible to others).
+// Saving films and episodes on demand into the library: admins, and people allowed VOD
+// downloads (the pages show the buttons when the server says canSave). Upgrades, which
+// replace the library's copy, and the download queue are for admins.
 
 export function useIsAdmin() {
   return !!useQuery(meQuery).data?.isAdmin;
@@ -81,10 +83,14 @@ export function libraryTitle(l?: VodLibraryMatch | null) {
   ].join("\n");
 }
 
-/** What a film's or episode's save button offers, given how it compares with the library. */
-export function libraryAction(l?: VodLibraryMatch | null): { can: boolean; upgrade: boolean; label: string } {
+/**
+ * What a film's or episode's save button offers, given how it compares with the library.
+ * Upgrading (replacing the library's copy) is for admins.
+ */
+export function libraryAction(l?: VodLibraryMatch | null, admin = true): { can: boolean; upgrade: boolean; label: string } {
   switch (l?.verdict) {
     case "better": {
+      if (!admin) return { can: false, upgrade: false, label: "In library (an admin can upgrade it)" };
       const from = shortQuality(l.libraryQuality);
       return { can: true, upgrade: true, label: `Upgrade (${shortQuality(l.quality) || "better"}${from ? ` → replaces ${from}` : ""})` };
     }
@@ -96,13 +102,14 @@ export function libraryAction(l?: VodLibraryMatch | null): { can: boolean; upgra
   return { can: true, upgrade: false, label: "Save to library" };
 }
 
-function toastResult(r: { queued: number; already: number; skipped: number; upgrades?: number }) {
+/** The result of queueing saves; admins get a link to the download queue. */
+export function toastResult(r: { queued: number; already: number; skipped: number; upgrades?: number }, admin = true) {
   const parts = [
     r.queued && `${r.queued} queued${r.upgrades ? ` (${r.upgrades} upgrade${r.upgrades === 1 ? "" : "s"})` : ""}`,
     r.already && `${r.already} already queued or saved`,
     r.skipped && `${r.skipped} already in the library`,
   ].filter(Boolean);
-  toast(parts.length ? parts.join(", ") : "Nothing to save", { link: { to: "/vod/saves", label: "Downloads" } });
+  toast(parts.length ? parts.join(", ") : "Nothing to save", admin ? { link: { to: "/vod/saves", label: "Downloads" } } : undefined);
 }
 
 /** Where a film's or episode's page can save to: the default folder and the extra save folders. */
@@ -180,11 +187,10 @@ export function SaveMovieButton({
 }) {
   const admin = useIsAdmin();
   const m = useSaveVod();
-  if (!admin) return null;
   const state = save?.state;
   const busy = saveActive(state) || state === "paused";
   const done = state === "done" || state === "skipped";
-  const action = libraryAction(library);
+  const action = libraryAction(library, admin);
   const [main, ...more] = saveOptions(targets);
   // A save on its way, or just finished, shows its state; otherwise what the library allows.
   const showSave = busy || state === "failed" || (done && action.can && !action.upgrade);
@@ -199,7 +205,7 @@ export function SaveMovieButton({
   const run = (o?: SaveOption) =>
     m.mutate(
       { movieId, upgrade: action.upgrade, destination: o?.id },
-      { onSuccess: toastResult, onError: (e) => toast(e.message, { tone: "error" }) },
+      { onSuccess: (r) => toastResult(r, admin), onError: (e) => toast(e.message, { tone: "error" }) },
     );
   return (
     <div className="inline-flex items-center">
@@ -257,12 +263,11 @@ export function SaveSeriesButton({
 }) {
   const admin = useIsAdmin();
   const m = useSaveVod();
-  if (!admin) return null;
   const [main, ...more] = saveOptions(targets);
   const run = (includeUpgrades: boolean, o?: SaveOption) =>
     m.mutate(
       { seriesId, season, includeUpgrades, destination: o?.id },
-      { onSuccess: toastResult, onError: (e) => toast(e.message, { tone: "error" }) },
+      { onSuccess: (r) => toastResult(r, admin), onError: (e) => toast(e.message, { tone: "error" }) },
     );
   const what = season == null ? "show" : "season";
   const into = main?.name ? `the ${main.name} folder` : "the library's shows folder";
@@ -308,7 +313,7 @@ export function SaveSeriesButton({
           onPick={(o) => run(false, o)}
         />
       </div>
-      {library.better > 0 && (
+      {admin && library.better > 0 && (
         <Button
           size="sm"
           variant="ghost"
@@ -340,9 +345,8 @@ export function SaveEpisodeIcon({
 }) {
   const admin = useIsAdmin();
   const m = useSaveVod();
-  if (!admin) return null;
   const state = save?.state;
-  const action = libraryAction(library);
+  const action = libraryAction(library, admin);
   const idle = !state || state === "failed" || state === "cancelled" || ((state === "done" || state === "skipped") && action.upgrade);
   const can = idle && action.can;
   const label = idle ? action.label : saveLabel(save);

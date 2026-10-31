@@ -234,7 +234,7 @@ Suggestions appear in several places:
 - **Also on VOD,** at the bottom of a library film's or show's page: VOD titles like this one.
 - **Recommended for you,** at the top of VOD Movies and VOD Shows. **See all** opens the **Recommended** page.
 - **Muse:** tick **Include VOD** under the search box in Muse for movies to get VOD titles that fit your description beside the library's.
-- **Discover:** a title that isn't in your library but is on VOD shows **Watch now on VOD**, on its tile and in its request dialog, so you can watch it instead of requesting it.
+- **Discover:** a title that isn't in your library but is on VOD shows **Watch now on VOD**, on its tile and in its request dialog, so you can watch it instead of requesting it. Administrators, and people allowed **Can download from VOD** (Settings → Users), also see **Download** beside it when the title can be saved (an Xtream Codes source, with a download folder set). It queues the film, or a show's episodes the library doesn't have, in the download tool's default folder; a film already queued or saved shows that instead.
 
 ### The Recommended page
 

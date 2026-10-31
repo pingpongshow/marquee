@@ -12,6 +12,7 @@ import {
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { allRecordingUsageQuery, formatSize, liveStatusQuery, usageLabel } from "../livetv/api";
+import { vodStatusQuery } from "../livetv/vodApi";
 import { vodFollowsQuery } from "../livetv/vodApi";
 import { requestsStatusQuery } from "../requests/api";
 import {
@@ -58,6 +59,8 @@ function describe(r: UserRestrictions, libraryNames: Map<number, string>) {
     parts.push(`Remote ≤ ${(r.remoteQualityKbps / 1000).toFixed(0)} Mbps`);
   if (r.liveTv === false) parts.push("No Live TV");
   if ((r.canRecordDVR ?? r.canRecord) === false) parts.push("No recording");
+  if (r.canRequest && r.autoApproveRequests) parts.push("Requests approved automatically");
+  if (r.canDownloadVod) parts.push("VOD downloads");
   if (r.canViewDVR === false) parts.push("Can't watch recordings");
   const limits = describeTimeLimits(r);
   if (limits) parts.push(limits);
@@ -83,10 +86,22 @@ function RequestPermission({
     <div className="space-y-3">
       <Toggle
         label="Can request movies and shows"
-        help="Through Seerr. Every request still needs an admin's approval."
+        help={
+          value.autoApproveRequests
+            ? "Through Seerr."
+            : "Through Seerr. Every request needs an admin's approval unless approved automatically (below)."
+        }
         checked={!!value.canRequest}
         onChange={(v) => onChange({ ...value, canRequest: v })}
       />
+      {value.canRequest && (
+        <Toggle
+          label="Approve their requests automatically"
+          help="Their requests go straight to Seerr, without waiting for an admin."
+          checked={!!value.autoApproveRequests}
+          onChange={(v) => onChange({ ...value, autoApproveRequests: v })}
+        />
+      )}
       {value.canRequest && (
         <Field
           label="Request as Seerr user"
@@ -114,6 +129,30 @@ function RequestPermission({
         </Field>
       )}
     </div>
+  );
+}
+
+/** May this person queue films and episodes on demand in the VOD download tool. */
+function VodDownloadPermission({
+  value,
+  onChange,
+}: {
+  value: UserRestrictions;
+  onChange: (r: UserRestrictions) => void;
+}) {
+  const status = useQuery(vodStatusQuery);
+  if (!status.data?.enabled) return null;
+  return (
+    <Toggle
+      label="Can download from VOD"
+      help={
+        value.liveTv === false
+          ? "Needs Live TV, which on demand is part of."
+          : "Can queue films and episodes on demand into the library's download folders, from the VOD pages and Discover. Managing the download queue and replacing the library's copies stay with admins."
+      }
+      checked={!!value.canDownloadVod}
+      onChange={(v) => onChange({ ...value, canDownloadVod: v })}
+    />
   );
 }
 
@@ -318,6 +357,7 @@ function RestrictionsEditor({
       </Field>
       <RequestPermission value={value} onChange={onChange} />
       <LiveTvPermission value={value} onChange={onChange} />
+      <VodDownloadPermission value={value} onChange={onChange} />
       <DvrPermissions value={value} onChange={onChange} />
       <Toggle
         label="Allow streaming away from home"

@@ -78,6 +78,7 @@ func (h *Handlers) canSeeLibrary(ctx context.Context, id int64) bool {
 func toAPIRestrictions(r auth.Restrictions) UserRestrictions {
 	out := UserRestrictions{LibraryIds: r.LibraryIDs, AllowRemote: ptr(r.RemoteAllowed()), RemoteQualityKbps: ptr(r.RemoteQualityKbps),
 		CanRequest: ptr(r.CanRequest), CanRecord: ptr(r.DVRRecordAllowed()), SeerrUserId: r.SeerrUserID,
+		AutoApproveRequests: ptr(r.AutoApproveRequests), CanDownloadVod: ptr(r.VODDownloads),
 		CanRecordDVR: ptr(r.DVRRecordAllowed()), CanViewDVR: ptr(r.DVRViewAllowed()), DvrQuotaGb: r.DVRQuotaGB,
 		LiveTv: ptr(r.LiveTVAllowed()), Friend: ptr(r.Friend),
 		DailyLimitMinutes: r.DailyLimitMinutes, WeekendLimitMinutes: r.WeekendLimitMinutes,
@@ -111,6 +112,8 @@ func fromAPIRestrictions(r *UserRestrictions) (auth.Restrictions, error) {
 	if r.CanRequest != nil {
 		out.CanRequest = *r.CanRequest
 	}
+	set(&out.AutoApproveRequests, r.AutoApproveRequests)
+	set(&out.VODDownloads, r.CanDownloadVod)
 	// Only "no" is stored; canRecord is the old name, read when canRecordDVR isn't sent.
 	switch {
 	case r.CanRecordDVR != nil && !*r.CanRecordDVR:

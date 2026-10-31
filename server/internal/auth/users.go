@@ -26,6 +26,13 @@ type Restrictions struct {
 	RemoteQualityKbps int      `json:"remoteQualityKbps,omitempty"`
 	// CanRequest lets the user ask for titles through Seerr (REQ-1); admins always may.
 	CanRequest bool `json:"canRequest,omitempty"`
+	// AutoApproveRequests sends the user's requests straight to Seerr, without waiting for an
+	// admin (admins' own requests always go straight through).
+	AutoApproveRequests bool `json:"autoApproveRequests,omitempty"`
+	// VODDownloads lets the user queue films and episodes on demand in the VOD download tool
+	// (into the library's download folders); admins always may. Managing the queue and
+	// upgrades that replace the library's copies stay with admins.
+	VODDownloads bool `json:"canDownloadVod,omitempty"`
 	// RecordDVR: nil or true = may schedule Live TV recordings (LIVE-5); ViewDVR: nil or
 	// true = may see and play the household's recordings. Admins always may. Only "no" is
 	// stored. (Recording used to be opt-in as "canRecord"; migration 41 converted it.)

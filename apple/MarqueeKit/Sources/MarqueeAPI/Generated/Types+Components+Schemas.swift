@@ -468,6 +468,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/canRequest`.
             public var canRequest: Swift.Bool?
+            /// This user's requests go straight to Seerr without an admin approving them (with canRequest). Default false; admins' own requests always do.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/autoApproveRequests`.
+            public var autoApproveRequests: Swift.Bool?
+            /// May queue films and episodes on demand in the VOD download tool, into the library's download folders. Default false; admins always may. Managing the queue and upgrades that replace the library's copies stay with admins.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/canDownloadVod`.
+            public var canDownloadVod: Swift.Bool?
             /// Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent.
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/canRecord`.
@@ -525,6 +533,8 @@ extension Components {
             ///   - allowRemote: May stream from outside the home network. Default true.
             ///   - remoteQualityKbps: Cap for remote streams. 0 = server default.
             ///   - canRequest: May request titles through Seerr (REQ-1). Default false; admins always may.
+            ///   - autoApproveRequests: This user's requests go straight to Seerr without an admin approving them (with canRequest). Default false; admins' own requests always do.
+            ///   - canDownloadVod: May queue films and episodes on demand in the VOD download tool, into the library's download folders. Default false; admins always may. Managing the queue and upgrades that replace the library's copies stay with admins.
             ///   - canRecord: Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent.
             ///   - canRecordDVR: May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused.
             ///   - canViewDVR: May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may.
@@ -543,6 +553,8 @@ extension Components {
                 allowRemote: Swift.Bool? = nil,
                 remoteQualityKbps: Swift.Int? = nil,
                 canRequest: Swift.Bool? = nil,
+                autoApproveRequests: Swift.Bool? = nil,
+                canDownloadVod: Swift.Bool? = nil,
                 canRecord: Swift.Bool? = nil,
                 canRecordDVR: Swift.Bool? = nil,
                 canViewDVR: Swift.Bool? = nil,
@@ -561,6 +573,8 @@ extension Components {
                 self.allowRemote = allowRemote
                 self.remoteQualityKbps = remoteQualityKbps
                 self.canRequest = canRequest
+                self.autoApproveRequests = autoApproveRequests
+                self.canDownloadVod = canDownloadVod
                 self.canRecord = canRecord
                 self.canRecordDVR = canRecordDVR
                 self.canViewDVR = canViewDVR
@@ -580,6 +594,8 @@ extension Components {
                 case allowRemote
                 case remoteQualityKbps
                 case canRequest
+                case autoApproveRequests
+                case canDownloadVod
                 case canRecord
                 case canRecordDVR
                 case canViewDVR
@@ -4323,21 +4339,35 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/VodRef/id`.
             public var id: Swift.Int64
+            /// The caller (an admin) can queue it in the VOD download tool, to its default folder (POST /livetv/vod/movies/{id}/save, or /livetv/vod/series/{id}/save for the episodes the library lacks). Set on Discover's results only.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodRef/canSave`.
+            public var canSave: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/VodRef/save`.
+            public var save: Components.Schemas.VodSaveState?
             /// Creates a new `VodRef`.
             ///
             /// - Parameters:
             ///   - kind:
             ///   - id: The film's or series' id (GET /livetv/vod/movies/{id} or /livetv/vod/series/{id}).
+            ///   - canSave: The caller (an admin) can queue it in the VOD download tool, to its default folder (POST /livetv/vod/movies/{id}/save, or /livetv/vod/series/{id}/save for the episodes the library lacks). Set on Discover's results only.
+            ///   - save:
             public init(
                 kind: Components.Schemas.VodRef.KindPayload,
-                id: Swift.Int64
+                id: Swift.Int64,
+                canSave: Swift.Bool? = nil,
+                save: Components.Schemas.VodSaveState? = nil
             ) {
                 self.kind = kind
                 self.id = id
+                self.canSave = canSave
+                self.save = save
             }
             public enum CodingKeys: String, CodingKey {
                 case kind
                 case id
+                case canSave
+                case save
             }
         }
         /// - Remark: Generated from `#/components/schemas/VodSeriesDetail`.
