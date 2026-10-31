@@ -832,8 +832,9 @@ export function VodPlayerPage({ movieId, startMs }: { movieId: number; startMs?:
         unwrap(
           api.POST("/livetv/vod/movies/{movieId}/play", {
             params: { path: { movieId } },
-            // Films that are files are made into HLS for this browser (copied when it plays the codec).
-            body: { profile: deviceProfile() },
+            // Films that are files are made into HLS for this browser (copied when it plays the codec),
+            // starting where it plays from (Play from start: 0; otherwise the resume point).
+            body: { profile: deviceProfile(), startMs },
           }),
         )
       }

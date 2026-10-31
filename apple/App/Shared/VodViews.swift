@@ -933,6 +933,8 @@ struct VodPlayerView: View {
     @State private var startMs: Int64?
     @State private var player = AVPlayer()
     @State private var session: String?
+    /// Where the session started, until the player gets there (nil: there, or from the beginning).
+    @State private var target: Int64?
     @State private var error: String?
     /// The time limit refused or ended playback (kids' profiles): shown full screen.
     @State private var timeLimit: String?
@@ -1035,7 +1037,7 @@ struct VodPlayerView: View {
         do {
             let s: (id: String, url: URL, startMs: Int64)
             switch current {
-            case .movie(let m): s = try await app.playVod(m.id)
+            case .movie(let m): s = try await app.playVod(m.id, startMs: startMs)
             case .episode(let e):
                 s = try await app.playVodEpisode(e.id, startMs: startMs)
                 Task { next = try? await app.vodNextEpisode(e.id) }
@@ -1047,14 +1049,20 @@ struct VodPlayerView: View {
             player.replaceCurrentItem(with: item)
             watch(item)
             let from = startMs ?? s.startMs
-            if from > 0 {
-                // Seek once the stream is ready, then play from there.
-                for _ in 0..<100 where item.status == .unknown { try? await Task.sleep(for: .milliseconds(100)) }
-                if item.status == .readyToPlay {
-                    await player.seek(to: CMTime(value: from, timescale: 1000), toleranceBefore: .zero, toleranceAfter: .positiveInfinity)
-                }
-            }
+            // Nothing is reported until the player is where it started, so a slow start never
+            // overwrites where they were with a position from the beginning.
+            target = from > 0 ? from : nil
+            let seek = { _ = await player.seek(to: CMTime(value: from, timescale: 1000), toleranceBefore: .zero, toleranceAfter: .positiveInfinity) }
+            // Asked for at once, as for the library's videos, so the stream is fetched from there
+            // rather than from the beginning.
+            if from > 0 { await seek() }
+            // A source's file converted as it plays can take a while to be ready.
+            for _ in 0..<600 where item.status == .unknown && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(100)) }
+            if Task.isCancelled || closing { return }
             if item.status == .failed { throw MarqueeError(item.error?.localizedDescription ?? "This couldn't be played") }
+            if item.status != .readyToPlay { throw MarqueeError(current.isEpisode ? "The episode took too long to start." : "The movie took too long to start.") }
+            // The first seek didn't take (asked before the stream was ready): again, now.
+            if from > 0 && !settled { await seek() }
             player.play()
             loading = false
             // Where they are, every 10 seconds while playing.
@@ -1156,13 +1164,22 @@ struct VodPlayerView: View {
 
     private var position: Double { player.currentTime().seconds }
 
+    /// Whether the player is where the session started (or later, or anywhere once it got
+    /// there): until then its position is from before the seek, not where they are.
+    private var settled: Bool {
+        guard let target else { return true }
+        guard position.isFinite, position * 1000 >= Double(target - 30_000) else { return false }
+        self.target = nil
+        return true
+    }
+
     private var durationMs: Int64? {
         let d = player.currentItem?.duration.seconds ?? .nan
         return d.isFinite && d > 0 ? Int64(d * 1000) : nil
     }
 
     private func report() async {
-        guard let session, position.isFinite, position > 0 else { return }
+        guard let session, position.isFinite, position > 0, settled else { return }
         if let reached = await app.reportVod(session, positionMs: Int64(position * 1000), durationMs: durationMs), self.session == session {
             reachedTimeLimit(reached)
         }
@@ -1191,7 +1208,7 @@ struct VodPlayerView: View {
             let d = item.duration.seconds
             return d.isFinite && d > 0 && position >= d - 1
         } ?? false
-        let pos = atEnd ? (durationMs ?? Int64(position * 1000)) : Int64(max(0, position.isFinite ? position : 0) * 1000)
+        let pos = !settled ? 0 : atEnd ? (durationMs ?? Int64(position * 1000)) : Int64(max(0, position.isFinite ? position : 0) * 1000)
         let dur = durationMs
         player.pause()
         player.replaceCurrentItem(with: nil)

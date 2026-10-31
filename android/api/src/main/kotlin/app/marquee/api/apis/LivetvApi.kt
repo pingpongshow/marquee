@@ -3685,7 +3685,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * PATCH /livetv/vod/sessions/{sessionId}
-     * Report the position, so the film resumes there (and counts as watched near the end).
+     * Report the position, so the film resumes there (and counts as watched near the end). In a session&#39;s first minute, until the player reaches where the session started (startMs), a position well before it isn&#39;t saved: a player that failed to seek there doesn&#39;t overwrite the resume point.
      * 
      * @param sessionId 
      * @param reportVodPlaybackRequest 
@@ -3717,7 +3717,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * PATCH /livetv/vod/sessions/{sessionId}
-     * Report the position, so the film resumes there (and counts as watched near the end).
+     * Report the position, so the film resumes there (and counts as watched near the end). In a session&#39;s first minute, until the player reaches where the session started (startMs), a position well before it isn&#39;t saved: a player that failed to seek there doesn&#39;t overwrite the resume point.
      * 
      * @param sessionId 
      * @param reportVodPlaybackRequest 

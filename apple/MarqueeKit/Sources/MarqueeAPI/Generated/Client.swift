@@ -22795,7 +22795,7 @@ public struct Client: APIProtocol {
             }
         )
     }
-    /// Report the position, so the film resumes there (and counts as watched near the end).
+    /// Report the position, so the film resumes there (and counts as watched near the end). In a session's first minute, until the player reaches where the session started (startMs), a position well before it isn't saved: a player that failed to seek there doesn't overwrite the resume point.
     ///
     /// - Remark: HTTP `PATCH /livetv/vod/sessions/{sessionId}`.
     /// - Remark: Generated from `#/paths//livetv/vod/sessions/{sessionId}/patch(reportVodPlayback)`.

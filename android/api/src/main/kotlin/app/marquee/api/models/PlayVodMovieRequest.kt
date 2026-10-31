@@ -34,6 +34,7 @@ import kotlinx.serialization.Contextual
  *
  * @param profile What the device plays (Xtream Codes films). Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them.
  * @param maxBitrateKbps The app's quality setting; 0/omitted = original (home) or automatic (remote).
+ * @param startMs Where to start (Xtream Codes films; the session's startMs says where it did); omitted = the caller's resume point (0 = from the beginning).
  */
 @Serializable
 
@@ -45,7 +46,11 @@ data class PlayVodMovieRequest (
 
     /* The app's quality setting; 0/omitted = original (home) or automatic (remote). */
     @SerialName(value = "maxBitrateKbps")
-    val maxBitrateKbps: kotlin.Int? = null
+    val maxBitrateKbps: kotlin.Int? = null,
+
+    /* Where to start (Xtream Codes films; the session's startMs says where it did); omitted = the caller's resume point (0 = from the beginning). */
+    @SerialName(value = "startMs")
+    val startMs: kotlin.Long? = null
 
 ) {
 

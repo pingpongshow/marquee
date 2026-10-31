@@ -417,18 +417,23 @@ func (h *Handlers) PlayVodMovie(ctx context.Context, req PlayVodMovieRequestObje
 		return PlayVodMovie404JSONResponse{NotFoundJSONResponse(errVodNotFound)}, nil
 	}
 	link, ua, hls := h.VOD.PlayLink(*m)
+	start := m.PositionMS
+	if b := req.Body; b != nil {
+		set(&start, b.StartMs)
+	}
 	if hls {
 		h.yieldForVOD(ctx, m.SourceID)
 		st := h.VOD.Streams.Start(s.User.ID, m.ID, link, ua)
+		st.StartMS = start
 		return PlayVodMovie200JSONResponse(VodSession{Id: st.ID, Url: vod.StreamPrefix + st.ID + "/master.m3u8", MovieId: m.ID,
-			StartMs: nz(m.PositionMS)}), nil
+			StartMs: nz(start)}), nil
 	}
 	// A file (Xtream Codes): the server makes it into HLS, like a library transcode.
 	var opts vodPlayOptions
 	if b := req.Body; b != nil {
 		opts = vodPlayOptions{Profile: b.Profile, MaxBitrateKbps: b.MaxBitrateKbps}
 	}
-	ps, apiErr503, apiErr502, err := h.startVodFile(ctx, s, "film", m.Title, link, ua, m.PositionMS, m.SourceID, opts)
+	ps, apiErr503, apiErr502, err := h.startVodFile(ctx, s, "film", m.Title, link, ua, start, m.SourceID, opts)
 	switch {
 	case apiErr503 != nil:
 		return PlayVodMovie503JSONResponse{ServiceUnavailableJSONResponse(*apiErr503)}, nil
@@ -438,6 +443,7 @@ func (h *Handlers) PlayVodMovie(ctx context.Context, req PlayVodMovieRequestObje
 		return nil, err
 	}
 	st := h.VOD.Streams.StartPlayback(s.User.ID, m.ID, ps.ID)
+	st.StartMS = ps.StartMS
 	return PlayVodMovie200JSONResponse(VodSession{Id: st.ID, Url: playback.StreamPrefix + ps.ID + "/master.m3u8", MovieId: m.ID,
 		StartMs: nz(ps.StartMS)}), nil
 }
@@ -523,6 +529,9 @@ func (h *Handlers) ReportVodPlayback(ctx context.Context, req ReportVodPlaybackR
 	st.Touch()
 	if st.PlaybackID != "" && h.Playback != nil {
 		h.Playback.Progress(ctx, st.PlaybackID, req.Body.PositionMs, "playing") // keeps it alive; shows where they are
+	}
+	if !st.Settled(req.Body.PositionMs) {
+		return ReportVodPlayback204Response{}, nil // the player hasn't reached where it started yet
 	}
 	var err error
 	if st.EpisodeID != 0 {

@@ -486,6 +486,7 @@ func (h *Handlers) PlayVodEpisode(ctx context.Context, req PlayVodEpisodeRequest
 		return nil, err
 	}
 	st := h.VOD.Streams.StartEpisodePlayback(s.User.ID, e.ID, ps.ID)
+	st.StartMS = ps.StartMS
 	return PlayVodEpisode200JSONResponse(VodSession{Id: st.ID, Url: playback.StreamPrefix + ps.ID + "/master.m3u8",
 		MovieId: 0, EpisodeId: ptr(e.ID), StartMs: nz(ps.StartMS)}), nil
 }

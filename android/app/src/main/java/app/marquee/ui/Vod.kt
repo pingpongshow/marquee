@@ -729,7 +729,7 @@ private fun VodVideo(nav: NavHostController, movieId: Long?, seriesId: Long?, ep
         val pending = marquee.scope.async {
             runCatching {
                 if (episodeId != null) marquee.livetv.playVodEpisode(episodeId, PlayVodEpisodeRequest(AndroidProfile.profile, startMs = startMs))
-                else marquee.livetv.playVodMovie(movieId!!, PlayVodMovieRequest(AndroidProfile.profile))
+                else marquee.livetv.playVodMovie(movieId!!, PlayVodMovieRequest(AndroidProfile.profile, startMs = startMs))
             }
         }
         val result = try {

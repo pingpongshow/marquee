@@ -52,11 +52,32 @@ type Stream struct {
 	// PlaybackID is the server's own HLS session (playback.Manager) for a film that is a
 	// file (Xtream Codes); "" when the source's HLS is passed through.
 	PlaybackID string
+	// StartMS is where the session started (the resume point, or where the viewer chose).
+	StartMS int64
 
-	mu    sync.Mutex
-	urls  []string
-	index map[string]int
-	last  time.Time
+	mu      sync.Mutex
+	urls    []string
+	index   map[string]int
+	last    time.Time
+	started time.Time
+	reached bool // a position at or past StartMS was reported
+}
+
+// earlyGrace is how long after a session starts a position well before its start point
+// is taken for a player that hasn't sought there yet (it starts at the beginning while
+// the stream gets ready), not where the viewer is.
+const earlyGrace = time.Minute
+
+// Settled reports whether a position is where the viewer is, to be saved: anything once
+// the player has reached the start point or a minute has passed, else nothing more than
+// 30 seconds before it (a seek lands on a keyframe a little earlier).
+func (s *Stream) Settled(positionMS int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if positionMS >= s.StartMS-30_000 {
+		s.reached = true
+	}
+	return s.reached || time.Since(s.started) > earlyGrace
 }
 
 func newID() string {
@@ -75,7 +96,7 @@ func (st *Streams) client() *http.Client {
 // Start opens a session for a film's master playlist.
 func (st *Streams) Start(userID, movieID int64, masterURL, userAgent string) *Stream {
 	s := &Stream{ID: newID(), UserID: userID, MovieID: movieID, userAgent: userAgent, master: masterURL,
-		index: map[string]int{}, last: time.Now()}
+		index: map[string]int{}, last: time.Now(), started: time.Now()}
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if st.sessions == nil {

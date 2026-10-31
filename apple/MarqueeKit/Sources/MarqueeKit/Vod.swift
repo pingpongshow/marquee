@@ -93,8 +93,10 @@ public extension AppSession {
 
     /// Starts a film: the session id, the HLS URL and the caller's resume point (ms). Sends the
     /// device's profile, so the server copies what this device plays (HEVC, AC3…).
-    func playVod(_ id: Int64) async throws -> (id: String, url: URL, startMs: Int64) {
-        let body = Operations.PlayVodMovie.Input.Body.JsonPayload(profile: .init(value1: AppleDeviceProfile.current()), maxBitrateKbps: vodMaxBitrate)
+    /// `startMs` nil resumes where the viewer left off; 0 starts from the beginning.
+    func playVod(_ id: Int64, startMs: Int64? = nil) async throws -> (id: String, url: URL, startMs: Int64) {
+        let body = Operations.PlayVodMovie.Input.Body.JsonPayload(profile: .init(value1: AppleDeviceProfile.current()),
+                                                                 maxBitrateKbps: vodMaxBitrate, startMs: startMs)
         switch try await vodAPI.playVodMovie(path: .init(movieId: id), body: .json(body)) {
         case let .ok(ok):
             let s = try ok.body.json

@@ -36455,21 +36455,29 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/play/POST/requestBody/json/maxBitrateKbps`.
                     public var maxBitrateKbps: Swift.Int?
+                    /// Where to start (Xtream Codes films; the session's startMs says where it did); omitted = the caller's resume point (0 = from the beginning).
+                    ///
+                    /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/play/POST/requestBody/json/startMs`.
+                    public var startMs: Swift.Int64?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
                     ///   - profile: What the device plays (Xtream Codes films). Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them.
                     ///   - maxBitrateKbps: The app's quality setting; 0/omitted = original (home) or automatic (remote).
+                    ///   - startMs: Where to start (Xtream Codes films; the session's startMs says where it did); omitted = the caller's resume point (0 = from the beginning).
                     public init(
                         profile: Operations.PlayVodMovie.Input.Body.JsonPayload.ProfilePayload? = nil,
-                        maxBitrateKbps: Swift.Int? = nil
+                        maxBitrateKbps: Swift.Int? = nil,
+                        startMs: Swift.Int64? = nil
                     ) {
                         self.profile = profile
                         self.maxBitrateKbps = maxBitrateKbps
+                        self.startMs = startMs
                     }
                     public enum CodingKeys: String, CodingKey {
                         case profile
                         case maxBitrateKbps
+                        case startMs
                     }
                 }
                 /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/play/POST/requestBody/content/application\/json`.
@@ -36690,7 +36698,7 @@ public enum Operations {
             }
         }
     }
-    /// Report the position, so the film resumes there (and counts as watched near the end).
+    /// Report the position, so the film resumes there (and counts as watched near the end). In a session's first minute, until the player reaches where the session started (startMs), a position well before it isn't saved: a player that failed to seek there doesn't overwrite the resume point.
     ///
     /// - Remark: HTTP `PATCH /livetv/vod/sessions/{sessionId}`.
     /// - Remark: Generated from `#/paths//livetv/vod/sessions/{sessionId}/patch(reportVodPlayback)`.
