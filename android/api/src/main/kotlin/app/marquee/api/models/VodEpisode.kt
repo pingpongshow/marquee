@@ -48,6 +48,7 @@ import kotlinx.serialization.Contextual
  * @param positionMs The caller's resume point.
  * @param save 
  * @param library 
+ * @param libraryItemId On a show's page: the library's copy of this episode (in a library the caller can see), which the apps play instead of the stream on demand.
  */
 @Serializable
 
@@ -100,7 +101,11 @@ data class VodEpisode (
     val save: VodSaveState? = null,
 
     @SerialName(value = "library")
-    val library: VodLibraryMatch? = null
+    val library: VodLibraryMatch? = null,
+
+    /* On a show's page: the library's copy of this episode (in a library the caller can see), which the apps play instead of the stream on demand. */
+    @SerialName(value = "libraryItemId")
+    val libraryItemId: kotlin.Long? = null
 
 ) {
 

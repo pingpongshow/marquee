@@ -28,6 +28,12 @@ func (h *Handlers) vodInLibrary(ctx context.Context, s auth.Session) (*vodsave.L
 	return idx, vis
 }
 
+// libraryVisible says whether the caller can open a library item (as in their listings).
+func (h *Handlers) libraryVisible(ctx context.Context, s auth.Session) func(int64) bool {
+	acc := userAccess(s.User)
+	return func(id int64) bool { return h.Items.Visible(ctx, acc, id) == nil }
+}
+
 // applyInLibraryFilter narrows a listing to the titles the library has (or doesn't).
 func applyInLibraryFilter(f *vod.Filter, inLibrary *bool, series bool, idx *vodsave.LibraryIndex, vis vodsave.Visibility) {
 	if inLibrary == nil {

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -183,7 +184,12 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
     fun watched(e: VodEpisode) = episodeOverride[e.id] ?: showOverride ?: e.watched
     val showWatched = showOverride ?: s.watched
     val seasonWatched = episodes.isNotEmpty() && episodes.all { watched(it) }
-    fun play(e: VodEpisode, from: Long? = null) = nav.navigate("vodepplay/${s.id}/${e.id}" + (from?.let { "?start=$it" } ?: ""))
+    // An episode the library has plays from the library (resuming there); others on demand.
+    fun play(e: VodEpisode, from: Long? = null) {
+        val start = from?.let { "?start=$it" } ?: ""
+        val library = e.libraryItemId
+        nav.navigate(if (library != null) "player/$library$start" else "vodepplay/${s.id}/${e.id}$start")
+    }
     fun change(apply: () -> Unit, undo: () -> Unit, call: suspend () -> Unit) {
         apply()
         busy = true
@@ -230,19 +236,27 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
                                 style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                         }
                         FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // The library's copy comes first.
+                            val library = s.libraryItemId
+                            if (library != null) Button({ nav.navigate("item/$library") }, Modifier.focusRing().initialFocus(marquee.isTv)) {
+                                Icon(Icons.Filled.VideoLibrary, null)
+                                Text("Open in library", Modifier.padding(start = 6.dp))
+                            }
                             if (next != null) {
                                 val pos = next.positionMs ?: 0
                                 val resume = pos > 0 && !watched(next) && (episodeOverride[next.id] ?: showOverride) == null
-                                Button({ play(next) }, Modifier.focusRing().initialFocus(marquee.isTv)) {
+                                val label = @Composable {
                                     Icon(Icons.Filled.PlayArrow, null)
                                     Text(if (resume) "Resume ${next.label()} from ${formatTime(pos)}" else "Play ${next.label()}", Modifier.padding(start = 6.dp))
                                 }
+                                if (library != null) OutlinedButton({ play(next) }, Modifier.focusRing()) { label() }
+                                else Button({ play(next) }, Modifier.focusRing().initialFocus(marquee.isTv)) { label() }
                                 if (resume) OutlinedButton({ play(next, 0) }, Modifier.focusRing()) {
                                     Icon(Icons.Filled.Replay, null)
                                     Text("Play from start", Modifier.padding(start = 6.dp))
                                 }
                             }
-                            if (s.episodes.isNotEmpty()) OutlinedButton({ setShow(!showWatched) }, Modifier.focusRing().initialFocus(marquee.isTv && next == null).semantics {
+                            if (s.episodes.isNotEmpty()) OutlinedButton({ setShow(!showWatched) }, Modifier.focusRing().initialFocus(marquee.isTv && next == null && library == null).semantics {
                                 contentDescription = if (showWatched) "Mark the show unwatched" else "Mark the show watched"
                                 stateDescription = if (showWatched) "Watched" else "Not watched"
                             }, enabled = !busy) {
@@ -348,7 +362,7 @@ private fun VodEpisodeRow(e: VodEpisode, watched: Boolean, choices: WatchChoices
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("${e.episode}. ${e.title}", fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    val meta = listOfNotNull(e.runtimeMs?.let(::formatRuntime), e.airDate)
+                    val meta = listOfNotNull(e.runtimeMs?.let(::formatRuntime), e.airDate, if (e.libraryItemId != null) "Plays from your library" else null)
                     if (meta.isNotEmpty()) Text(meta.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     if (wide) e.overview?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                 }

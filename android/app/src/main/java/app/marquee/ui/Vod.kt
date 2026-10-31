@@ -564,7 +564,18 @@ fun VodMovieScreen(nav: NavHostController, movieId: Long) {
                             Text("TMDB ${"%.1f".format(it)}", Modifier.clip(RoundedCornerShape(6.dp)).background(Surface2).padding(horizontal = 8.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                         }
-                        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // The library's copy comes first; the stream on demand stays a tap away.
+                        val library = m.libraryItemId
+                        if (library != null) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button({ nav.navigate("player/$library") }, Modifier.focusRing().initialFocus(marquee.isTv)) {
+                                Icon(Icons.Filled.PlayArrow, null)
+                                Text("Play from library", Modifier.padding(start = 6.dp))
+                            }
+                            OutlinedButton({ play(null) }, Modifier.focusRing()) {
+                                Icon(Icons.Filled.PlayArrow, null)
+                                Text(if (resume) "Resume on VOD from ${formatTime(position)}" else "Play on VOD", Modifier.padding(start = 6.dp))
+                            }
+                        } else Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                             Button({ play(null) }, Modifier.focusRing().initialFocus(marquee.isTv)) {
                                 Icon(Icons.Filled.PlayArrow, null)
                                 Text(if (resume) "Resume from ${formatTime(position)}" else "Play", Modifier.padding(start = 6.dp))

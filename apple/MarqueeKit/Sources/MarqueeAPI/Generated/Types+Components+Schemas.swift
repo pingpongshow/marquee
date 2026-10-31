@@ -3928,6 +3928,10 @@ extension Components {
                 public var save: Components.Schemas.VodSaveState?
                 /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/library`.
                 public var library: Components.Schemas.VodLibraryMatch?
+                /// The library's copy of this film (its best, in a library the caller can see; matched by TMDB id, else by title and year). The apps play it first, the stream on demand second.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/libraryItemId`.
+                public var libraryItemId: Swift.Int64?
                 /// On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist.
                 ///
                 /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/watchlisted`.
@@ -3949,6 +3953,7 @@ extension Components {
                 ///   - saveDestinations: Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both).
                 ///   - save:
                 ///   - library:
+                ///   - libraryItemId: The library's copy of this film (its best, in a library the caller can see; matched by TMDB id, else by title and year). The apps play it first, the stream on demand second.
                 ///   - watchlisted: On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist.
                 public init(
                     overview: Swift.String? = nil,
@@ -3965,6 +3970,7 @@ extension Components {
                     saveDestinations: [Components.Schemas.VodSaveDestinationRef]? = nil,
                     save: Components.Schemas.VodSaveState? = nil,
                     library: Components.Schemas.VodLibraryMatch? = nil,
+                    libraryItemId: Swift.Int64? = nil,
                     watchlisted: Swift.Bool? = nil
                 ) {
                     self.overview = overview
@@ -3981,6 +3987,7 @@ extension Components {
                     self.saveDestinations = saveDestinations
                     self.save = save
                     self.library = library
+                    self.libraryItemId = libraryItemId
                     self.watchlisted = watchlisted
                 }
                 public enum CodingKeys: String, CodingKey {
@@ -3998,6 +4005,7 @@ extension Components {
                     case saveDestinations
                     case save
                     case library
+                    case libraryItemId
                     case watchlisted
                 }
             }
@@ -4445,6 +4453,10 @@ extension Components {
                 public var saveDestinations: [Components.Schemas.VodSaveDestinationRef]?
                 /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/library`.
                 public var library: Components.Schemas.VodLibraryRollup?
+                /// The library's copy of this show (in a library the caller can see): the apps open it first. Each episode the library has carries its own libraryItemId.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/libraryItemId`.
+                public var libraryItemId: Swift.Int64?
                 /// On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist.
                 ///
                 /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/watchlisted`.
@@ -4466,6 +4478,7 @@ extension Components {
                 ///   - saveDefault: Admins: saving without a destination works (vodSave.showsFolder is set).
                 ///   - saveDestinations: Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both).
                 ///   - library:
+                ///   - libraryItemId: The library's copy of this show (in a library the caller can see): the apps open it first. Each episode the library has carries its own libraryItemId.
                 ///   - watchlisted: On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist.
                 public init(
                     overview: Swift.String? = nil,
@@ -4482,6 +4495,7 @@ extension Components {
                     saveDefault: Swift.Bool? = nil,
                     saveDestinations: [Components.Schemas.VodSaveDestinationRef]? = nil,
                     library: Components.Schemas.VodLibraryRollup? = nil,
+                    libraryItemId: Swift.Int64? = nil,
                     watchlisted: Swift.Bool? = nil
                 ) {
                     self.overview = overview
@@ -4498,6 +4512,7 @@ extension Components {
                     self.saveDefault = saveDefault
                     self.saveDestinations = saveDestinations
                     self.library = library
+                    self.libraryItemId = libraryItemId
                     self.watchlisted = watchlisted
                 }
                 public enum CodingKeys: String, CodingKey {
@@ -4515,6 +4530,7 @@ extension Components {
                     case saveDefault
                     case saveDestinations
                     case library
+                    case libraryItemId
                     case watchlisted
                 }
             }
@@ -4826,6 +4842,10 @@ extension Components {
             public var save: Components.Schemas.VodSaveState?
             /// - Remark: Generated from `#/components/schemas/VodEpisode/library`.
             public var library: Components.Schemas.VodLibraryMatch?
+            /// On a show's page: the library's copy of this episode (in a library the caller can see), which the apps play instead of the stream on demand.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/libraryItemId`.
+            public var libraryItemId: Swift.Int64?
             /// Creates a new `VodEpisode`.
             ///
             /// - Parameters:
@@ -4844,6 +4864,7 @@ extension Components {
             ///   - watched:
             ///   - save:
             ///   - library:
+            ///   - libraryItemId: On a show's page: the library's copy of this episode (in a library the caller can see), which the apps play instead of the stream on demand.
             public init(
                 id: Swift.Int64,
                 seriesId: Swift.Int64,
@@ -4859,7 +4880,8 @@ extension Components {
                 positionMs: Swift.Int64? = nil,
                 watched: Swift.Bool,
                 save: Components.Schemas.VodSaveState? = nil,
-                library: Components.Schemas.VodLibraryMatch? = nil
+                library: Components.Schemas.VodLibraryMatch? = nil,
+                libraryItemId: Swift.Int64? = nil
             ) {
                 self.id = id
                 self.seriesId = seriesId
@@ -4876,6 +4898,7 @@ extension Components {
                 self.watched = watched
                 self.save = save
                 self.library = library
+                self.libraryItemId = libraryItemId
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -4893,6 +4916,7 @@ extension Components {
                 case watched
                 case save
                 case library
+                case libraryItemId
             }
         }
         /// Saving films and episodes on demand (Xtream Codes sources) into the library (admins only). Partial sends keep the other fields.
@@ -5634,6 +5658,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/RequestsStatus/canRequest`.
             public var canRequest: Swift.Bool
+            /// The caller's requests go straight to Seerr without waiting for an admin (admins always; others when set to).
+            ///
+            /// - Remark: Generated from `#/components/schemas/RequestsStatus/autoApproved`.
+            public var autoApproved: Swift.Bool?
             /// Requests waiting for approval (admins; 0 for others).
             ///
             /// - Remark: Generated from `#/components/schemas/RequestsStatus/pendingApprovals`.
@@ -5643,19 +5671,23 @@ extension Components {
             /// - Parameters:
             ///   - enabled: Seerr is configured.
             ///   - canRequest: The caller may make requests (admins always; others when granted).
+            ///   - autoApproved: The caller's requests go straight to Seerr without waiting for an admin (admins always; others when set to).
             ///   - pendingApprovals: Requests waiting for approval (admins; 0 for others).
             public init(
                 enabled: Swift.Bool,
                 canRequest: Swift.Bool,
+                autoApproved: Swift.Bool? = nil,
                 pendingApprovals: Swift.Int
             ) {
                 self.enabled = enabled
                 self.canRequest = canRequest
+                self.autoApproved = autoApproved
                 self.pendingApprovals = pendingApprovals
             }
             public enum CodingKeys: String, CodingKey {
                 case enabled
                 case canRequest
+                case autoApproved
                 case pendingApprovals
             }
         }

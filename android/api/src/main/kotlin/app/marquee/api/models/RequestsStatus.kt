@@ -34,6 +34,7 @@ import kotlinx.serialization.Contextual
  * @param enabled Seerr is configured.
  * @param canRequest The caller may make requests (admins always; others when granted).
  * @param pendingApprovals Requests waiting for approval (admins; 0 for others).
+ * @param autoApproved The caller's requests go straight to Seerr without waiting for an admin (admins always; others when set to).
  */
 @Serializable
 
@@ -49,7 +50,11 @@ data class RequestsStatus (
 
     /* Requests waiting for approval (admins; 0 for others). */
     @SerialName(value = "pendingApprovals")
-    val pendingApprovals: kotlin.Int
+    val pendingApprovals: kotlin.Int,
+
+    /* The caller's requests go straight to Seerr without waiting for an admin (admins always; others when set to). */
+    @SerialName(value = "autoApproved")
+    val autoApproved: kotlin.Boolean? = null
 
 ) {
 

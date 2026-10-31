@@ -267,6 +267,24 @@ func (h *Handlers) GetVodSeries(ctx context.Context, req GetVodSeriesRequestObje
 	if next != nil {
 		out.NextEpisode = ptr(toAPIVodEpisode(*next))
 	}
+	// The library's copies come first: the apps open the show, and play its episodes, there.
+	if *out.InLibrary {
+		if show, eps, err := h.VODSaves.SeriesItems(ctx, m.ID, h.libraryVisible(ctx, s)); err != nil {
+			slog.WarnContext(ctx, "vod library copies", "err", err)
+		} else if show > 0 {
+			out.LibraryItemId = &show
+			for i := range out.Episodes {
+				if id, ok := eps[out.Episodes[i].Id]; ok {
+					out.Episodes[i].LibraryItemId = &id
+				}
+			}
+			if out.NextEpisode != nil {
+				if id, ok := eps[out.NextEpisode.Id]; ok {
+					out.NextEpisode.LibraryItemId = &id
+				}
+			}
+		}
+	}
 	if episodesErr != nil && len(eps) == 0 {
 		out.EpisodesError = ptr(episodesErr.Error())
 	}

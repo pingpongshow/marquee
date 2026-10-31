@@ -5285,6 +5285,11 @@ export interface components {
             saveDestinations?: components["schemas"]["VodSaveDestinationRef"][];
             save?: components["schemas"]["VodSaveState"];
             library?: components["schemas"]["VodLibraryMatch"];
+            /**
+             * Format: int64
+             * @description The library's copy of this film (its best, in a library the caller can see; matched by TMDB id, else by title and year). The apps play it first, the stream on demand second.
+             */
+            libraryItemId?: number;
             /** @description On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist. */
             watchlisted?: boolean;
         };
@@ -5398,6 +5403,11 @@ export interface components {
             /** @description Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both). */
             saveDestinations?: components["schemas"]["VodSaveDestinationRef"][];
             library?: components["schemas"]["VodLibraryRollup"];
+            /**
+             * Format: int64
+             * @description The library's copy of this show (in a library the caller can see): the apps open it first. Each episode the library has carries its own libraryItemId.
+             */
+            libraryItemId?: number;
             /** @description On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist. */
             watchlisted?: boolean;
         };
@@ -5484,6 +5494,11 @@ export interface components {
             watched: boolean;
             save?: components["schemas"]["VodSaveState"];
             library?: components["schemas"]["VodLibraryMatch"];
+            /**
+             * Format: int64
+             * @description On a show's page: the library's copy of this episode (in a library the caller can see), which the apps play instead of the stream on demand.
+             */
+            libraryItemId?: number;
         };
         /** @description Saving films and episodes on demand (Xtream Codes sources) into the library (admins only). Partial sends keep the other fields. */
         VodSaveSettings: {

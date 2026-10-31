@@ -6302,6 +6302,7 @@ components:
               items: { $ref: "#/components/schemas/VodSaveDestinationRef" }
             save: { $ref: "#/components/schemas/VodSaveState" }
             library: { $ref: "#/components/schemas/VodLibraryMatch" }
+            libraryItemId: { type: integer, format: int64, description: "The library's copy of this film (its best, in a library the caller can see; matched by TMDB id, else by title and year). The apps play it first, the stream on demand second." }
             watchlisted: { type: boolean, description: "On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist." }
 
     VodMoviePage:
@@ -6411,6 +6412,7 @@ components:
               description: "Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both)."
               items: { $ref: "#/components/schemas/VodSaveDestinationRef" }
             library: { $ref: "#/components/schemas/VodLibraryRollup" }
+            libraryItemId: { type: integer, format: int64, description: "The library's copy of this show (in a library the caller can see): the apps open it first. Each episode the library has carries its own libraryItemId." }
             watchlisted: { type: boolean, description: "On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist." }
 
     VodSeason:
@@ -6481,6 +6483,7 @@ components:
         watched: { type: boolean }
         save: { $ref: "#/components/schemas/VodSaveState" }
         library: { $ref: "#/components/schemas/VodLibraryMatch" }
+        libraryItemId: { type: integer, format: int64, description: "On a show's page: the library's copy of this episode (in a library the caller can see), which the apps play instead of the stream on demand." }
 
     VodSaveSettings:
       type: object

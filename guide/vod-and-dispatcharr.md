@@ -101,6 +101,7 @@ Each page has:
 - A **Category** menu (the source's own groups), a search box and **Sort**: Title, Recently added, Release year or Rating.
 - **Filters:** watched state (Unwatched, In progress, Watched), genre, decade, minimum rating, **In my library** (yes or no) and source. Active filters show as chips you can clear one by one.
 - A poster grid. Titles your library already has get a **green border** (*In your library*).
+- **The library's copy comes first.** On the page of a film your library has, the main button is **Play from library**, which plays your library's copy and picks up where you left off there. **Play on VOD** is next to it if you'd rather stream it. A show your library has offers **Open in library**, and each episode the library has plays from the library (marked *Plays from your library*); the others play on demand. This only counts libraries you can see.
 
 Your category, sort and filters are remembered for each page.
 

@@ -158,11 +158,15 @@ func (s *Service) MovieCopy(ctx context.Context, tmdbID int, title string, year 
 
 // EpisodeCopies are a show's episodes in the library, by season and episode.
 func (s *Service) EpisodeCopies(ctx context.Context, tmdbID int, title string, year int) (map[[2]int]*LibraryCopy, error) {
-	out := map[[2]int]*LibraryCopy{}
 	shows, err := s.candidates(ctx, "show", tmdbID, title, year)
 	if err != nil {
 		return nil, err
 	}
+	return s.episodeCopies(ctx, shows)
+}
+
+func (s *Service) episodeCopies(ctx context.Context, shows []int64) (map[[2]int]*LibraryCopy, error) {
+	out := map[[2]int]*LibraryCopy{}
 	for _, show := range shows {
 		rows, err := s.DB.QueryContext(ctx, `SELECT e.id, z.idx, e.idx, `+fileCols+` FROM items e JOIN items z ON z.id=e.parent_id
 			JOIN media_versions v ON v.item_id=e.id JOIN media_files f ON f.version_id=v.id
@@ -191,6 +195,96 @@ func (s *Service) EpisodeCopies(ctx context.Context, tmdbID int, title string, y
 		}
 	}
 	return out, nil
+}
+
+// ---- the copies a page plays instead
+
+// MovieItem is the library's best copy of a film on demand that visible says the caller
+// can open (0 when there's none).
+func (s *Service) MovieItem(ctx context.Context, movieID int64, visible func(itemID int64) bool) (int64, error) {
+	r, err := s.movieRow(ctx, movieID)
+	if err != nil {
+		return 0, err
+	}
+	name, year := libraryTitle(r.title, r.year)
+	ids, err := s.candidates(ctx, "movie", r.tmdbID, name, year)
+	if err != nil {
+		return 0, err
+	}
+	var best *LibraryCopy
+	for _, id := range ids {
+		if !visible(id) {
+			continue
+		}
+		c, err := s.bestCopy(ctx, id)
+		if err != nil {
+			return 0, err
+		}
+		if c != nil && (best == nil || better(c.Quality, best.Quality)) {
+			best = c
+		}
+	}
+	if best == nil {
+		return 0, nil
+	}
+	return best.ItemID, nil
+}
+
+// SeriesItems are the library's copy of a series on demand that the caller can open (the
+// show with the most episodes to play; 0 when there's none) and its episodes' copies, by
+// the episode on demand's id.
+func (s *Service) SeriesItems(ctx context.Context, seriesID int64, visible func(itemID int64) bool) (int64, map[int64]int64, error) {
+	r, err := s.seriesRow(ctx, seriesID)
+	if err != nil {
+		return 0, nil, err
+	}
+	name, year := libraryTitle(r.title, r.year)
+	ids, err := s.candidates(ctx, "show", r.tmdbID, name, year)
+	if err != nil {
+		return 0, nil, err
+	}
+	var shows []int64
+	var show int64
+	most := 0
+	for _, id := range ids {
+		if !visible(id) {
+			continue
+		}
+		var n int
+		if err := s.DB.QueryRowContext(ctx, `SELECT COUNT(DISTINCT e.id) FROM items e JOIN media_versions v ON v.item_id=e.id
+			JOIN media_files f ON f.version_id=v.id WHERE e.grandparent_id=? AND e.type='episode' AND f.available=1`, id).Scan(&n); err != nil {
+			return 0, nil, err
+		}
+		if n > 0 {
+			shows = append(shows, id)
+			if n > most {
+				show, most = id, n
+			}
+		}
+	}
+	if show == 0 {
+		return 0, nil, nil
+	}
+	copies, err := s.episodeCopies(ctx, shows)
+	if err != nil {
+		return 0, nil, err
+	}
+	rows, err := s.DB.QueryContext(ctx, "SELECT id, season, episode FROM vod_episodes WHERE series_id=?", seriesID)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+	eps := map[int64]int64{}
+	for rows.Next() {
+		var e episodeKey
+		if err := rows.Scan(&e.id, &e.season, &e.episode); err != nil {
+			return 0, nil, err
+		}
+		if c := copies[[2]int{e.season, e.episode}]; c != nil {
+			eps[e.id] = c.ItemID
+		}
+	}
+	return show, eps, rows.Err()
 }
 
 // ---- comparisons for the pages admins open

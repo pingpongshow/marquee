@@ -291,6 +291,14 @@ func (h *Handlers) GetVodMovie(ctx context.Context, req GetVodMovieRequestObject
 		TmdbId: nz(m.TMDBID), ImdbId: nz(m.IMDBID), Matched: m.Matched}
 	idx, vis := h.vodInLibrary(ctx, s)
 	out.InLibrary = ptr(idx.Has(false, m.ID, vis))
+	// The library's copy comes first: the apps play it, and the stream on demand second.
+	if *out.InLibrary {
+		if id, err := h.VODSaves.MovieItem(ctx, m.ID, h.libraryVisible(ctx, s)); err != nil {
+			slog.WarnContext(ctx, "vod library copy", "err", err)
+		} else if id > 0 {
+			out.LibraryItemId = &id
+		}
+	}
 	if out.Genres == nil {
 		out.Genres = []string{}
 	}

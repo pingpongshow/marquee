@@ -550,13 +550,30 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
               </div>
             )}
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={() => play()}>
-                <Play className="size-4 fill-current" /> {resume ? `Resume from ${formatTrackTime(m.positionMs)}` : "Play"}
-              </Button>
-              {resume && (
-                <Button onClick={() => play(0)}>
-                  <RotateCcw className="size-4" /> Play from start
-                </Button>
+              {/* The library's copy comes first; the stream on demand stays a click away. */}
+              {m.libraryItemId ? (
+                <>
+                  <Button
+                    variant="primary"
+                    onClick={() => navigate({ to: "/play/$itemId", params: { itemId: String(m.libraryItemId) } })}
+                  >
+                    <Play className="size-4 fill-current" /> Play from library
+                  </Button>
+                  <Button onClick={() => play()}>
+                    <Play className="size-4" /> {resume ? `Resume on VOD from ${formatTrackTime(m.positionMs)}` : "Play on VOD"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="primary" onClick={() => play()}>
+                    <Play className="size-4 fill-current" /> {resume ? `Resume from ${formatTrackTime(m.positionMs)}` : "Play"}
+                  </Button>
+                  {resume && (
+                    <Button onClick={() => play(0)}>
+                      <RotateCcw className="size-4" /> Play from start
+                    </Button>
+                  )}
+                </>
               )}
               <Button
                 variant="ghost"
@@ -575,6 +592,14 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
               </Button>
               {m.canSave && <SaveMovieButton movieId={m.id} save={m.save} library={m.library} targets={m} />}
             </div>
+            {m.libraryItemId && (
+              <p className="mt-3 text-sm text-muted">
+                In your library ·{" "}
+                <Link to="/item/$itemId" params={{ itemId: String(m.libraryItemId) }} className="text-accent hover:underline">
+                  Open its page
+                </Link>
+              </p>
+            )}
             {m.tagline && <p className="mt-4 text-lg text-muted italic">{m.tagline}</p>}
             {m.overview && <p className="mt-5 max-w-3xl leading-relaxed text-text/90">{m.overview}</p>}
             {!m.matched && <p className="mt-4 text-sm text-faint">Details from the source (not matched to TMDB).</p>}

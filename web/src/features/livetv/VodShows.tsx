@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Bookmark, BookmarkCheck, Check, ChevronRight, Play, RotateCcw, Tv } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, ChevronRight, Library, Play, RotateCcw, Tv } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { toast } from "@/components/Toast";
@@ -69,12 +69,15 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
   // Optimistic while the request is in flight; otherwise whatever the server says.
   const listed = watchlist.isPending ? !!watchlist.variables?.on : !!s.watchlisted;
   const next = s.nextEpisode;
+  // An episode the library has plays from the library (resuming there); others on demand.
   const play = (e: VodEpisode, t?: number) =>
-    navigate({
-      to: "/vod/shows/$seriesId/play/$episodeId",
-      params: { seriesId: String(s.id), episodeId: String(e.id) },
-      search: { t },
-    });
+    e.libraryItemId
+      ? navigate({ to: "/play/$itemId", params: { itemId: String(e.libraryItemId) }, search: { t } })
+      : navigate({
+          to: "/vod/shows/$seriesId/play/$episodeId",
+          params: { seriesId: String(s.id), episodeId: String(e.id) },
+          search: { t },
+        });
   const meta = [
     s.year ? String(s.year) : "",
     s.contentRating ?? "",
@@ -121,8 +124,13 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
               </div>
             )}
             <div className="mt-5 flex flex-wrap items-center gap-3">
+              {s.libraryItemId && (
+                <Button variant="primary" onClick={() => navigate({ to: "/item/$itemId", params: { itemId: String(s.libraryItemId) } })}>
+                  <Library className="size-4" /> Open in library
+                </Button>
+              )}
               {next && (
-                <Button variant="primary" onClick={() => play(next)}>
+                <Button variant={s.libraryItemId ? "secondary" : "primary"} onClick={() => play(next)}>
                   <Play className="size-4 fill-current" />{" "}
                   {next.positionMs
                     ? `Resume ${epLabel(next)} from ${formatTrackTime(next.positionMs)}`
@@ -237,7 +245,9 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                           {e.episode}. {e.title}
                         </div>
                         <div className="text-xs text-muted">
-                          {[e.airDate, formatDuration(e.runtimeMs)].filter(Boolean).join(" · ")}
+                          {[e.airDate, formatDuration(e.runtimeMs), e.libraryItemId ? "Plays from your library" : ""]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </div>
                       </div>
                       {s.canSave && <SaveEpisodeIcon episodeId={e.id} save={e.save} library={e.library} targets={s} />}

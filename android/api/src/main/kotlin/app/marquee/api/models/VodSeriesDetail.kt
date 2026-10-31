@@ -64,6 +64,7 @@ import kotlinx.serialization.Contextual
  * @param saveDefault Admins: saving without a destination works (vodSave.showsFolder is set).
  * @param saveDestinations Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both).
  * @param library 
+ * @param libraryItemId The library's copy of this show (in a library the caller can see): the apps open it first. Each episode the library has carries its own libraryItemId.
  * @param watchlisted On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist.
  */
 @Serializable
@@ -171,6 +172,10 @@ data class VodSeriesDetail (
 
     @SerialName(value = "library")
     val library: VodLibraryRollup? = null,
+
+    /* The library's copy of this show (in a library the caller can see): the apps open it first. Each episode the library has carries its own libraryItemId. */
+    @SerialName(value = "libraryItemId")
+    val libraryItemId: kotlin.Long? = null,
 
     /* On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist. */
     @SerialName(value = "watchlisted")

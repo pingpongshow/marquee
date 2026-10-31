@@ -623,6 +623,7 @@ extension VodMovie {
 /// Watchlist.
 struct VodMovieView: View {
     @Environment(AppSession.self) private var app
+    @Environment(VideoPresenter.self) private var video
     let id: Int64
     @State private var movie: VodMovieDetail?
     @State private var error: String?
@@ -730,12 +731,24 @@ struct VodMovieView: View {
         let resume = resumeMs > 0
         // As a library title's: labelled while they fit, else the secondary ones icon-only.
         return HeaderActions {
-            Button { playing = VodPlayTarget(movie: m, startMs: nil) } label: {
-                Label(resume ? "Resume from \(formatTime(seconds: Double(resumeMs) / 1000))" : "Play", systemImage: "play.fill")
+            // The library's copy comes first; the stream on demand stays a tap away.
+            if let item = m.info.libraryItemId {
+                Button { video.play(item) } label: { Label("Play from Library", systemImage: "play.fill") }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("vod.playLibrary")
+                Button { playing = VodPlayTarget(movie: m, startMs: nil) } label: {
+                    Label(resume ? "Resume on VOD from \(formatTime(seconds: Double(resumeMs) / 1000))" : "Play on VOD", systemImage: "play")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("vod.play")
+            } else {
+                Button { playing = VodPlayTarget(movie: m, startMs: nil) } label: {
+                    Label(resume ? "Resume from \(formatTime(seconds: Double(resumeMs) / 1000))" : "Play", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("vod.play")
             }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("vod.play")
-            if resume {
+            if resume && m.info.libraryItemId == nil {
                 Button { playing = VodPlayTarget(movie: m, startMs: 0) } label: {
                     Label("Play from Start", systemImage: "arrow.counterclockwise")
                 }

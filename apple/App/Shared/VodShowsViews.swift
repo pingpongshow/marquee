@@ -90,6 +90,7 @@ extension VodEpisode {
 /// season picker with Mark Season Watched, and the season's episodes.
 struct VodSeriesView: View {
     @Environment(AppSession.self) private var app
+    @Environment(VideoPresenter.self) private var video
     let id: Int64
     @State private var show: VodSeriesDetail?
     @State private var error: String?
@@ -215,21 +216,36 @@ struct VodSeriesView: View {
         }
     }
 
+    /// An episode the library has plays from the library (resuming there); others on demand.
+    private func play(_ e: VodEpisode, startMs: Int64?) {
+        if let item = e.libraryItemId {
+            video.play(item, startMs: startMs)
+        } else {
+            playing = VodPlayTarget(episode: e, startMs: startMs)
+        }
+    }
+
     private func actions(_ s: VodSeriesDetail) -> some View {
         let next = s.base.next
         let resumeMs = next?.positionMs ?? 0
         let watched = pending[0] ?? s.base.watched
         // As a library title's: labelled while they fit, else the secondary ones icon-only.
         return HeaderActions {
+            // The library's copy comes first.
+            if let item = s.info.libraryItemId {
+                NavigationLink(value: Route.item(item)) { Label("Open in Library", systemImage: "books.vertical") }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("vod.show.openLibrary")
+            }
             if let next {
-                Button { playing = VodPlayTarget(episode: next, startMs: nil) } label: {
+                Button { play(next, startMs: nil) } label: {
                     Label(resumeMs > 0 ? "Resume \(next.label) from \(formatTime(seconds: Double(resumeMs) / 1000))"
                                        : "\(s.base.watchedCount > 0 ? "Play" : "Start") \(next.label)", systemImage: "play.fill")
                 }
-                .buttonStyle(.borderedProminent)
+                .modifier(PrimaryUnless(secondary: s.info.libraryItemId != nil))
                 .accessibilityIdentifier("vod.show.play")
                 if resumeMs > 0 {
-                    Button { playing = VodPlayTarget(episode: next, startMs: 0) } label: {
+                    Button { play(next, startMs: 0) } label: {
                         Label("Play from Start", systemImage: "arrow.counterclockwise")
                     }
                     .buttonStyle(.bordered)
@@ -315,7 +331,8 @@ struct VodSeriesView: View {
         let watched = pending[e.id] ?? e.watched
         let still = VodArt(title: e.title, path: e.stillUrl, watched: false, progress: e.progress,
                            width: isTV ? 320 : 150, aspect: 9.0 / 16.0)
-        let meta = [e.airDate, (e.runtimeMs ?? 0) >= 60_000 ? formatDuration(ms: e.runtimeMs) : nil].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        let meta = [e.airDate, (e.runtimeMs ?? 0) >= 60_000 ? formatDuration(ms: e.runtimeMs) : nil,
+                    e.libraryItemId != nil ? "Plays from your library" : nil].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         let text = VStack(alignment: .leading, spacing: 4) {
             Text("\(e.episode). \(e.title)").font(isTV ? .headline : .subheadline.weight(.semibold)).lineLimit(2)
             if !meta.isEmpty { Text(meta).font(.caption).foregroundStyle(.secondary) }
@@ -332,7 +349,7 @@ struct VodSeriesView: View {
         .accessibilityIdentifier("vod.episode.watched")
         #if os(tvOS)
         return HStack(alignment: .center, spacing: 30) {
-            Button { playing = VodPlayTarget(episode: e, startMs: nil) } label: {
+            Button { play(e, startMs: nil) } label: {
                 HStack(alignment: .top, spacing: 24) { still; text }.padding(16)
             }
             .buttonStyle(.card)
@@ -343,7 +360,7 @@ struct VodSeriesView: View {
         }
         #else
         return HStack(alignment: .center, spacing: 12) {
-            Button { playing = VodPlayTarget(episode: e, startMs: nil) } label: {
+            Button { play(e, startMs: nil) } label: {
                 HStack(alignment: .top, spacing: 12) { still; text }.contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -352,9 +369,9 @@ struct VodSeriesView: View {
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("vod.episode")
             .contextMenu {
-                Button("Play", systemImage: "play.fill") { playing = VodPlayTarget(episode: e, startMs: nil) }
+                Button("Play", systemImage: "play.fill") { play(e, startMs: nil) }
                 if (e.positionMs ?? 0) > 0 {
-                    Button("Play from Start", systemImage: "arrow.counterclockwise") { playing = VodPlayTarget(episode: e, startMs: 0) }
+                    Button("Play from Start", systemImage: "arrow.counterclockwise") { play(e, startMs: 0) }
                 }
                 episodeMarks(e, watched: watched)
             }
@@ -421,6 +438,19 @@ struct VodSeriesView: View {
         } catch is CancellationError {
         } catch {
             if show == nil { self.error = error.localizedDescription }
+        }
+    }
+}
+
+/// Prominent, or bordered when something else on the header comes first.
+private struct PrimaryUnless: ViewModifier {
+    let secondary: Bool
+
+    func body(content: Content) -> some View {
+        if secondary {
+            content.buttonStyle(.bordered)
+        } else {
+            content.buttonStyle(.borderedProminent)
         }
     }
 }
