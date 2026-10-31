@@ -9,6 +9,7 @@ import { Alert, Card, Select, Spinner } from "@/components/ui";
 type Stats = components["schemas"]["Stats"];
 type Count = components["schemas"]["StatsCount"];
 type PlaylistStats = components["schemas"]["PlaylistStats"];
+type HomeRowStats = components["schemas"]["HomeRowStats"];
 
 const periods = [
   { days: 7, label: "Last 7 days" },
@@ -79,6 +80,7 @@ export function StatsView({ admin }: { admin: boolean }) {
             <TopList title="Apps" items={s.platforms.map((p) => ({ ...p, title: platformName(p.title) }))} />
             <Delivery s={s} />
           </div>
+          {!!s.homeRows?.length && <HomeRows rows={s.homeRows} />}
           {!!s.playlists?.length && <Playlists rows={s.playlists} />}
         </>
       )}
@@ -227,6 +229,43 @@ function Playlists({ rows }: { rows: PlaylistStats[] }) {
                 <td className="py-1.5 text-right tabular-nums">{pct(r.finished)}</td>
                 <td className="py-1.5 text-right tabular-nums">{pct(r.skipped)}</td>
                 <td className="py-1.5 text-right tabular-nums">{r.favourited.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+/** How each kind of Home row did for movies and shows (USER-16): rows that show plenty and
+ * get few plays are the ones missing. */
+function HomeRows({ rows }: { rows: HomeRowStats[] }) {
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  return (
+    <Card
+      title="Home rows"
+      description="Movies and shows played from each kind of Home row: a play counts for the row that showed the title in the two days before. Shown is how many titles it put in front of people."
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[32rem] text-left text-sm">
+          <thead className="text-xs text-muted">
+            <tr>
+              <th className="py-1.5 font-medium">Row</th>
+              <th className="py-1.5 text-right font-medium">Shown</th>
+              <th className="py-1.5 text-right font-medium">Plays</th>
+              <th className="py-1.5 text-right font-medium">Viewers</th>
+              <th className="py-1.5 text-right font-medium">To the end</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.row} className="border-t border-border">
+                <td className="py-1.5">{r.label}</td>
+                <td className="py-1.5 text-right tabular-nums">{r.shown.toLocaleString()}</td>
+                <td className="py-1.5 text-right tabular-nums">{r.plays.toLocaleString()}</td>
+                <td className="py-1.5 text-right tabular-nums">{r.viewers.toLocaleString()}</td>
+                <td className="py-1.5 text-right tabular-nums">{r.plays ? pct(r.finished) : "–"}</td>
               </tr>
             ))}
           </tbody>

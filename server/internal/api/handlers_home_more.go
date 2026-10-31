@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +20,7 @@ import (
 const (
 	homeRowSize = 20 // library titles per Home row
 	genreRows   = 3
+	peopleRows  = 2 // More From rows
 )
 
 // decades are the ones the decade row takes turns with, a different one each day.
@@ -55,6 +57,9 @@ type moreRows struct {
 	n    int
 	// The on-demand recommendation rows, worked out once per request when needed.
 	vodRows func() (map[string][]vodsuggest.Suggestion, error)
+	// The person's taste, worked out once per request when a row needs it; nil when it
+	// couldn't be (the rows then go by rating).
+	taste func() *items.TasteModel
 }
 
 func (h *Handlers) newMoreRows(ctx context.Context, home []int64, n int) *moreRows {
@@ -70,6 +75,14 @@ func (h *Handlers) newMoreRows(ctx context.Context, home []int64, n int) *moreRo
 			out[r.ID] = r.Items
 		}
 		return out, err
+	})
+	m.taste = sync.OnceValue(func() *items.TasteModel {
+		t, err := h.Items.TasteModel(ctx, m.acc.UserID, h.videoIndex(), h.vodTaste(ctx, m.acc.UserID))
+		if err != nil {
+			slog.WarnContext(ctx, "home: taste", "err", err)
+			return nil
+		}
+		return t
 	})
 	return m
 }
@@ -90,15 +103,21 @@ func (m *moreRows) muse(q vodsuggest.MuseQuery) func() ([]VodSuggestion, error) 
 	return func() ([]VodSuggestion, error) { return m.h.vodMuse(m.ctx, q, m.n) }
 }
 
-// discover is a category row of unwatched library titles that fit q.
+// discover is a category row of unwatched library titles that fit q, ordered for the person.
 func (m *moreRows) discover(id, title string, q items.DiscoverQuery, vod func() ([]VodSuggestion, error)) homeRow {
 	return homeRow{id: id, title: title, vodFill: vod,
-		fill: func() ([]items.Summary, error) { return m.h.Items.Discover(m.ctx, m.acc, m.home, q, m.n) }}
+		fill: func() ([]items.Summary, error) {
+			q := q
+			q.Taste = m.taste()
+			return m.h.Items.Discover(m.ctx, m.acc, m.home, q, m.n)
+		}}
 }
 
 func (m *moreRows) holiday(hd items.Holiday) homeRow {
 	return homeRow{id: "holiday-" + hd.ID, title: hd.Title,
-		fill:    func() ([]items.Summary, error) { return m.h.Items.HolidayVideos(m.ctx, m.acc, hd, m.home, m.n) },
+		fill: func() ([]items.Summary, error) {
+			return m.h.Items.HolidayVideos(m.ctx, m.acc, hd, m.home, m.n, m.taste())
+		},
 		vodFill: m.muse(vodsuggest.MuseQuery{Keywords: hd.Keywords, Words: hd.ID})}
 }
 
@@ -119,10 +138,35 @@ func (m *moreRows) decade(from int) homeRow {
 		m.muse(vodsuggest.MuseQuery{YearFrom: from, YearTo: from + 9, MinRating: 6.5}))
 }
 
+// peopleRows are the More From rows: directors and actors of what the person loved.
+func (m *moreRows) peopleRows() ([]homeRow, error) {
+	t := m.taste()
+	if t == nil {
+		return nil, nil
+	}
+	people, err := m.h.Items.PeopleYouLove(m.ctx, m.acc, t, m.home, peopleRows, m.n)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]homeRow, len(people))
+	for i, p := range people {
+		title := "More With " + p.Name
+		if p.Director {
+			title = "More From " + p.Name
+		}
+		list := p.Items
+		out[i] = homeRow{id: fmt.Sprintf("person-%d", p.PersonID), title: title, fill: func() ([]items.Summary, error) { return list, nil }}
+	}
+	return out, nil
+}
+
 // rows are the extra suggestion rows, in their default order after Because You Watched.
 func (m *moreRows) rows() []homeRow {
 	year := time.Now().Year()
 	return []homeRow{
+		{id: "continue-saga", title: "Continue the Saga",
+			fill: func() ([]items.Summary, error) { return m.h.Items.NextInCollections(m.ctx, m.acc, m.home, m.n) }},
+		{id: "more-from", title: "More From People You Love", expand: m.peopleRows},
 		{id: "holiday", title: "Holiday Picks", expand: func() ([]homeRow, error) {
 			var out []homeRow
 			for _, hd := range items.HolidaysOn(time.Now()) {
@@ -133,6 +177,7 @@ func (m *moreRows) rows() []homeRow {
 		m.discover("new-releases", "New Releases", items.DiscoverQuery{YearFrom: year - 2, Newest: true},
 			m.muse(vodsuggest.MuseQuery{YearFrom: year - 2})),
 		m.discover("top-rated", "Top Rated", items.DiscoverQuery{MinRating: 7.5}, m.muse(vodsuggest.MuseQuery{MinRating: 7.5})),
+		m.hiddenGems(),
 		{id: "trending", title: "Trending Now", vodFill: m.vodRow("popular"),
 			fill: func() ([]items.Summary, error) { return m.h.Items.Trending(m.ctx, m.acc, m.home, m.n) }},
 		{id: "genres", title: "Your Genres", expand: func() ([]homeRow, error) {
@@ -170,6 +215,20 @@ func (m *moreRows) rows() []homeRow {
 	}
 }
 
+// hiddenGems are well-rated titles nobody on the server has watched yet.
+func (m *moreRows) hiddenGems() homeRow {
+	r := m.discover("hidden-gems", "Hidden Gems", items.DiscoverQuery{MinRating: 7.3, Unplayed: true}, nil)
+	fill := r.fill
+	r.fill = func() ([]items.Summary, error) {
+		list, err := fill()
+		for i := range list {
+			list[i].Reason = "No one here has watched it yet"
+		}
+		return list, err
+	}
+	return r
+}
+
 // direct finds a row that's one of several (a holiday, genre or decade) by its hub id,
 // whether or not it's on Home today (See all of yesterday's genre row still works).
 func (m *moreRows) direct(id string) (homeRow, bool, error) {
@@ -194,6 +253,16 @@ func (m *moreRows) direct(id string) (homeRow, bool, error) {
 	case "decade":
 		if y, err := strconv.Atoi(rest); err == nil && y%10 == 0 && y >= 1900 && y <= time.Now().Year() {
 			return m.decade(y), true, nil
+		}
+	case "person":
+		rows, err := m.peopleRows()
+		if err != nil {
+			return homeRow{}, false, err
+		}
+		for _, r := range rows {
+			if r.id == id {
+				return r, true, nil
+			}
 		}
 	}
 	return homeRow{}, false, nil

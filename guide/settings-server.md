@@ -371,6 +371,14 @@ You get totals (plays, hours watched and listened, number of people or hours per
 
 A high skip rate shows a kind that isn't working. Plays count here once the apps are updated to report where a play started.
 
+**Home rows** lists each kind of Home row movies and shows were played from, such as Recommended for You, Because You Watched, Top Rated or Hidden Gems. A play counts for the row that showed the title (or its show) in the two days before. For each row it shows:
+
+- **Shown:** how many titles it put in front of people.
+- **Plays** and **Viewers**.
+- **To the end:** the share watched at least 90% of the way.
+
+A row that shows a lot and gets few plays isn't working for your household.
+
 Each person sees their own statistics under **Account**.
 
 ## Logs

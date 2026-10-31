@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.HomeRowStats
 import app.marquee.api.models.PlaylistStats
 import app.marquee.api.models.StatsCount
 import app.marquee.api.models.StatsDaysInner
@@ -53,6 +54,7 @@ import kotlinx.serialization.Contextual
  * @param remote 
  * @param since 
  * @param playlists How the music played from each kind of station and mix went (MUSIC-17), most played first.
+ * @param homeRows How each kind of Home row did for movies and shows (USER-16), most played first: a play counts for the row that showed the title (or its show) in the two days before.
  */
 @Serializable
 
@@ -112,7 +114,11 @@ data class Stats (
 
     /* How the music played from each kind of station and mix went (MUSIC-17), most played first. */
     @SerialName(value = "playlists")
-    val playlists: kotlin.collections.List<PlaylistStats>? = null
+    val playlists: kotlin.collections.List<PlaylistStats>? = null,
+
+    /* How each kind of Home row did for movies and shows (USER-16), most played first: a play counts for the row that showed the title (or its show) in the two days before. */
+    @SerialName(value = "homeRows")
+    val homeRows: kotlin.collections.List<HomeRowStats>? = null
 
 ) {
 

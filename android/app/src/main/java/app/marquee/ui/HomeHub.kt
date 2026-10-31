@@ -102,7 +102,8 @@ fun HomeHubScreen(nav: NavHostController, hubId: String) {
                     val item = e.item
                     val vod = e.vod
                     if (item != null) PosterCard(item, marquee.imageUrl(item.images?.poster, 300), maxWidth, { page.opened = e.key; openItem(nav, item) },
-                        shape = shapeFor(item), autoFocus = focus, actions = tileActions(item, nav = nav))
+                        shape = shapeFor(item), autoFocus = focus,
+                        actions = tileActions(item, nav = nav, suggestion = HomeRows.isSuggestion(hubId), onRemoved = { hidden.add(e.key) }))
                     else if (vod != null) VodSuggestionTile(nav, vod, maxWidth, autoFocus = focus, badge = true, watchlist = hubId == "watchlist",
                         onOpen = { page.opened = e.key }) {
                         if (hubId == "watchlist") removeVodFromWatchlist(marquee, context, vod, onRemoved = { hidden.add(e.key) }, onFailed = { hidden.remove(e.key) })

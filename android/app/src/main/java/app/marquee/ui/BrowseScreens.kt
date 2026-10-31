@@ -217,12 +217,13 @@ fun HomeScreen(nav: NavHostController) {
                         onOpen = { k -> openedKey = "vodsug:$k"; opened = null })
                     return@itemsIndexed
                 }
-                if (hub.items.isEmpty()) return@itemsIndexed
-                Shelf(hub.title, hub.items, sidePadding, onSeeAll = seeAll, seeAllTileHeight = cardWidth / shapeFor(hub.items.first()).ratio,
+                val rowItems = hub.items.filter { "item:${it.id}" !in removed }
+                if (rowItems.isEmpty()) return@itemsIndexed
+                Shelf(hub.title, rowItems, sidePadding, onSeeAll = seeAll, seeAllTileHeight = cardWidth / shapeFor(rowItems.first()).ratio,
                     seeAllFocus = seeAllFocus) { i, it ->
                     PosterCard(it, marquee.imageUrl(it.images?.poster, 300), cardWidth, { opened = it.id; openedKey = null; openItem(nav, it) },
                         shape = shapeFor(it), autoFocus = marquee.isTv && (if (opened != null) it.id == opened else first && i == 0),
-                        actions = tileActions(it, nav = nav))
+                        actions = tileActions(it, nav = nav, suggestion = HomeRows.isSuggestion(hub.id), onRemoved = { id -> removed.add("item:$id") }))
                 }
             }
         }
@@ -257,7 +258,8 @@ private fun MixedRow(nav: NavHostController, hub: Hub, entries: List<HomeEntry>,
         val item = e.item
         val vod = e.vod
         if (item != null) PosterCard(item, marquee.imageUrl(item.images?.poster, 300), cardWidth, { onOpenItem(item.id); openItem(nav, item) },
-            shape = shapeFor(item), autoFocus = focus, actions = tileActions(item, nav = nav))
+            shape = shapeFor(item), autoFocus = focus,
+            actions = tileActions(item, nav = nav, suggestion = HomeRows.isSuggestion(hub.id), onRemoved = { hidden.add(e.key) }))
         else if (vod != null) VodSuggestionTile(nav, vod, cardWidth, autoFocus = focus, badge = true, watchlist = hub.id == "watchlist",
             onOpen = { onOpenVod(vod.key) }) {
             if (hub.id == "watchlist") removeVodFromWatchlist(marquee, context, vod, onRemoved = { hidden.add(e.key) }, onFailed = { hidden.remove(e.key) })

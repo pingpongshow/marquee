@@ -238,6 +238,10 @@ fun PosterCard(item: ItemSummary, imageUrl: String?, width: Dp, onClick: () -> U
         }
         Text(item.title, Modifier.padding(top = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
         Text(subtitleFor(item), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // Why a Home suggestion row picked it ("Because you loved Heat").
+        item.reason?.takeIf { it.isNotBlank() }?.let {
+            Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = Gold)
+        }
         if (showRating) RatingBadge(item.userRating, Modifier.padding(top = 2.dp))
     }
 }

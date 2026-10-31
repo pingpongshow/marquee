@@ -34,7 +34,9 @@ struct HomeHubView: View {
                     } else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: tileWidth, maximum: tileWidth * 1.4), spacing: gap, alignment: .top)],
                                   alignment: .leading, spacing: gap) {
-                            ForEach(entries, id: \.key) { HomeEntryTile(entry: $0, width: tileWidth, watchlist: id == "watchlist") }
+                            ForEach(entries, id: \.key) {
+                                HomeEntryTile(entry: $0, width: tileWidth, watchlist: id == "watchlist", suggestion: isSuggestionRow(id))
+                            }
                         }
                         .accessibilityIdentifier("homeHub.grid")
                     }
@@ -93,10 +95,12 @@ struct HomeEntryTile: View {
     var width: CGFloat = PosterCard.defaultWidth
     /// In Your Watchlist: a title on demand offers Remove from Watchlist, not Not interested.
     var watchlist = false
+    /// On a suggestion row: a library title offers Not interested too.
+    var suggestion = false
 
     var body: some View {
         if let item = entry.item {
-            PosterCard(item: item, width: width, shape: PosterShape.for(item) == .wide ? .wide : nil)
+            PosterCard(item: item, width: width, shape: PosterShape.for(item) == .wide ? .wide : nil, suggestion: suggestion)
         } else if let s = entry.vod {
             VodSuggestionTile(suggestion: s, width: width, mixed: true, watchlist: watchlist)
         }

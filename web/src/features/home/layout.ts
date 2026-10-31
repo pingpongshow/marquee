@@ -58,3 +58,12 @@ export function seeAllTarget(hub: { id: string; libraryId?: number }): SeeAllTar
   if (hub.libraryId && /^(recent|played)-\d+$/.test(hub.id)) return { to: "/library/$libraryId", params: { libraryId: String(hub.libraryId) } };
   return { to: "/home/row/$hubId", params: { hubId: hub.id } };
 }
+
+/** Home rows that suggest titles (USER-16), as opposed to Continue Watching, the watchlist,
+ * favourites, Recently Added and pinned rows: their tiles offer Not interested. */
+export function isSuggestionRow(id: string) {
+  return !(
+    ["continue-watching", "watchlist", "favorites", "watch-again"].includes(id) ||
+    /^(recent|played|collection|playlist|library)-/.test(id)
+  );
+}

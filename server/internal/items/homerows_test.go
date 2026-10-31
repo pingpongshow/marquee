@@ -84,10 +84,10 @@ func TestHomeRowQueries(t *testing.T) {
 		return strings.Join(out, ",")
 	}
 	// The title word counts double; "Shelf Life" isn't an elf.
-	if got := titles(s.HolidayVideos(ctx, acc, christmas, libs, 10)); got != "Elf,Heat" {
+	if got := titles(s.HolidayVideos(ctx, acc, christmas, libs, 10, nil)); got != "Elf,Heat" {
 		t.Errorf("christmas: %s", got)
 	}
-	if got := titles(s.HolidayVideos(ctx, acc, halloween_, libs, 10)); got != "Halloween" {
+	if got := titles(s.HolidayVideos(ctx, acc, halloween_, libs, 10, nil)); got != "Halloween" {
 		t.Errorf("halloween: %s", got)
 	}
 	if got := titles(s.TopRated(ctx, acc, libs, 10)); got != "Shelf Life,Heat,Halloween" {

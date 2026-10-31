@@ -81,6 +81,14 @@ object HomeRows {
     }
 
     fun homeHubRoute(hubId: String): String = "homehub/" + android.net.Uri.encode(hubId)
+
+    /**
+     * Rows that suggest titles (USER-16), as opposed to Continue Watching, the watchlist,
+     * favourites, Recently Added and pinned rows: their titles offer Not interested.
+     */
+    fun isSuggestion(hubId: String): Boolean =
+        hubId !in setOf(CONTINUE_HUB, "watchlist", "favorites", "watch-again") &&
+            listOf("recent-", "played-", "collection-", "playlist-", "library-").none { hubId.startsWith(it) }
 }
 
 /** Edit Home: reorder with up/down buttons (D-pad friendly), hide or show, unpin, or reset. */

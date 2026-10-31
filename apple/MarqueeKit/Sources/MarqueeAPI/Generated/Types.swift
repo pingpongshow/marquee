@@ -1427,6 +1427,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /music/mixes`.
     /// - Remark: Generated from `#/paths//music/mixes/get(musicMixes)`.
     func musicMixes(_ input: Operations.MusicMixes.Input) async throws -> Operations.MusicMixes.Output
+    /// Not interested (USER-16): stop suggesting this movie or show to you. It leaves every suggestion row (Home, Because you watched, Muse…) and counts as something you turned away from, steering suggestions away from titles like it.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/not-interested`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/put(markNotInterested)`.
+    func markNotInterested(_ input: Operations.MarkNotInterested.Input) async throws -> Operations.MarkNotInterested.Output
+    /// Suggest this movie or show again (undo Not interested).
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/not-interested`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/delete(unmarkNotInterested)`.
+    func unmarkNotInterested(_ input: Operations.UnmarkNotInterested.Input) async throws -> Operations.UnmarkNotInterested.Output
     /// Your rating (MUSIC-11), 0–10 (half stars; 10 = loved), or null to clear it.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/rating`.
@@ -4910,6 +4920,32 @@ extension APIProtocol {
     ) async throws -> Operations.MusicMixes.Output {
         try await musicMixes(Operations.MusicMixes.Input(
             query: query,
+            headers: headers
+        ))
+    }
+    /// Not interested (USER-16): stop suggesting this movie or show to you. It leaves every suggestion row (Home, Because you watched, Muse…) and counts as something you turned away from, steering suggestions away from titles like it.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/not-interested`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/put(markNotInterested)`.
+    public func markNotInterested(
+        path: Operations.MarkNotInterested.Input.Path,
+        headers: Operations.MarkNotInterested.Input.Headers = .init()
+    ) async throws -> Operations.MarkNotInterested.Output {
+        try await markNotInterested(Operations.MarkNotInterested.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Suggest this movie or show again (undo Not interested).
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/not-interested`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/delete(unmarkNotInterested)`.
+    public func unmarkNotInterested(
+        path: Operations.UnmarkNotInterested.Input.Path,
+        headers: Operations.UnmarkNotInterested.Input.Headers = .init()
+    ) async throws -> Operations.UnmarkNotInterested.Output {
+        try await unmarkNotInterested(Operations.UnmarkNotInterested.Input(
+            path: path,
             headers: headers
         ))
     }

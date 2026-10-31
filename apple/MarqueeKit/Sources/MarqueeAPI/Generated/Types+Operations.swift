@@ -54164,6 +54164,322 @@ public enum Operations {
             }
         }
     }
+    /// Not interested (USER-16): stop suggesting this movie or show to you. It leaves every suggestion row (Home, Because you watched, Muse…) and counts as something you turned away from, steering suggestions away from titles like it.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/not-interested`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/put(markNotInterested)`.
+    public enum MarkNotInterested {
+        public static let id: Swift.String = "markNotInterested"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/not-interested/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/not-interested/PUT/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.MarkNotInterested.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/not-interested/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkNotInterested.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkNotInterested.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.MarkNotInterested.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.MarkNotInterested.Input.Path,
+                headers: Operations.MarkNotInterested.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Marked.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/put(markNotInterested)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.MarkNotInterested.Output.NoContent)
+            /// Marked.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/put(markNotInterested)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.MarkNotInterested.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/put(markNotInterested)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/put(markNotInterested)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Suggest this movie or show again (undo Not interested).
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/not-interested`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/delete(unmarkNotInterested)`.
+    public enum UnmarkNotInterested {
+        public static let id: Swift.String = "unmarkNotInterested"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/not-interested/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/not-interested/DELETE/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.UnmarkNotInterested.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/not-interested/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UnmarkNotInterested.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UnmarkNotInterested.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.UnmarkNotInterested.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.UnmarkNotInterested.Input.Path,
+                headers: Operations.UnmarkNotInterested.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Unmarked.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/delete(unmarkNotInterested)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.UnmarkNotInterested.Output.NoContent)
+            /// Unmarked.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/delete(unmarkNotInterested)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.UnmarkNotInterested.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/delete(unmarkNotInterested)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/not-interested/delete(unmarkNotInterested)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Your rating (MUSIC-11), 0–10 (half stars; 10 = loved), or null to clear it.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/rating`.

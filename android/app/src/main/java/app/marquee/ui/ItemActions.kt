@@ -50,7 +50,8 @@ fun watchChoices(item: ItemSummary): WatchChoices {
  * episode when there's a [nav] to open it with.
  */
 @Composable
-fun tileActions(item: ItemSummary, continueWatching: Boolean = false, nav: NavHostController? = null, onRemoved: (Long) -> Unit = {}): List<TileAction> {
+fun tileActions(item: ItemSummary, continueWatching: Boolean = false, nav: NavHostController? = null, suggestion: Boolean = false,
+    onRemoved: (Long) -> Unit = {}): List<TileAction> {
     val marquee = LocalMarquee.current
     val context = LocalContext.current
     // The app's scope: the tile may leave the screen (its row reloads) before the request ends.
@@ -67,6 +68,15 @@ fun tileActions(item: ItemSummary, continueWatching: Boolean = false, nav: NavHo
         favorite?.let(::add)
         val show = item.grandparentId
         if (nav != null && item.type == ItemType.EPISODE && show != null) add(TileAction("Go to show") { nav.navigate("item/$show") })
+        // On a Home suggestion row (USER-16): stop suggesting it; it leaves the row at once.
+        if (suggestion && !marquee.isOffline && (item.type == ItemType.MOVIE || item.type == ItemType.SHOW)) add(TileAction("Not interested") {
+            onRemoved(item.id)
+            scope.launch {
+                withContext(Dispatchers.IO) { runCatching { marquee.items.markNotInterested(item.id) } }
+                    .onSuccess { toast(context, "We won't suggest “${item.title}” again") }
+                    .onFailure { toast(context, "Couldn't change “${item.title}”: ${serverMessage(it, "")}") }
+            }
+        })
         if (continueWatching && !marquee.isOffline) add(TileAction("Remove from Continue Watching") {
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { marquee.hubs.removeFromContinueWatching(item.id) } }

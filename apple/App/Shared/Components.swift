@@ -422,6 +422,8 @@ struct PosterCard: View {
     var shape: PosterShape?
     /// In the Continue Watching row: takes it off the row (its context menu).
     var onRemoveFromContinue: (() -> Void)?
+    /// On a Home suggestion row (USER-16): its menu offers Not interested.
+    var suggestion = false
 
     #if os(tvOS)
     static let defaultWidth: CGFloat = 250
@@ -461,6 +463,7 @@ struct PosterCard: View {
 
     @ViewBuilder private var menu: some View {
         if let onRemoveFromContinue { RemoveFromContinueButton(action: onRemoveFromContinue) }
+        if suggestion && (item._type == .movie || item._type == .show) { NotInterestedButton(item: item) }
         ItemMenuItems(item: item)
     }
 
@@ -468,6 +471,10 @@ struct PosterCard: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(item._type == .episode ? (item.grandparentTitle ?? item.title) : item.title).font(.subheadline.weight(.medium)).lineLimit(1)
             Text(item._type == .episode ? item.subtitle + " · " + item.title : item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            // Why a Home suggestion row picked it ("Because you loved Heat").
+            if let reason = item.reason, !reason.isEmpty {
+                Text(reason).font(.caption2).foregroundStyle(Color.marqueeGold).lineLimit(1)
+            }
         }
     }
 
@@ -767,4 +774,29 @@ struct HeaderActions<Primary: View, Secondary: View>: View {
     #else
     private let spacing: CGFloat = 10
     #endif
+}
+
+/// Not interested in a Home suggestion's context menu (USER-16): the title stops being
+/// suggested, and Home reloads without it.
+struct NotInterestedButton: View {
+    @Environment(AppSession.self) private var app
+    let item: Item
+
+    var body: some View {
+        Button {
+            Task {
+                try? await app.setNotInterested(item.id, true)
+                HomeChanges.shared.version += 1
+            }
+        } label: {
+            Label("Not Interested", systemImage: "hand.thumbsdown")
+        }
+    }
+}
+
+/// Home rows that suggest titles (USER-16), as opposed to Continue Watching, the watchlist,
+/// favourites, Recently Added and pinned rows: their titles offer Not interested.
+func isSuggestionRow(_ id: String) -> Bool {
+    if ["continue-watching", "watchlist", "favorites", "watch-again"].contains(id) { return false }
+    return !["recent-", "played-", "collection-", "playlist-", "library-"].contains { id.hasPrefix($0) }
 }

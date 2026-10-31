@@ -81,6 +81,14 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 	if b.Context != nil {
 		r.Context = playContext(*b.Context)
 	}
+	if !r.Preload {
+		// A movie or episode Home showed in the last two days counts for that Home row (USER-16),
+		// and is no longer being passed over.
+		if r.Context == "" {
+			r.Context = h.Items.HomeContext(ctx, u.ID, b.ItemId)
+		}
+		h.Items.Opened(ctx, u.ID, b.ItemId)
+	}
 	r.SubtitleOffsetMS, r.AudioOffsetMS = b.SubtitleOffsetMs, b.AudioOffsetMs
 	set(&r.Quality.RequestedKbps, b.MaxBitrateKbps)
 	set(&r.Quality.MeasuredKbps, b.MeasuredKbps)

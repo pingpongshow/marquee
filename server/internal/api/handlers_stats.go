@@ -54,6 +54,13 @@ func (h *Handlers) GetStats(ctx context.Context, req GetStatsRequestObject) (Get
 		}
 		out.Playlists = &pl
 	}
+	if len(r.HomeRows) > 0 {
+		hr := make([]HomeRowStats, len(r.HomeRows))
+		for i, x := range r.HomeRows {
+			hr[i] = HomeRowStats{Row: x.Row, Label: x.Label, Shown: x.Shown, Plays: x.Plays, Viewers: x.Viewers, Finished: float32(x.Finished)}
+		}
+		out.HomeRows = &hr
+	}
 	if !r.Since.IsZero() {
 		out.Since = &r.Since
 	}

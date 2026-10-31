@@ -80,6 +80,8 @@ import kotlinx.serialization.Contextual
  * @param releaseType Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
  * @param audioFormat 
  * @param communityRating 
+ * @param reason Home suggestion rows (USER-16): why it was picked, e.g. \"Because you loved Heat\", \"Like Arrival\", \"Next in The Dark Knight Collection\". Show it under the title. Absent elsewhere and when there's no personal reason.
+ * @param notInterested You marked it Not interested (PUT/DELETE /items/{itemId}/not-interested).
  * @param placementOverride Tracks, for admins; moved to another album by hand (see /items/{itemId}/music-placement).
  * @param collections Collections the item belongs to (META-7).
  * @param smartRules 
@@ -224,6 +226,14 @@ data class ItemDetail (
 
     @SerialName(value = "communityRating")
     val communityRating: CommunityRating? = null,
+
+    /* Home suggestion rows (USER-16): why it was picked, e.g. \"Because you loved Heat\", \"Like Arrival\", \"Next in The Dark Knight Collection\". Show it under the title. Absent elsewhere and when there's no personal reason. */
+    @SerialName(value = "reason")
+    val reason: kotlin.String? = null,
+
+    /* You marked it Not interested (PUT/DELETE /items/{itemId}/not-interested). */
+    @SerialName(value = "notInterested")
+    val notInterested: kotlin.Boolean? = null,
 
     /* Tracks, for admins; moved to another album by hand (see /items/{itemId}/music-placement). */
     @SerialName(value = "placementOverride")

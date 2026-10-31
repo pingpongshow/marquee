@@ -43,6 +43,8 @@ type Summary struct {
 	// Everyone's ratings combined (USER-17); count 0 = nobody rated it.
 	CommunityRating float64
 	CommunityCount  int
+	// Reason is why a Home suggestion row picked it ("Because you loved Heat"); "" elsewhere.
+	Reason string
 }
 
 // AudioFormat describes a track's file, for showing its quality (e.g. FLAC 24/96).

@@ -59,7 +59,7 @@ func thanksgivingDay(year int, loc *time.Location) time.Time {
 
 // HolidayVideos are movies and shows in libIDs for h (a keyword tag or a word in the title),
 // most matches first, then by rating.
-func (s *Store) HolidayVideos(ctx context.Context, acc Access, h Holiday, libIDs []int64, limit int) ([]Summary, error) {
+func (s *Store) HolidayVideos(ctx context.Context, acc Access, h Holiday, libIDs []int64, limit int, taste *TasteModel) ([]Summary, error) {
 	if len(libIDs) == 0 {
 		return nil, nil
 	}
@@ -80,6 +80,29 @@ func (s *Store) HolidayVideos(ctx context.Context, acc Access, h Holiday, libIDs
 		summaryFrom + ` WHERE i.type IN ('movie', 'show') AND i.extra_type IS NULL AND ` + ac + `
 		ORDER BY hits DESC, COALESCE(i.audience_rating, i.imdb_rating, i.critic_rating, 0) DESC`
 	args = append(args, aargs...)
+	if taste != nil {
+		// For the person: the most fitting of a wider pool, the holiday's own fit counting too.
+		var cands []Cand
+		maxHits := 0.0
+		err := eachRow(ctx, s.db, `SELECT id, hits, rating FROM (`+strings.Replace(q, " AS hits", " AS hits, COALESCE(i.audience_rating, i.imdb_rating, i.critic_rating, 0) AS rating", 1)+
+			`) WHERE hits > 0 LIMIT ?`, append(args, max(limit*4, 80)), func(r *sql.Rows) error {
+			var c Cand
+			var hits float64
+			if err := r.Scan(&c.ID, &hits, &c.Rating); err != nil {
+				return err
+			}
+			c.Prior, maxHits = hits, max(maxHits, hits)
+			cands = append(cands, c)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		for i := range cands {
+			cands[i].Prior /= max(maxHits, 1)
+		}
+		return s.picked(ctx, acc, taste.Order(cands, limit))
+	}
 	var ids []int64
 	err := eachRow(ctx, s.db, `SELECT id FROM (`+q+`) WHERE hits > 0 LIMIT ?`, append(args, limit), func(r *sql.Rows) error {
 		var id int64
@@ -107,6 +130,12 @@ type DiscoverQuery struct {
 	Family           bool     // rated for families (or unrated family/animation/kids titles)
 	Foreign          bool     // not originally in English
 	Newest           bool     // newest first instead of best rated
+	// Unplayed: nobody on the server has watched or started it, and it's been in the library a
+	// month (Hidden Gems).
+	Unplayed bool
+	// Taste orders the row for the person (fit and rating, variety, a daily turn) from a wider
+	// pool of the best rated (or newest); nil = by rating (or newest) only.
+	Taste *TasteModel
 }
 
 // TopRated are well-rated movies and shows in libIDs the person hasn't started, best first.
@@ -173,11 +202,54 @@ func (s *Store) Discover(ctx context.Context, acc Access, libIDs []int64, q Disc
 			args = append(args, g)
 		}
 	}
+	if q.Unplayed {
+		where += ` AND NOT EXISTS (SELECT 1 FROM user_item_state x WHERE x.item_id = i.id AND (x.play_count > 0 OR x.view_offset_ms > 0))
+			AND NOT EXISTS (SELECT 1 FROM items e JOIN user_item_state x ON x.item_id = e.id AND (x.play_count > 0 OR x.view_offset_ms > 0)
+				WHERE i.type = 'show' AND e.grandparent_id = i.id AND e.type = 'episode')
+			AND i.added_at < ?`
+		args = append(args, isoUTC(time.Now().AddDate(0, -1, 0)))
+	}
 	order := rating + ` DESC, i.sort_title COLLATE NOCASE`
 	if q.Newest {
 		order = `COALESCE(i.originally_available_at, i.year) DESC, ` + order
 	}
-	return s.idsThenSummaries(ctx, acc, `SELECT i.id`+summaryFrom+where+` ORDER BY `+order+` LIMIT ?`, append(args, limit))
+	if q.Taste == nil {
+		return s.idsThenSummaries(ctx, acc, `SELECT i.id`+summaryFrom+where+` ORDER BY `+order+` LIMIT ?`, append(args, limit))
+	}
+	// For the person: a wider pool in the same order, then by how well each fits them.
+	var cands []Cand
+	if err := eachRow(ctx, s.db, `SELECT i.id, `+rating+summaryFrom+where+` ORDER BY `+order+` LIMIT ?`, append(args, max(limit*6, 120)),
+		func(r *sql.Rows) error {
+			var c Cand
+			if err := r.Scan(&c.ID, &c.Rating); err != nil {
+				return err
+			}
+			cands = append(cands, c)
+			return nil
+		}); err != nil {
+		return nil, err
+	}
+	if q.Newest { // newest still counts for most
+		for i := range cands {
+			cands[i].Prior = 1 - float64(i)/float64(len(cands))
+		}
+	}
+	return s.picked(ctx, acc, q.Taste.Order(cands, limit))
+}
+
+// picked loads the picks acc can see, in order, with their reasons.
+func (s *Store) picked(ctx context.Context, acc Access, picks []Pick) ([]Summary, error) {
+	ids := make([]int64, len(picks))
+	why := map[int64]string{}
+	for i, p := range picks {
+		ids[i] = p.ID
+		why[p.ID] = p.Reason
+	}
+	list, err := s.ByIDs(ctx, acc, ids)
+	for i := range list {
+		list[i].Reason = why[list[i].ID]
+	}
+	return list, err
 }
 
 // WatchAgain are movies and shows the person loved (rated 8 or more, or a favourite) and

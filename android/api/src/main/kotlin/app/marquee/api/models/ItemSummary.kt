@@ -68,6 +68,7 @@ import kotlinx.serialization.Contextual
  * @param releaseType Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
  * @param audioFormat 
  * @param communityRating 
+ * @param reason Home suggestion rows (USER-16): why it was picked, e.g. \"Because you loved Heat\", \"Like Arrival\", \"Next in The Dark Knight Collection\". Show it under the title. Absent elsewhere and when there's no personal reason.
  */
 @Serializable
 
@@ -181,7 +182,11 @@ data class ItemSummary (
     val audioFormat: AudioFormat? = null,
 
     @SerialName(value = "communityRating")
-    val communityRating: CommunityRating? = null
+    val communityRating: CommunityRating? = null,
+
+    /* Home suggestion rows (USER-16): why it was picked, e.g. \"Because you loved Heat\", \"Like Arrival\", \"Next in The Dark Knight Collection\". Show it under the title. Absent elsewhere and when there's no personal reason. */
+    @SerialName(value = "reason")
+    val reason: kotlin.String? = null
 
 ) {
 

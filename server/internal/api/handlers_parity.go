@@ -205,11 +205,15 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow, n 
 	// stay empty until movies and shows are embedded.
 	{
 		home := append([]int64{}, home...) // none means none, not all
+		more := h.newMoreRows(ctx, home, n)
 		defaults = append(defaults,
 			homeRow{id: "recommended", title: "Recommended for You", fill: func() ([]items.Summary, error) {
 				idx := h.videoIndex()
 				if idx.Len() == 0 {
 					return nil, nil
+				}
+				if t := more.taste(); t != nil {
+					return h.Items.RecommendedFor(ctx, acc, t, home, n)
 				}
 				return h.Items.Recommended(ctx, acc, idx, home, n, h.vodTaste(ctx, acc.UserID))
 			}},
@@ -243,7 +247,7 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow, n 
 			}
 			return h.toAPIVodSuggestions(ctx, s.User.ID, list)
 		}
-		defaults = append(defaults, h.newMoreRows(ctx, home, n).rows()...)
+		defaults = append(defaults, more.rows()...)
 	}
 	// Films and series on demand picked for them (Watch on VOD), when on demand is theirs to
 	// watch. Its content (vodEntries) is only sent to apps that ask for it (HomeHubs).
@@ -301,7 +305,63 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow, n 
 		out = append(out[:after+1], append([]homeRow{r}, out[after+1:]...)...)
 		after++
 	}
+	if len(saved) == 0 {
+		out = h.sinkUnplayedRows(ctx, uid, out)
+	}
 	return out, nil
+}
+
+// Rows that showed someone this many titles in a month without a single play sink below the
+// rest of their suggestion rows (only while they keep Home's default order).
+const sinkAfterShown = 40
+
+// sinkUnplayedRows moves the suggestion rows uid never plays from (after showing them plenty)
+// below the ones they do, keeping each group's order; Recently Added and the rest stay put.
+func (h *Handlers) sinkUnplayedRows(ctx context.Context, uid int64, rows []homeRow) []homeRow {
+	use, err := h.Items.HomeRowUse(ctx, uid)
+	if err != nil || len(use) == 0 {
+		return rows
+	}
+	var keep, sunk, tail []homeRow
+	for _, r := range rows {
+		fam := homeRowFamily(r.id)
+		switch u := use[fam]; {
+		case strings.HasPrefix(r.id, "recent-") || strings.HasPrefix(r.id, "played-") || r.id == "favorites" || r.pinned:
+			tail = append(tail, r)
+		case items.SuggestionRow(fam) && u.Shown >= sinkAfterShown && u.Plays == 0:
+			sunk = append(sunk, r)
+		default:
+			keep = append(keep, r)
+		}
+	}
+	if len(sunk) == 0 {
+		return rows
+	}
+	// Recently Added and pinned rows keep their places after the suggestions.
+	out := append(append(keep, sunk...), tail...)
+	return out
+}
+
+// homeRowFamily is the row a Home row counts as: rows that come several at a time count
+// together (every Because You Watched row as because-you-watched).
+func homeRowFamily(id string) string {
+	switch {
+	case strings.HasPrefix(id, "because-") && id != "because-you-watched":
+		return "because-you-watched"
+	case strings.HasPrefix(id, "genre-"):
+		return "genres"
+	case strings.HasPrefix(id, "holiday-"):
+		return "holiday"
+	case strings.HasPrefix(id, "decade-"):
+		return "decades"
+	case strings.HasPrefix(id, "person-"):
+		return "more-from"
+	case strings.HasPrefix(id, "recent-"):
+		return "recent"
+	case strings.HasPrefix(id, "played-"):
+		return "played"
+	}
+	return id
 }
 
 func layoutToAPI(rows []homeRow) HomeLayout {
@@ -374,7 +434,42 @@ func (h *Handlers) HomeHubs(ctx context.Context, req HomeHubsRequestObject) (Hom
 			out = append(out, hub)
 		}
 	}
+	h.noteHomeShown(s.User.ID, out)
 	return out, nil
+}
+
+// homeShownPerRow is how many titles of each row count as seen: what's on screen without scrolling.
+const homeShownPerRow = 8
+
+// noteHomeShown records, in the background, the titles Home is showing (by row family).
+func (h *Handlers) noteHomeShown(uid int64, hubs []Hub) {
+	shown := map[string][]int64{}
+	for _, hub := range hubs {
+		fam := homeRowFamily(hub.Id)
+		var ids []int64
+		if hub.MixedEntries != nil {
+			for _, e := range *hub.MixedEntries {
+				if e.Item != nil {
+					ids = append(ids, e.Item.Id)
+				}
+			}
+		} else {
+			for _, it := range hub.Items {
+				ids = append(ids, it.Id)
+			}
+		}
+		if len(ids) > homeShownPerRow {
+			ids = ids[:homeShownPerRow]
+		}
+		shown[fam] = append(shown[fam], ids...)
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := h.Items.HomeShown(ctx, uid, shown); err != nil {
+			slog.Warn("home: shown", "err", err)
+		}
+	}()
 }
 
 func (h *Handlers) GetHomeLayout(ctx context.Context, _ GetHomeLayoutRequestObject) (GetHomeLayoutResponseObject, error) {

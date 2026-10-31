@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -39,6 +40,25 @@ type Report struct {
 	Local, Remote        int
 	MusicHours, VideoHrs float64
 	Playlists            []Playlist
+	HomeRows             []HomeRow
+}
+
+// HomeRow is how one kind of Home row did for movies and shows (USER-16).
+type HomeRow struct {
+	Row, Label            string
+	Shown, Plays, Viewers int
+	Finished              float64 // share of plays watched to the end (90%)
+}
+
+// homeRowLabels names Home rows (and families of rows) by their ids.
+var homeRowLabels = map[string]string{
+	"continue-watching": "Continue Watching", "watchlist": "Your Watchlist", "recommended": "Recommended for You",
+	"because-you-watched": "Because You Watched", "continue-saga": "Continue the Saga", "more-from": "More From People You Love",
+	"holiday": "Holiday Picks", "new-releases": "New Releases", "top-rated": "Top Rated", "hidden-gems": "Hidden Gems",
+	"trending": "Trending Now", "genres": "Your Genres", "acclaimed": "Critically Acclaimed", "binge-worthy": "Binge-Worthy Shows",
+	"short-films": "Under 95 Minutes", "decades": "Best of a Decade", "classics": "Timeless Classics",
+	"family": "Family Movie Night", "international": "International Picks", "watch-again": "Watch It Again",
+	"favorites": "Your Favourites", "recent": "Recently Added", "played": "Recently Played",
 }
 
 // Playlist is how the music played from one kind of station or mix went (MUSIC-17).
@@ -187,8 +207,86 @@ func Build(ctx context.Context, db *sql.DB, days int, userID int64, limit int) (
 	if err := rows.Err(); err != nil {
 		return r, err
 	}
-	r.Playlists, err = playlists(ctx, db, where, args)
+	if r.Playlists, err = playlists(ctx, db, where, args); err != nil {
+		return r, err
+	}
+	r.HomeRows, err = homeRows(ctx, db, where, args, r.Since, userID)
 	return r, err
+}
+
+// homeRows sums the movie and episode plays by the Home row they came from (context
+// home:{row}), with how many titles each row showed in the period.
+func homeRows(ctx context.Context, db *sql.DB, where string, args []any, since time.Time, userID int64) ([]HomeRow, error) {
+	byRow := map[string]*HomeRow{}
+	get := func(row string) *HomeRow {
+		if byRow[row] == nil {
+			label := homeRowLabels[row]
+			if label == "" {
+				label = row
+			}
+			byRow[row] = &HomeRow{Row: row, Label: label}
+		}
+		return byRow[row]
+	}
+	rows, err := db.QueryContext(ctx, `SELECT SUBSTR(h.context, 6), COUNT(*), COUNT(DISTINCT h.user_id),
+		SUM(CASE WHEN i.duration_ms > 0 AND COALESCE(h.position_ms, 0) >= i.duration_ms * 0.9 THEN 1 ELSE 0 END)`+
+		from+where+` AND i.type IN ('movie', 'episode') AND h.context LIKE 'home:%' GROUP BY h.context`, args...)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var row string
+		var plays, viewers, finished int
+		if err := rows.Scan(&row, &plays, &viewers, &finished); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		r := get(row)
+		r.Plays, r.Viewers = plays, viewers
+		if plays > 0 {
+			r.Finished = float64(finished) / float64(plays)
+		}
+	}
+	rows.Close()
+	q, qargs := `SELECT row_id, COUNT(*) FROM home_shown WHERE 1 = 1`, []any{}
+	if !since.IsZero() {
+		q += ` AND shown_at >= ?`
+		qargs = append(qargs, since.UTC().Format("2006-01-02T15:04:05.000Z"))
+	}
+	if userID != 0 {
+		q += ` AND user_id = ?`
+		qargs = append(qargs, userID)
+	}
+	rows, err = db.QueryContext(ctx, q+` GROUP BY row_id`, qargs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var row string
+		var n int
+		if err := rows.Scan(&row, &n); err != nil {
+			return nil, err
+		}
+		get(row).Shown = n
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]HomeRow, 0, len(byRow))
+	for _, r := range byRow {
+		out = append(out, *r)
+	}
+	sort.Slice(out, func(a, b int) bool {
+		if out[a].Plays != out[b].Plays {
+			return out[a].Plays > out[b].Plays
+		}
+		if out[a].Shown != out[b].Shown {
+			return out[a].Shown > out[b].Shown
+		}
+		return out[a].Row < out[b].Row
+	})
+	return out, nil
 }
 
 // playlists sums the music plays by what they were started from: plays, listeners, how many

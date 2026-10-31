@@ -137,6 +137,16 @@ public extension AppSession {
 
     func watchlist() async throws -> [Item] { try await api.getWatchlist().ok.body.json }
 
+    /// Not interested (USER-16): stops suggesting a movie or show to this person (on), or
+    /// suggests it again.
+    func setNotInterested(_ id: Int64, _ on: Bool) async throws {
+        if on {
+            _ = try await api.markNotInterested(path: .init(itemId: id)).noContent
+        } else {
+            _ = try await api.unmarkNotInterested(path: .init(itemId: id)).noContent
+        }
+    }
+
     func playlists(kind: Schemas.PlaylistKind? = nil) async throws -> [Playlist] {
         try await api.listPlaylists(query: .init(kind: kind)).ok.body.json
     }

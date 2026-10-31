@@ -605,11 +605,12 @@ var fillerWords = map[string]bool{"similar": true, "films": true, "film": true, 
 // familyMaxLevel is the highest rating level a family search allows (PG / TV-PG).
 const familyMaxLevel = 3
 
-// notStarted is an SQL condition (alias i) that uid hasn't watched or started the item;
-// a show counts as started once any episode is.
+// notStarted is an SQL condition (alias i) that uid hasn't watched or started the item (a
+// show counts as started once any episode is) and hasn't said they're not interested in it.
 func notStarted(uid int64) string {
 	u := strconv.FormatInt(uid, 10)
-	return `NOT EXISTS (SELECT 1 FROM user_item_state x WHERE x.user_id = ` + u + ` AND x.item_id = i.id AND (x.play_count > 0 OR x.view_offset_ms > 0))
+	return `NOT EXISTS (SELECT 1 FROM item_not_interested n WHERE n.user_id = ` + u + ` AND n.item_id = i.id)
+		AND NOT EXISTS (SELECT 1 FROM user_item_state x WHERE x.user_id = ` + u + ` AND x.item_id = i.id AND (x.play_count > 0 OR x.view_offset_ms > 0))
 		AND NOT EXISTS (SELECT 1 FROM items e JOIN user_item_state x ON x.item_id = e.id AND x.user_id = ` + u + `
 			AND (x.play_count > 0 OR x.view_offset_ms > 0) WHERE i.type = 'show' AND e.grandparent_id = i.id AND e.type = 'episode')`
 }

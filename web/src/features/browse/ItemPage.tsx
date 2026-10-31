@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { clsx } from "clsx";
 import { AlertTriangle, Check, ChevronRight, Sparkles } from "lucide-react";
@@ -509,7 +509,7 @@ export function ItemPage() {
           <PlayButtons key={d.id} item={d} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {favoriteTypes.has(d.type) && <FavoriteButton key={d.id} item={d} />}
-            <ItemMenu item={d} />
+            <ItemMenu item={d} suggestion={!d.notInterested} />
             {(d.type === "movie" || d.type === "episode") && <DownloadOriginal item={d} />}
             {(d.type === "season" || d.type === "show") && <DownloadZip item={d} />}
             {me.data?.isAdmin && <ItemActions item={d} />}
@@ -520,6 +520,7 @@ export function ItemPage() {
               </Button>
             )}
           </div>
+          {d.notInterested && <NotInterestedNote itemId={d.id} />}
           {editingRules && <SmartRulesDialog collection={d} onClose={() => setEditingRules(false)} />}
           {d.tagline && <p className="mt-4 text-lg text-muted italic">{d.tagline}</p>}
           {!d.available && (
@@ -550,5 +551,22 @@ export function ItemPage() {
       <MediaInfo item={d} isAdmin={!!me.data?.isAdmin} />
     </div>
     </div>
+  );
+}
+
+/** Marked Not interested (USER-16): it isn't suggested; Suggest again takes that back. */
+function NotInterestedNote({ itemId }: { itemId: number }) {
+  const qc = useQueryClient();
+  const undo = useMutation({
+    mutationFn: () => unwrap(api.DELETE("/items/{itemId}/not-interested", { params: { path: { itemId } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["items"] }),
+  });
+  return (
+    <p className="mt-3 text-sm text-muted">
+      You said you're not interested, so it isn't suggested to you.{" "}
+      <button className="text-accent hover:underline" onClick={() => undo.mutate()} disabled={undo.isPending}>
+        Suggest it again
+      </button>
+    </p>
   );
 }

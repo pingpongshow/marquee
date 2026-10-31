@@ -7,6 +7,7 @@ import (
 
 	"marquee/internal/items"
 	"marquee/internal/vod"
+	"marquee/internal/vodsave"
 )
 
 // ---------- Ratings of films and series on demand (LIVE-6) ----------
@@ -108,7 +109,8 @@ func (h *Handlers) vodTaste(ctx context.Context, uid int64) items.VODTaste {
 		default:
 			continue
 		}
-		out.Liked = append(out.Liked, items.VODLike{TMDBRef: ref, Weight: w, Recs: m.Recs})
+		title, _ := vodsave.CleanTitle(m.Title) // "EN - Heat (1995)" reads "Heat"
+		out.Liked = append(out.Liked, items.VODLike{TMDBRef: ref, Title: title, Weight: w, Recs: m.Recs})
 	}
 	return out
 }

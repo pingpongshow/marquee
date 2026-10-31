@@ -4251,6 +4251,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/not-interested": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Not interested (USER-16): stop suggesting this movie or show to you. It leaves every suggestion row (Home, Because you watched, Muse…) and counts as something you turned away from, steering suggestions away from titles like it. */
+        put: operations["markNotInterested"];
+        post?: never;
+        /** Suggest this movie or show again (undo Not interested). */
+        delete: operations["unmarkNotInterested"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{itemId}/rating": {
         parameters: {
             query?: never;
@@ -7398,6 +7418,23 @@ export interface components {
             remote: number;
             /** @description How the music played from each kind of station and mix went (MUSIC-17), most played first. */
             playlists?: components["schemas"]["PlaylistStats"][];
+            /** @description How each kind of Home row did for movies and shows (USER-16), most played first: a play counts for the row that showed the title (or its show) in the two days before. */
+            homeRows?: components["schemas"]["HomeRowStats"][];
+        };
+        HomeRowStats: {
+            /**
+             * @description The row, or its family for rows that come several at a time (because-you-watched, genres, holiday, decades, more-from).
+             * @example recommended
+             */
+            row: string;
+            /** @example Recommended for You */
+            label: string;
+            /** @description Titles it showed (each person and title once) in the period. */
+            shown: number;
+            plays: number;
+            viewers: number;
+            /** @description Share of plays watched to the end (90% or more). */
+            finished: number;
         };
         PlaylistStats: {
             /** @example mix:daily */
@@ -7534,6 +7571,8 @@ export interface components {
             releaseType?: "album" | "ep" | "single" | "compilation" | "live" | "soundtrack" | "remix" | "demo" | "other";
             audioFormat?: components["schemas"]["AudioFormat"];
             communityRating?: components["schemas"]["CommunityRating"];
+            /** @description Home suggestion rows (USER-16): why it was picked, e.g. "Because you loved Heat", "Like Arrival", "Next in The Dark Knight Collection". Show it under the title. Absent elsewhere and when there's no personal reason. */
+            reason?: string;
         };
         /** @description Everyone's ratings of an item combined (USER-17): the average of the accounts that rated it, 0–10. Absent when nobody has. */
         CommunityRating: {
@@ -7703,6 +7742,8 @@ export interface components {
             offset: number;
         };
         ItemDetail: components["schemas"]["ItemSummary"] & {
+            /** @description You marked it Not interested (PUT/DELETE /items/{itemId}/not-interested). */
+            notInterested?: boolean;
             /** @description Fields edited by an administrator; agents never overwrite them. */
             lockedFields: string[];
             /** @description Tracks, for admins; moved to another album by hand (see /items/{itemId}/music-placement). */
@@ -15625,6 +15666,50 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    markNotInterested: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unmarkNotInterested: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unmarked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     rateItem: {

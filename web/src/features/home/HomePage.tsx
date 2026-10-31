@@ -10,6 +10,7 @@ import { EditHomeDialog } from "./EditHome";
 import { GettingStarted } from "./GettingStarted";
 import { seeAllTarget } from "./layout";
 import { fetchHubs, hubsKey } from "../browse/watched";
+import { isSuggestionRow } from "./layout";
 import { VodSuggestionTile } from "../livetv/VodSuggestions";
 
 export function HomePage() {
@@ -76,14 +77,16 @@ export function HomePage() {
                     e.vod ? (
                       <VodSuggestionTile key={e.key} s={e.vod} badge watchlist={hub.id === "watchlist"} />
                     ) : e.item ? (
-                      <HubItem key={e.key} it={e.item} wide={false} continueWatching={false} />
+                      <HubItem key={e.key} it={e.item} wide={false} continueWatching={false} suggestion={isSuggestionRow(hub.id)} />
                     ) : null,
                   )
                 : vod
                 ? vod.map((s) => <VodSuggestionTile key={s.key} s={s} />)
                 : entries
                 ? entries.map((e) => <ContinueTile key={e.key} e={e} />)
-                : hub.items.map((it) => <HubItem key={it.id} it={it} wide={wide} continueWatching={wide} />)}
+                : hub.items.map((it) => (
+                    <HubItem key={it.id} it={it} wide={wide} continueWatching={wide} suggestion={isSuggestionRow(hub.id)} />
+                  ))}
               {entries && (hub.total ?? 0) > entries.length && <ViewMoreTile total={hub.total ?? 0} />}
             </ul>
           </section>

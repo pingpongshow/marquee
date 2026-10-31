@@ -21,16 +21,19 @@ export function HubItem({
   it,
   wide,
   continueWatching,
+  suggestion,
   className,
 }: {
   it: ItemSummary;
   wide: boolean;
   continueWatching: boolean;
+  /** On a suggestion row: its menu offers Not interested, and it says why it's there. */
+  suggestion?: boolean;
   /** Replaces the tile's width (a grid's cell). */
   className?: string;
 }) {
   // The "…" menu shows on hover, and right-click opens it too.
-  const tile = useTileMenu(it, { continueWatching });
+  const tile = useTileMenu(it, { continueWatching, suggestion });
   // Continue Watching episodes open the player directly.
   const playable = (it.type === "episode" || it.type === "movie" || it.type === "video") && wide;
   const title = it.type === "episode" ? it.grandparentTitle : it.title;
@@ -48,6 +51,11 @@ export function HubItem({
       />
       <div className="mt-2 truncate text-sm font-medium">{title}</div>
       <div className="truncate text-xs text-muted">{sub}</div>
+      {it.reason && (
+        <div className="truncate text-xs text-accent/90" title={it.reason}>
+          {it.reason}
+        </div>
+      )}
     </>
   );
   return (

@@ -64,7 +64,9 @@ struct HomeView: View {
                         // demand together, in the server's order; those on demand are marked VOD
                         // and open their own pages.
                         ShelfRow(title: hub.title, seeAll: seeAll(hub), seeAllSize: seeAllSize(hub)) {
-                            ForEach(Self.visible(mixed), id: \.key) { HomeEntryTile(entry: $0, watchlist: hub.id == "watchlist") }
+                            ForEach(Self.visible(mixed), id: \.key) {
+                                HomeEntryTile(entry: $0, watchlist: hub.id == "watchlist", suggestion: isSuggestionRow(hub.id))
+                            }
                         }
                     } else if wide, let entries = hub.entries {
                         // Library titles and films and episodes on demand together, in the
@@ -84,7 +86,8 @@ struct HomeView: View {
                                 if wide && item.isPlayableVideo {
                                     ContinueCard(item: item, onRemove: remove)
                                 } else {
-                                    PosterCard(item: item, shape: PosterShape.for(item) == .wide ? .wide : nil, onRemoveFromContinue: remove)
+                                    PosterCard(item: item, shape: PosterShape.for(item) == .wide ? .wide : nil, onRemoveFromContinue: remove,
+                                               suggestion: isSuggestionRow(hub.id))
                                 }
                             }
                         }

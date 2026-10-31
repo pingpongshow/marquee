@@ -3,6 +3,7 @@ import { useParams } from "@tanstack/react-router";
 import { api, unwrap } from "@/api/client";
 import { Alert, Spinner } from "@/components/ui";
 import { HubItem } from "./ContinueWatching";
+import { isSuggestionRow } from "./layout";
 import { VodSuggestionTile } from "../livetv/VodSuggestions";
 
 /** See all (USER-12): one Home row in full, library titles and on-demand ones (marked VOD) together. */
@@ -39,10 +40,12 @@ export function HomeRowPage() {
                 e.vod ? (
                   <VodSuggestionTile key={e.key} s={e.vod} badge watchlist={hubId === "watchlist"} className="min-w-0" />
                 ) : e.item ? (
-                  <HubItem key={e.key} it={e.item} wide={false} continueWatching={false} className="min-w-0" />
+                  <HubItem key={e.key} it={e.item} wide={false} continueWatching={false} suggestion={isSuggestionRow(hubId)} className="min-w-0" />
                 ) : null,
               )
-            : h.items.map((it) => <HubItem key={it.id} it={it} wide={false} continueWatching={false} className="min-w-0" />)}
+            : h.items.map((it) => (
+                <HubItem key={it.id} it={it} wide={false} continueWatching={false} suggestion={isSuggestionRow(hubId)} className="min-w-0" />
+              ))}
         </ul>
       )}
     </div>

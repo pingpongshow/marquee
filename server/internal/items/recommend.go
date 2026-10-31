@@ -73,12 +73,14 @@ func (s *Store) recentSeeds(ctx context.Context, uid int64, days, limit int) ([]
 	return out, err
 }
 
-// started is every movie and show uid has watched or started (a show once any episode is).
+// started is every movie and show uid has watched or started (a show once any episode is),
+// and the ones they said they're not interested in.
 func (s *Store) started(ctx context.Context, uid int64) (map[int64]bool, error) {
 	out := map[int64]bool{}
 	err := eachRow(ctx, s.db, `SELECT x.item_id FROM user_item_state x WHERE x.user_id = ?1 AND (x.play_count > 0 OR x.view_offset_ms > 0)
 		UNION SELECT e.grandparent_id FROM user_item_state x JOIN items e ON e.id = x.item_id AND e.type = 'episode'
-		WHERE x.user_id = ?1 AND (x.play_count > 0 OR x.view_offset_ms > 0) AND e.grandparent_id IS NOT NULL`, []any{uid}, func(r *sql.Rows) error {
+		WHERE x.user_id = ?1 AND (x.play_count > 0 OR x.view_offset_ms > 0) AND e.grandparent_id IS NOT NULL
+		UNION SELECT item_id FROM item_not_interested WHERE user_id = ?1`, []any{uid}, func(r *sql.Rows) error {
 		var id int64
 		if err := r.Scan(&id); err != nil {
 			return err
@@ -234,6 +236,7 @@ type TMDBRef struct {
 // finished 1) and TMDB's recommendations for it, best first.
 type VODLike struct {
 	TMDBRef
+	Title  string // for "Because you watched …"
 	Weight float64
 	Recs   []int
 }
@@ -243,101 +246,114 @@ type VODLike struct {
 // title watched on demand is mostly what TMDB recommends for it.
 const vodRecWeight = relatedRecWeight
 
-// Recommended ranks the movies and shows the person hasn't started by cosine to the centroid
-// of their favourites and last 20 completed ones, weighted by their rating where they gave
-// one (a favourite counts most), then moves up titles close to a favourite. What they watched
-// and liked on demand (vod) counts too.
+// Recommended is RecommendedFor with the person's taste worked out now.
 func (s *Store) Recommended(ctx context.Context, acc Access, idx *VideoIndex, libIDs []int64, n int, vod VODTaste) ([]Summary, error) {
 	if idx.Len() == 0 || acc.UserID == 0 {
 		return nil, nil
 	}
-	seeds, err := s.recentSeeds(ctx, acc.UserID, 3650, 20)
+	m, err := s.TasteModel(ctx, acc.UserID, idx, vod)
 	if err != nil {
 		return nil, err
 	}
-	if seeds, err = s.withFavorites(ctx, acc.UserID, seeds, 20); err != nil {
-		return nil, err
-	}
-	if len(seeds) == 0 && len(vod.Liked) == 0 {
+	return s.RecommendedFor(ctx, acc, m, libIDs, n)
+}
+
+// RecommendedFor ranks the movies and shows the person hasn't started near each of their taste
+// clusters (their favourites and recent finished titles, weighted by rating, a favourite most),
+// taking from each in proportion to its weight so every side of their taste gets its share.
+// Titles close to a favourite and ones TMDB recommends for what they liked on demand move up;
+// ones like what they turned away from, and ones passed over on Home day after day, move down;
+// the order turns a little each day; near-duplicates and a second film of a series wait.
+// Each title says why ("Because you loved Heat").
+func (s *Store) RecommendedFor(ctx context.Context, acc Access, m *TasteModel, libIDs []int64, n int) ([]Summary, error) {
+	idx := m.idx
+	if idx.Len() == 0 || acc.UserID == 0 || (!m.Personal() && len(m.vodBoost) == 0) {
 		return nil, nil
-	}
-	ids := make([]int64, len(seeds))
-	weights := make([]float64, len(seeds))
-	var favs []int64
-	for i, sd := range seeds {
-		ids[i], weights[i] = sd.ID, 1
-		switch {
-		case sd.Favorite:
-			weights[i] = favoriteWeight
-			favs = append(favs, sd.ID)
-		case sd.Rating > 0:
-			weights[i] = sd.Rating / 7 // 7/10 counts as usual, 10 a little more, 2 barely
-		}
-	}
-	lib, err := s.itemsByTMDB(ctx, vod.refs())
-	if err != nil {
-		return nil, err
-	}
-	// Liked on demand and in the library too: a seed like the library's own.
-	isSeed := map[int64]bool{}
-	for _, id := range ids {
-		isSeed[id] = true
-	}
-	for _, l := range vod.Liked {
-		for _, id := range lib[l.TMDBRef] {
-			if !isSeed[id] {
-				isSeed[id] = true
-				ids, weights = append(ids, id), append(weights, l.Weight)
-			}
-		}
 	}
 	started, err := s.started(ctx, acc.UserID)
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range vod.Seen {
-		for _, id := range lib[r] {
-			started[id] = true
-		}
-	}
-	// TMDB's recommendations for what they liked on demand.
-	boost := map[int64]float64{}
-	for _, l := range vod.Liked {
-		for rank, tm := range l.Recs {
-			if rank == 40 {
-				break
-			}
-			b := vodRecWeight * min(l.Weight, favoriteWeight) * max(0.2, 1-0.02*float64(rank))
-			for _, id := range lib[TMDBRef{l.Type, tm}] {
-				boost[id] = max(boost[id], b)
-			}
-		}
+	for id := range m.vodSeen {
+		started[id] = true
 	}
 	acc = within(acc, libIDs)
 	inLib := libraryKeep(acc.LibraryIDs)
 	keep := func(v *VideoVec) bool { return !started[v.ItemID] && inLib(v) }
-	var ranked []Scored
-	if c := idx.Centroid(ids, weights); c != nil {
-		ranked = idx.Nearest(c, keep, 400)
-	} else {
-		// Nothing of theirs is in the library: what TMDB recommends for their VOD titles.
-		for id := range boost {
+	adjust := func(list []Scored) []Scored {
+		for i := range list {
+			id := list[i].ItemID
+			list[i].Score += m.vodBoost[id] + 0.03*m.jitter(id) - m.passedPenalty(id) - m.negPenalty(id)
+		}
+		list = FavourSimilar(list, idx, m.favs)
+		sort.SliceStable(list, func(a, b int) bool { return list[a].Score > list[b].Score })
+		return list
+	}
+	type source struct {
+		list    []Scored
+		share   float64
+		cluster int
+		taken   int
+	}
+	var sources []source
+	total := 0.0
+	for _, cl := range m.clusters {
+		total += cl.weight
+	}
+	for c, cl := range m.clusters {
+		sources = append(sources, source{list: adjust(idx.Nearest(cl.centroid, keep, 300)), share: cl.weight / total, cluster: c})
+	}
+	// What TMDB recommends for titles liked on demand, as a source of its own.
+	if len(m.vodBoost) > 0 {
+		var list []Scored
+		for id := range m.vodBoost {
 			if v := idx.Get(id); v != nil && keep(v) {
-				ranked = append(ranked, Scored{ItemID: id})
+				list = append(list, Scored{ItemID: id})
 			}
 		}
-		if len(ranked) == 0 {
-			return nil, nil
+		share := 1.0
+		if len(sources) > 0 {
+			share = 0.25
 		}
+		sources = append(sources, source{list: adjust(list), share: share, cluster: -1})
 	}
-	neg, err := s.disliked(ctx, acc.UserID)
-	if err != nil {
-		return nil, err
+	// Weighted round robin: the source furthest behind its share gives its next title.
+	seen := map[int64]bool{}
+	var merged []int64
+	cluster := map[int64]int{}
+	for len(merged) < 400 {
+		best := -1
+		for i := range sources {
+			src := &sources[i]
+			for src.taken < len(src.list) && seen[src.list[src.taken].ItemID] {
+				src.taken++
+			}
+			if src.taken >= len(src.list) {
+				continue
+			}
+			if best < 0 || float64(src.taken)/src.share < float64(sources[best].taken)/sources[best].share {
+				best = i
+			}
+		}
+		if best < 0 {
+			break
+		}
+		id := sources[best].list[sources[best].taken].ItemID
+		sources[best].taken++
+		seen[id] = true
+		merged = append(merged, id)
+		cluster[id] = sources[best].cluster
 	}
-	ranked = PenaliseSimilar(ranked, idx, neg)
-	ranked = Boosted(ranked, boost)
-	ranked = FavourSimilar(ranked, idx, favs)
-	return s.visibleTop(ctx, acc, scoredIDs(ranked, 400), n)
+	order := m.diverse(len(merged), len(merged), func(i int) int64 { return merged[i] })
+	ranked := make([]int64, len(order))
+	for i, p := range order {
+		ranked[i] = merged[p]
+	}
+	list, err := s.visibleTop(ctx, acc, ranked, n)
+	for i := range list {
+		list[i].Reason = m.becauseReason(list[i].ID, cluster[list[i].ID])
+	}
+	return list, err
 }
 
 // refs are every title the taste needs found in the library: seen, liked and recommended.
@@ -443,10 +459,21 @@ func within(acc Access, libIDs []int64) Access {
 // and shows dropped after an episode or two (nothing watched for a month), from the last
 // six months.
 func (s *Store) disliked(ctx context.Context, uid int64) ([]int64, error) {
-	if s.Learn == nil || !s.Learn() {
-		return nil, nil
-	}
+	// Not interested is said outright, so it counts whether or not learning is on.
 	var out []int64
+	if err := eachRow(ctx, s.db, `SELECT item_id FROM item_not_interested WHERE user_id = ?`, []any{uid}, func(r *sql.Rows) error {
+		var id int64
+		if err := r.Scan(&id); err != nil {
+			return err
+		}
+		out = append(out, id)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	if s.Learn == nil || !s.Learn() {
+		return out, nil
+	}
 	err := eachRow(ctx, s.db, `SELECT x.item_id FROM user_item_state x JOIN items i ON i.id = x.item_id AND i.type IN ('movie', 'show')
 			WHERE x.user_id = ?1 AND x.rating IS NOT NULL AND x.rating <= 4
 		UNION SELECT x.item_id FROM user_item_state x JOIN items i ON i.id = x.item_id AND i.type = 'movie'

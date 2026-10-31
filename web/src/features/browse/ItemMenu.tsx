@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/Toast";
 import { useNavigate } from "@tanstack/react-router";
-import { Bookmark, BookmarkMinus, CircleCheck, CircleSlash, Compass, Disc3, EyeOff, Heart, HeartOff, Layers, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, Shuffle, Tv, UserRound } from "lucide-react";
+import { Bookmark, BookmarkMinus, CircleCheck, CircleSlash, Compass, Disc3, EyeOff, Heart, HeartOff, Layers, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, Shuffle, ThumbsDown, Tv, UserRound } from "lucide-react";
 import { clsx } from "clsx";
 import { useState, type MouseEvent } from "react";
 import { api, unwrap } from "@/api/client";
@@ -25,6 +25,7 @@ export function ItemMenu({
   item,
   className,
   continueWatching,
+  suggestion,
   open,
   onOpenChange,
   floating,
@@ -33,6 +34,8 @@ export function ItemMenu({
   className?: string;
   /** The item is a Continue Watching tile: offer to remove it from the row (USER-6). */
   continueWatching?: boolean;
+  /** The item is on a Home suggestion row: offer Not interested (USER-16). */
+  suggestion?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   floating?: boolean;
@@ -56,6 +59,7 @@ export function ItemMenu({
         : unwrap(api.DELETE("/items/{itemId}/watchlist", { params: { path: { itemId: item.id } } })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["items"] }),
   });
+  const notInterested = useNotInterested();
   const setFavorite = useSetFavorite();
   const isMusic = music.has(item.type);
   const leaves = async () => (item.type === "track" ? [item] : await fetchLeaves(item.id));
@@ -79,6 +83,11 @@ export function ItemMenu({
         {continueWatching && (
           <MenuItem icon={<EyeOff />} onClick={() => removeCw.mutate(item.id)}>
             Remove from Continue Watching
+          </MenuItem>
+        )}
+        {suggestion && (item.type === "movie" || item.type === "show") && (
+          <MenuItem icon={<ThumbsDown />} onClick={() => notInterested(item)}>
+            Not interested
           </MenuItem>
         )}
         {item.type === "episode" && item.grandparentId && (
@@ -158,7 +167,7 @@ export function ItemMenu({
  * A poster tile's "…" menu: shows on hover in the tile's corner, and right-click on the tile opens it.
  * Put it inside a `relative group/tile` element and pass that element `onContextMenu`.
  */
-export function useTileMenu(item: ItemSummary, opts?: { continueWatching?: boolean }) {
+export function useTileMenu(item: ItemSummary, opts?: { continueWatching?: boolean; suggestion?: boolean }) {
   const [open, setOpen] = useState(false);
   return {
     onContextMenu: (e: MouseEvent) => {
@@ -172,8 +181,30 @@ export function useTileMenu(item: ItemSummary, opts?: { continueWatching?: boole
           open ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100 focus-within:opacity-100",
         )}
       >
-        <ItemMenu item={item} continueWatching={opts?.continueWatching} open={open} onOpenChange={setOpen} floating />
+        <ItemMenu item={item} continueWatching={opts?.continueWatching} suggestion={opts?.suggestion} open={open} onOpenChange={setOpen} floating />
       </div>
     ),
   };
+}
+
+/**
+ * Not interested (USER-16): the title leaves Home's suggestion rows at once (and stops being
+ * suggested anywhere), with Undo in the toast. Returns the action.
+ */
+export function useNotInterested() {
+  const qc = useQueryClient();
+  const set = (item: ItemSummary, on: boolean) =>
+    unwrap(
+      on
+        ? api.PUT("/items/{itemId}/not-interested", { params: { path: { itemId: item.id } } })
+        : api.DELETE("/items/{itemId}/not-interested", { params: { path: { itemId: item.id } } }),
+    ).then(() => qc.invalidateQueries({ queryKey: ["items"] }));
+  return (item: ItemSummary) =>
+    void set(item, true)
+      .then(() =>
+        toast(`We won't suggest ${item.title} again.`, {
+          action: { label: "Undo", onClick: () => void set(item, false).catch(() => {}) },
+        }),
+      )
+      .catch((e: Error) => toast(e.message, { tone: "error" }));
 }

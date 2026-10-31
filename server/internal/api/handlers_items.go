@@ -158,6 +158,7 @@ func toAPISummary(s items.Summary) ItemSummary {
 	if t, err := time.Parse("2006-01-02", s.ReleaseDate); err == nil {
 		out.OriginallyAvailableAt = &openapi_types.Date{Time: t}
 	}
+	out.Reason = nz(s.Reason)
 	return out
 }
 
@@ -272,7 +273,8 @@ func (h *Handlers) ListPopularTracks(ctx context.Context, req ListPopularTracksR
 }
 
 func (h *Handlers) GetItem(ctx context.Context, req GetItemRequestObject) (GetItemResponseObject, error) {
-	if _, ok := session(ctx); !ok {
+	s, ok := session(ctx)
+	if !ok {
 		return GetItem401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	out, err := h.detail(ctx, req.ItemId)
@@ -282,7 +284,60 @@ func (h *Handlers) GetItem(ctx context.Context, req GetItemRequestObject) (GetIt
 	if err != nil {
 		return nil, internal(ctx, "getItem", err)
 	}
+	if out.Type == ItemTypeMovie || out.Type == ItemTypeShow {
+		h.Items.Opened(ctx, s.User.ID, out.Id) // looked at: no longer passed over on Home (USER-16)
+		out.NotInterested = ptr(h.Items.NotInterested(ctx, s.User.ID, out.Id))
+	}
 	return GetItem200JSONResponse(out), nil
+}
+
+// MarkNotInterested stops suggesting a movie or show to the caller (USER-16).
+func (h *Handlers) MarkNotInterested(ctx context.Context, req MarkNotInterestedRequestObject) (MarkNotInterestedResponseObject, error) {
+	found, authed, err := h.setNotInterested(ctx, req.ItemId, true)
+	switch {
+	case !authed:
+		return MarkNotInterested401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case err != nil:
+		return nil, internal(ctx, "markNotInterested", err)
+	case !found:
+		return MarkNotInterested404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "no such movie or show"))}, nil
+	}
+	return MarkNotInterested204Response{}, nil
+}
+
+func (h *Handlers) UnmarkNotInterested(ctx context.Context, req UnmarkNotInterestedRequestObject) (UnmarkNotInterestedResponseObject, error) {
+	found, authed, err := h.setNotInterested(ctx, req.ItemId, false)
+	switch {
+	case !authed:
+		return UnmarkNotInterested401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case err != nil:
+		return nil, internal(ctx, "unmarkNotInterested", err)
+	case !found:
+		return UnmarkNotInterested404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "no such movie or show"))}, nil
+	}
+	return UnmarkNotInterested204Response{}, nil
+}
+
+// setNotInterested marks a movie or show the caller can see Not interested, or unmarks it.
+func (h *Handlers) setNotInterested(ctx context.Context, id int64, on bool) (found, authed bool, err error) {
+	s, ok := session(ctx)
+	if !ok {
+		return false, false, nil
+	}
+	d, err := h.Items.Get(ctx, itemAccess(ctx), id, false)
+	if errors.Is(err, items.ErrNotFound) || (err == nil && d.Type != "movie" && d.Type != "show") {
+		return false, true, nil
+	}
+	if err != nil {
+		return false, true, err
+	}
+	if err := h.Items.SetNotInterested(ctx, s.User.ID, id, on); err != nil {
+		return true, true, err
+	}
+	if h.VODSuggest != nil {
+		h.VODSuggest.Forget(s.User.ID) // their VOD suggestions follow their taste
+	}
+	return true, true, nil
 }
 
 // detail loads an item as the caller may see it.

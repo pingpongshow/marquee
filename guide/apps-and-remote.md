@@ -213,6 +213,16 @@ Choose **Save preferences** when you're done.
 
 **Home rows.** Each person arranges their own Home screen: choose **Edit Home** on Home to drag rows (or use the arrows) into order and hide the ones you don't want. Pin collections and playlists to Home from their own pages with **Pin to Home**.
 
+**Suggestions on Home.** Home's suggestion rows are worked out for each person from their favourites, ratings and what they've finished (including what they watched or rated on VOD):
+
+- **Your tastes, not an average.** Marquee groups what you like into a few tastes (say, space films and romantic comedies) and gives each its share of **Recommended for You**, instead of averaging them into something that fits neither.
+- **Every row is ordered for you.** Top Rated, Your Genres, Best of a Decade, Holiday Picks and the other category rows put what fits your taste first, along with how well rated it is.
+- **Variety.** A row doesn't show near-copies of one film or more than one film of a series, the order turns a little each day, and titles you've scrolled past for several days without opening slowly make way for others.
+- **Why it's there.** Tiles say why they were picked: *Because you loved Heat*, *Like Arrival*, *Next in The Dark Knight Collection*.
+- **New rows:** **Continue the Saga** (the next film of a series you've started), **More From** a director or **More With** an actor whose films you loved, and **Hidden Gems** (well-rated titles nobody on your server has watched yet).
+- **Not interested.** Open a suggestion's menu (right-click or **…** on the web, long press or the context menu in the apps) and choose **Not interested**. It disappears from every suggestion row and Marquee steers away from titles like it. The web shows **Suggest it again** on the title's page to undo it.
+- **Rows that don't work for you sink.** If a row has shown you plenty of titles over a month and you've never played anything from it, it moves below your other suggestion rows. This only happens while you keep Home's default order; once you arrange Home yourself, your order stays.
+
 ---
 
 [Guide contents](README.md) · Previous: [First run](first-run.md) · Next: [Server settings](settings-server.md) · [Troubleshooting](troubleshooting.md)

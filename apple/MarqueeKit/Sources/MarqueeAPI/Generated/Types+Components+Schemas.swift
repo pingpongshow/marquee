@@ -12978,6 +12978,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Stats/playlists`.
             public var playlists: [Components.Schemas.PlaylistStats]?
+            /// How each kind of Home row did for movies and shows (USER-16), most played first: a play counts for the row that showed the title (or its show) in the two days before.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Stats/homeRows`.
+            public var homeRows: [Components.Schemas.HomeRowStats]?
             /// Creates a new `Stats`.
             ///
             /// - Parameters:
@@ -12999,6 +13003,7 @@ extension Components {
             ///   - local:
             ///   - remote:
             ///   - playlists: How the music played from each kind of station and mix went (MUSIC-17), most played first.
+            ///   - homeRows: How each kind of Home row did for movies and shows (USER-16), most played first: a play counts for the row that showed the title (or its show) in the two days before.
             public init(
                 since: Foundation.Date? = nil,
                 plays: Swift.Int,
@@ -13017,7 +13022,8 @@ extension Components {
                 methods: Components.Schemas.Stats.MethodsPayload,
                 local: Swift.Int,
                 remote: Swift.Int,
-                playlists: [Components.Schemas.PlaylistStats]? = nil
+                playlists: [Components.Schemas.PlaylistStats]? = nil,
+                homeRows: [Components.Schemas.HomeRowStats]? = nil
             ) {
                 self.since = since
                 self.plays = plays
@@ -13037,6 +13043,7 @@ extension Components {
                 self.local = local
                 self.remote = remote
                 self.playlists = playlists
+                self.homeRows = homeRows
             }
             public enum CodingKeys: String, CodingKey {
                 case since
@@ -13057,6 +13064,60 @@ extension Components {
                 case local
                 case remote
                 case playlists
+                case homeRows
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/HomeRowStats`.
+        public struct HomeRowStats: Codable, Hashable, Sendable {
+            /// The row, or its family for rows that come several at a time (because-you-watched, genres, holiday, decades, more-from).
+            ///
+            /// - Remark: Generated from `#/components/schemas/HomeRowStats/row`.
+            public var row: Swift.String
+            /// - Remark: Generated from `#/components/schemas/HomeRowStats/label`.
+            public var label: Swift.String
+            /// Titles it showed (each person and title once) in the period.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HomeRowStats/shown`.
+            public var shown: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/HomeRowStats/plays`.
+            public var plays: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/HomeRowStats/viewers`.
+            public var viewers: Swift.Int
+            /// Share of plays watched to the end (90% or more).
+            ///
+            /// - Remark: Generated from `#/components/schemas/HomeRowStats/finished`.
+            public var finished: Swift.Double
+            /// Creates a new `HomeRowStats`.
+            ///
+            /// - Parameters:
+            ///   - row: The row, or its family for rows that come several at a time (because-you-watched, genres, holiday, decades, more-from).
+            ///   - label:
+            ///   - shown: Titles it showed (each person and title once) in the period.
+            ///   - plays:
+            ///   - viewers:
+            ///   - finished: Share of plays watched to the end (90% or more).
+            public init(
+                row: Swift.String,
+                label: Swift.String,
+                shown: Swift.Int,
+                plays: Swift.Int,
+                viewers: Swift.Int,
+                finished: Swift.Double
+            ) {
+                self.row = row
+                self.label = label
+                self.shown = shown
+                self.plays = plays
+                self.viewers = viewers
+                self.finished = finished
+            }
+            public enum CodingKeys: String, CodingKey {
+                case row
+                case label
+                case shown
+                case plays
+                case viewers
+                case finished
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaylistStats`.
@@ -13522,6 +13583,10 @@ extension Components {
             public var audioFormat: Components.Schemas.AudioFormat?
             /// - Remark: Generated from `#/components/schemas/ItemSummary/communityRating`.
             public var communityRating: Components.Schemas.CommunityRating?
+            /// Home suggestion rows (USER-16): why it was picked, e.g. "Because you loved Heat", "Like Arrival", "Next in The Dark Knight Collection". Show it under the title. Absent elsewhere and when there's no personal reason.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/reason`.
+            public var reason: Swift.String?
             /// Creates a new `ItemSummary`.
             ///
             /// - Parameters:
@@ -13558,6 +13623,7 @@ extension Components {
             ///   - releaseType: Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
             ///   - audioFormat:
             ///   - communityRating:
+            ///   - reason: Home suggestion rows (USER-16): why it was picked, e.g. "Because you loved Heat", "Like Arrival", "Next in The Dark Knight Collection". Show it under the title. Absent elsewhere and when there's no personal reason.
             public init(
                 id: Swift.Int64,
                 libraryId: Swift.Int64,
@@ -13591,7 +13657,8 @@ extension Components {
                 extraType: Components.Schemas.ItemSummary.ExtraTypePayload? = nil,
                 releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload? = nil,
                 audioFormat: Components.Schemas.AudioFormat? = nil,
-                communityRating: Components.Schemas.CommunityRating? = nil
+                communityRating: Components.Schemas.CommunityRating? = nil,
+                reason: Swift.String? = nil
             ) {
                 self.id = id
                 self.libraryId = libraryId
@@ -13626,6 +13693,7 @@ extension Components {
                 self.releaseType = releaseType
                 self.audioFormat = audioFormat
                 self.communityRating = communityRating
+                self.reason = reason
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -13661,6 +13729,7 @@ extension Components {
                 case releaseType
                 case audioFormat
                 case communityRating
+                case reason
             }
         }
         /// Everyone's ratings of an item combined (USER-17): the average of the accounts that rated it, 0–10. Absent when nobody has.
@@ -14410,6 +14479,10 @@ extension Components {
             public var value1: Components.Schemas.ItemSummary
             /// - Remark: Generated from `#/components/schemas/ItemDetail/value2`.
             public struct Value2Payload: Codable, Hashable, Sendable {
+                /// You marked it Not interested (PUT/DELETE /items/{itemId}/not-interested).
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/notInterested`.
+                public var notInterested: Swift.Bool?
                 /// Fields edited by an administrator; agents never overwrite them.
                 ///
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/lockedFields`.
@@ -14477,6 +14550,7 @@ extension Components {
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
+                ///   - notInterested: You marked it Not interested (PUT/DELETE /items/{itemId}/not-interested).
                 ///   - lockedFields: Fields edited by an administrator; agents never overwrite them.
                 ///   - placementOverride: Tracks, for admins; moved to another album by hand (see /items/{itemId}/music-placement).
                 ///   - collections: Collections the item belongs to (META-7).
@@ -14494,6 +14568,7 @@ extension Components {
                 ///   - versions:
                 ///   - chapters:
                 public init(
+                    notInterested: Swift.Bool? = nil,
                     lockedFields: [Swift.String],
                     placementOverride: Swift.Bool? = nil,
                     collections: [Components.Schemas.ItemSummary]? = nil,
@@ -14511,6 +14586,7 @@ extension Components {
                     versions: [Components.Schemas.MediaVersion],
                     chapters: [Components.Schemas.Chapter]
                 ) {
+                    self.notInterested = notInterested
                     self.lockedFields = lockedFields
                     self.placementOverride = placementOverride
                     self.collections = collections
@@ -14529,6 +14605,7 @@ extension Components {
                     self.chapters = chapters
                 }
                 public enum CodingKeys: String, CodingKey {
+                    case notInterested
                     case lockedFields
                     case placementOverride
                     case collections
