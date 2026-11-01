@@ -34,7 +34,7 @@ RUN apt-get update \
       autoconf automake libtool pkg-config nasm libargtable2-dev \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
-RUN curl -fsSL -o ffmpeg.tar.xz https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz \
+RUN curl -fsSL --retry 8 --retry-all-errors --retry-delay 15 --connect-timeout 30 -o ffmpeg.tar.xz https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz \
  && echo "${FFMPEG_SHA256}  ffmpeg.tar.xz" | sha256sum -c - \
  && tar xf ffmpeg.tar.xz && cd ffmpeg-${FFMPEG_VERSION} \
  && ./configure --prefix=/opt/ffmpeg --pkg-config-flags=--static --enable-static --disable-shared \
