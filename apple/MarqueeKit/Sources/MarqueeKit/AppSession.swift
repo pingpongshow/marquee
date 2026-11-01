@@ -39,10 +39,15 @@ final class TokenBox: @unchecked Sendable {
 /// Adds the bearer token to every API request.
 struct AuthMiddleware: ClientMiddleware {
     let token: @Sendable () -> String?
+    /// The token of the person whose playback is being ended, for requests made (and tasks
+    /// started) while it ends: they finish after the token has changed to the next person's, or
+    /// to none, and with it the server refused them, so its sessions ran on until they timed out.
+    @TaskLocal static var leaving: String?
+
     func intercept(_ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String,
                    next: @Sendable (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)) async throws -> (HTTPResponse, HTTPBody?) {
         var request = request
-        if let t = token() { request.headerFields[.authorization] = "Bearer \(t)" }
+        if let t = Self.leaving ?? token() { request.headerFields[.authorization] = "Bearer \(t)" }
         return try await next(request, body, baseURL)
     }
 }
@@ -89,6 +94,9 @@ public final class AppSession {
     /// Called when the signed-in person goes away or changes (sign out, profile switch,
     /// forgetting the server), so playback that belongs to them can stop.
     @ObservationIgnored public var onUserChange: (() -> Void)?
+    /// Waits (briefly) for what `onUserChange` started to reach the server: signing out ends the
+    /// token once it has.
+    @ObservationIgnored public var userPlaybackEnded: (() async -> Void)?
 
     private let tokenBox = TokenBox()
     private var token: String? {
@@ -218,7 +226,7 @@ public final class AppSession {
                 if let lanURL { record.lanURL = lanURL }
                 if let remoteURL { record.remoteURL = remoteURL }
                 if info.networkClass == .remote, record.remoteURL == nil { record.remoteURL = url }
-                if server?.id != record.id, me != nil { onUserChange?() }
+                if server?.id != record.id, me != nil { endUserPlayback() }
                 use(record)
                 await reconnect()
                 return
@@ -311,7 +319,7 @@ public final class AppSession {
     // MARK: - Signing in
 
     private func signedIn(_ auth: Schemas.AuthResult) {
-        if let old = me?.id, old != auth.user.id { onUserChange?() }
+        if let old = me?.id, old != auth.user.id { endUserPlayback() }
         if me?.id != auth.user.id { forgetImageKey() } // another person's key; theirs comes with /me
         token = auth.token
         if let id = server?.id { ServerStore.setToken(auth.token, for: id) }
@@ -389,12 +397,21 @@ public final class AppSession {
     }
 
     public func signOut() async {
+        // Their playback ends first, while the token still works.
+        endUserPlayback()
+        await userPlaybackEnded?()
         _ = try? await client?.logout()
         signOutLocally()
     }
 
+    /// Ends the signed-in person's playback (onUserChange) as them: its requests go with their
+    /// token, though it changes before they're sent.
+    private func endUserPlayback() {
+        AuthMiddleware.$leaving.withValue(token) { onUserChange?() }
+    }
+
     private func signOutLocally() {
-        onUserChange?()
+        endUserPlayback()
         token = nil
         me = nil
         forgetImageKey()
@@ -403,7 +420,7 @@ public final class AppSession {
     }
 
     public func forgetServer() {
-        onUserChange?()
+        endUserPlayback()
         if let id = server?.id { ServerStore.forget(id) }
         server = nil
         reconnectServerID = nil

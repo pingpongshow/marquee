@@ -171,6 +171,8 @@ public final class MusicPlayer {
     @ObservationIgnored private var buildGeneration = 0
     /// Item status observations, so a track that fails to load is noticed.
     @ObservationIgnored private var itemObservers: [ObjectIdentifier: NSKeyValueObservation] = [:]
+    /// Sessions being ended on the server (their last report and stop), until they have been.
+    @ObservationIgnored private var ending: [UUID: Task<Void, Never>] = [:]
     /// The entry already retried after a failure (one retry, then on to the next track).
     @ObservationIgnored private var retriedEntry: Int?
     /// Watches a stall of the current item (waiting for data that may never come: a stream
@@ -228,6 +230,7 @@ public final class MusicPlayer {
         #endif
         // Signing out, switching profile or forgetting the server ends the music.
         app.onUserChange = { [weak self] in self?.stop() }
+        app.userPlaybackEnded = { [weak self] in await self?.sessionsEnded() }
     }
 
     /// The position, from the player twice a second. Installed again whenever the track
@@ -564,9 +567,20 @@ public final class MusicPlayer {
         guard let s = sessions.removeValue(forKey: ObjectIdentifier(item)), !s.session.isEmpty else { return }
         let pos = item === player.currentItem ? Int64(max(0, player.currentTime().seconds) * 1000) : 0
         let client = app.client
-        Task {
+        let key = UUID()
+        ending[key] = Task { [weak self] in
             _ = try? await client?.reportPlayback(path: .init(sessionId: s.session), body: .json(.init(positionMs: pos, state: .paused)))
             _ = try? await client?.stopPlayback(path: .init(sessionId: s.session))
+            self?.ending[key] = nil
+        }
+    }
+
+    /// Waits for the sessions being ended to reach the server, for a few seconds at most (an
+    /// unreachable server doesn't hold up signing out).
+    public func sessionsEnded(within limit: Duration = .seconds(3)) async {
+        let deadline = ContinuousClock.now + limit
+        while !ending.isEmpty, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(50))
         }
     }
 
