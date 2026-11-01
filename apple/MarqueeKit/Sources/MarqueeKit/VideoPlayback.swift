@@ -84,6 +84,8 @@ public final class VideoPlayback {
     /// Counts starts: one overtaken by a newer start (a quick second timing step, a skipped
     /// trailer) stops its own session instead of replacing the newer one's.
     @ObservationIgnored private var startGeneration = 0
+    /// The session already being replaced because the server no longer had it.
+    @ObservationIgnored private var renewing: String?
     /// Night mode switched in the player; kept for the rest of this player (nil = the
     /// person's preference, decided by the server).
     @ObservationIgnored private var chosenNightMode: Bool?
@@ -459,11 +461,28 @@ public final class VideoPlayback {
         lastReport = Date()
         let pos = Int64(max(0, player.currentTime().seconds) * 1000)
         return Task { [weak self] in
-            // A session running when the time runs out ends: its reports answer 403 time_limit.
-            guard case let .undocumented(code, payload)? = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: state))),
-                  let reached = await TimeLimitReached.from(statusCode: code, payload: payload),
-                  let self, self.session?.id == s.id else { return }
-            await self.reachedTimeLimit(reached)
+            let response = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: state)))
+            guard let self, self.session?.id == s.id else { return }
+            switch response {
+            case .notFound? where state == .playing:
+                await self.renew(s)
+            case let .undocumented(code, payload)?:
+                // A session running when the time runs out ends: its reports answer 403 time_limit.
+                guard let reached = await TimeLimitReached.from(statusCode: code, payload: payload) else { return }
+                await self.reachedTimeLimit(reached)
+            default:
+                break
+            }
         }
+    }
+
+    /// The server no longer has the session (left paused for hours, or the server restarted):
+    /// Play carries on from here with a new one, instead of stalling once the little the
+    /// player had buffered runs out (Back and Resume used to be the only way out).
+    private func renew(_ s: PlaybackSession) async {
+        guard !stopped, offline == nil, renewing != s.id else { return }
+        renewing = s.id
+        let pos = Int64(max(0, player.currentTime().seconds) * 1000)
+        await start(itemID: s.itemId, startMs: pos, audio: selection.audio, subtitle: selection.subtitle, fileID: fileID)
     }
 }

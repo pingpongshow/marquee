@@ -299,7 +299,9 @@ func (m *Manager) remoteUsage(excluding string) (kbps, count int) {
 	defer m.mu.Unlock()
 	for id, s := range m.sessions {
 		if s.Remote && id != excluding {
-			kbps += s.BitrateKbps()
+			if !s.isSuspended() { // a paused, suspended session sends nothing
+				kbps += s.BitrateKbps()
+			}
 			count++
 		}
 	}
@@ -838,6 +840,10 @@ func nullStr(s string) any {
 // preloadLimit is the longest a preloaded track waits for its turn.
 const preloadLimit = 2 * time.Hour
 
+// PausedIdle is how long a session its player reported paused is kept (without FFmpeg once
+// idle): a paused player sends nothing. Players start a new session when theirs is gone.
+const PausedIdle = 5 * time.Minute
+
 // Reap stops sessions that stopped reporting (closed tab, lost connection).
 //
 // A preloaded (gapless) session makes no requests while it waits, often longer than idle
@@ -857,8 +863,15 @@ func (m *Manager) Reap(ctx context.Context, idle time.Duration) {
 		if s.Preloading() && activeDevice[s.DeviceID] && quiet <= preloadLimit {
 			continue
 		}
-		// A film left paused keeps its session (and segments) for a while, without FFmpeg.
-		if s.External && quiet > idle && quiet <= ExternalIdle {
+		// A film on demand, or anything its player left paused, keeps its session (and
+		// segments) for a while, without FFmpeg: a paused player sends nothing.
+		keep := time.Duration(0)
+		if s.External {
+			keep = ExternalIdle
+		} else if s.Snapshot().State == "paused" {
+			keep = PausedIdle
+		}
+		if quiet > idle && quiet <= keep {
 			s.mu.Lock()
 			suspend := !s.suspended
 			s.suspended = true
