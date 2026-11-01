@@ -94,7 +94,9 @@ struct ArtworkView: View {
 enum ImageMemory {
     static let cache: NSCache<NSString, UIImage> = {
         let c = NSCache<NSString, UIImage>()
-        c.totalCostLimit = 96 << 20
+        // The TV draws posters at twice the size (a 250-point poster at 2x is 1.5 MB): Home alone
+        // holds about a hundred.
+        c.totalCostLimit = (isTV ? 256 : 96) << 20
         return c
     }()
 
@@ -306,6 +308,8 @@ final class WatchStore {
     /// A video was played: its watched state is the server's again (as is every show's and
     /// season's, which the next episodes may have changed).
     func played(_ id: Int64) {
+        // Untouched when there's nothing to forget: every poster on screen reads the marks.
+        guard marks[id] != nil || marks.values.contains(where: \.container) else { return }
         marks[id] = nil
         marks = marks.filter { !$0.value.container }
     }
@@ -622,6 +626,9 @@ struct ShelfRow<Content: View>: View {
             }
             #if os(tvOS)
             .scrollClipDisabled()
+            // Down from far along one row reaches a shorter row below (a few tiles at its left)
+            // instead of skipping it or not moving.
+            .focusSection()
             #endif
         }
     }

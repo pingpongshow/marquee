@@ -121,7 +121,6 @@ struct ItemDetailView: View {
             let d = try await app.item(id)
             detail = d
             error = nil
-            loadedID = id
             watchlisted = OfflineSync.shared.pendingWatchlist(id) ?? d.base.watchlisted ?? false
             let wantsRelated = [.movie, .show, .artist, .album].contains(d.type)
             // Everything else in parallel.
@@ -139,6 +138,9 @@ struct ItemDetailView: View {
             series = await found
             trailer = await trail
             vodSimilar = await onVod ?? []
+            // Only once it all arrived: a page left while loading (a cast member opened before
+            // the shelves came) loads them again on return instead of keeping them empty.
+            if !Task.isCancelled { loadedID = id }
         } catch is CancellationError {
         } catch {
             if detail == nil { self.error = error.localizedDescription }
@@ -187,7 +189,7 @@ struct ItemDetailView: View {
 
     @ViewBuilder private var backdrop: some View {
         if let art = detail?.base.images?.backdrop {
-            CachedImage(url: app.imageURL(art, width: backdropWidth)) { phase in
+            CachedImage(url: backdropURL(art)) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFill()
                         .frame(height: backdropHeight).clipped()
@@ -200,12 +202,14 @@ struct ItemDetailView: View {
         }
     }
 
-    /// The backdrop's requested width: about the screen's on a phone, not a 4K frame.
-    private var backdropWidth: Int {
+    /// The backdrop: about the screen's width on a phone. On the TV 1920 pixels, not points
+    /// times a 4K screen's scale: faded as it is, it looks the same and decodes to a quarter of
+    /// the memory (8 MB, not 33), which would otherwise push some 20 posters out of the cache.
+    private func backdropURL(_ art: Int64) -> URL? {
         #if os(tvOS)
-        1920
+        app.imageURL(art, pixels: 1920)
         #else
-        compact ? 800 : 1280
+        app.imageURL(art, width: compact ? 800 : 1280)
         #endif
     }
 
@@ -671,12 +675,13 @@ struct ItemDetailView: View {
                     ForEach(children, id: \.id) { PosterCard(item: $0) }
                 }
             case .season:
-                VStack(alignment: .leading, spacing: 4) {
+                // Lazy: a long season (anime, a daily show) builds and fetches only the rows on screen.
+                LazyVStack(alignment: .leading, spacing: 4) {
                     Text("Episodes").font(.title3.bold()).padding(.horizontal, sidePadding)
                     ForEach(children, id: \.id) { ep in EpisodeRow(episode: ep) }
                 }
             case .album:
-                VStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     Text("Tracks").font(.title3.bold()).padding(.horizontal, sidePadding).padding(.bottom, 6)
                     ForEach(children, id: \.id) { t in
                         TrackRow(track: t, album: d.base, onMove: moveAction) {

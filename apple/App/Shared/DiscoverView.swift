@@ -10,6 +10,9 @@ struct DiscoverView: View {
     @State private var items: [DiscoverItem] = []
     @State private var error: String?
     @State private var picked: DiscoverItem?
+    /// A request was made from the sheet: the list loads again when it closes (otherwise it
+    /// stays as it was, with its later pages, scroll position and focus).
+    @State private var requested = false
     /// The same title on demand, opened from a title's sheet (Watch now on VOD).
     @State private var vodOpen: VodRef?
     @State private var browse = DiscoverBrowse()
@@ -29,7 +32,11 @@ struct DiscoverView: View {
                 filters = try? await app.discoverFilters()
             }
             .task(id: "\(category.rawValue)|\(query)|\(browse.hashValue)") { await load() }
-            .sheet(item: $picked, onDismiss: { Task { await load() } }) { RequestSheet(item: $0, onWatchVod: { vodOpen = $0 }) }
+            .sheet(item: $picked, onDismiss: {
+                guard requested else { return }
+                requested = false
+                Task { await load() }
+            }) { RequestSheet(item: $0, onWatchVod: { vodOpen = $0 }, onRequested: { requested = true }) }
             .navigationDestination(item: $vodOpen) { ref in
                 if ref.kind == .movie { VodMovieView(id: ref.id) } else { VodSeriesView(id: ref.id) }
             }
@@ -301,6 +308,8 @@ struct RequestSheet: View {
     let item: DiscoverItem
     /// Opens the same title on demand (the sheet closes first).
     var onWatchVod: ((VodRef) -> Void)?
+    /// After a request went through.
+    var onRequested: (() -> Void)?
     @State private var show: RequestableShow?
     @State private var ratings: TitleRatings?
     @State private var seasons: Set<Int> = []
@@ -425,6 +434,7 @@ struct RequestSheet: View {
             do {
                 _ = try await app.request(item, seasons: item.mediaType == .tv ? seasons.sorted() : [])
                 done = true
+                onRequested?()
                 try? await Task.sleep(for: .seconds(1))
                 dismiss()
             } catch {

@@ -43,9 +43,9 @@ struct PlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let p = playback {
-                // On the TV the player's transport bar keeps focus: it goes while Up Next is up,
-                // so the remote reaches the Up Next cards.
-                if !(isTV && upNext != nil) {
+                // On the TV the player's transport bar keeps focus: it goes while Up Next or the
+                // time limit is up, so the remote reaches their buttons.
+                if !(isTV && (upNext != nil || p.timeLimitReason != nil)) {
                     PlayerController(playback: p, together: together, onNext: playNext,
                                      trailer: trailerIndex == nil ? nil : TrailerActions(skip: nextTrailer, skipAll: skipTrailers),
                                      chrome: chromeModel)
@@ -89,7 +89,7 @@ struct PlayerView: View {
                 return
             }
             #endif
-            let reel = await cinemaReel()
+            let reel = await cinemaReel(p)
             if !reel.isEmpty {
                 trailers = reel
                 trailerIndex = 0
@@ -259,17 +259,20 @@ struct PlayerView: View {
 
     /// Trailers and the pre-roll to play first: only for a movie started from the beginning,
     /// not when joining a group or casting.
-    private func cinemaReel() async -> [Item] {
+    /// The server sends none for anything but a movie. The item and its trailers are asked for
+    /// together, and the player keeps the item, so starting the stream doesn't wait for it again.
+    private func cinemaReel(_ p: VideoPlayback) async -> [Item] {
         guard request.groupID == nil else { return [] }
         #if os(iOS)
         if CastController.shared.device != nil { return [] }
         #endif
-        var fromStart = request.startMs == 0
-        if request.startMs == nil, let d = try? await app.item(request.itemID) {
-            fromStart = d.type == .movie && (d.base.viewOffsetMs ?? 0) == 0
-        }
-        guard fromStart else { return [] }
-        return await app.prerolls(request.itemID)
+        let id = request.itemID
+        guard request.startMs == nil else { return request.startMs == 0 ? await app.prerolls(id) : [] }
+        async let detail = try? app.item(id)
+        async let reel = app.prerolls(id)
+        guard let d = await detail else { return [] }
+        p.use(d)
+        return (d.base.viewOffsetMs ?? 0) == 0 ? await reel : []
     }
 
     /// The movie itself (after any trailers), with the tracks chosen on its page.

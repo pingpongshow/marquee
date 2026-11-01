@@ -20,6 +20,8 @@ struct HomeView: View {
     @State private var editing = false
     /// A film or episode on demand playing from Continue Watching.
     @State private var vodPlaying: VodPlayTarget?
+    /// Counts loads, so an older one finishing late doesn't put back rows a newer one changed.
+    @State private var loads = 0
 
     var body: some View {
         ScrollView {
@@ -141,9 +143,14 @@ struct HomeView: View {
         .onChange(of: OfflineSync.shared.generation) { Task { await load() } }
         .task {
             // Watch-together groups to join, refreshed while Home is open.
+            // Not while a video plays over Home. Set only when they changed: setting them redraws
+            // every row.
             while !Task.isCancelled {
-                let me = app.me?.id
-                groups = ((try? await app.watchGroups()) ?? []).filter { !$0.members.contains { $0.userId == me } }
+                if video.request == nil {
+                    let me = app.me?.id
+                    let fresh = ((try? await app.watchGroups()) ?? []).filter { !$0.members.contains { $0.userId == me } }
+                    if fresh != groups { groups = fresh }
+                }
                 try? await Task.sleep(for: .seconds(15))
             }
         }
@@ -249,17 +256,28 @@ struct HomeView: View {
 
     private func load() async {
         loadedVersion = HomeChanges.shared.version
+        loads += 1
+        let load = loads
         do {
-            hubs = try await app.hubs(vod: true, mixed: true).filter {
+            let fresh = try await app.hubs(vod: true, mixed: true).filter {
                 !Self.isEmptyContinue($0) && !($0.id == Self.vodRow && ($0.vodEntries ?? []).isEmpty)
                     && !($0.mixedEntries?.isEmpty == true && $0.items.isEmpty)
             }
+            guard load == loads else { return }
+            hubs = fresh
             error = nil
             #if os(tvOS)
             if let lists = try? await app.playlists(kind: .video) { videoPlaylists = lists }
             saveTopShelf()
             #endif
         } catch {
+            // Called off (Home left while it loaded): it loads again when it's back, rather than
+            // showing "cancelled".
+            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
+                if load == loads { loadedVersion = -1 }
+                return
+            }
+            guard load == loads else { return }
             self.error = error.localizedDescription
         }
         loaded = true

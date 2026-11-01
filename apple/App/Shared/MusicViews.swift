@@ -284,22 +284,39 @@ struct StarPicker: View {
     }
 }
 
+/// Follows the music's time for LyricsView, passing on the line being sung when it changes:
+/// only this empty view redraws as the time ticks.
+private struct ActiveLyricLine: View {
+    @Environment(MusicPlayer.self) private var music
+    let lyrics: Lyrics
+    @Binding var active: Int?
+
+    var body: some View {
+        let now = lyrics.activeLine(at: music.time)
+        Color.clear
+            .onChange(of: now, initial: true) { active = now }
+    }
+}
+
 /// Lyrics for the playing track; synced lyrics follow the music.
 struct LyricsView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     let itemID: Int64
     @State private var lyrics: Lyrics?
+    @State private var lines: [LyricLineView] = []
+    /// The line being sung; set by ActiveLyricLine only when it changes, so the lines aren't
+    /// rebuilt each time the music's time ticks.
+    @State private var active: Int?
     @State private var loaded = false
 
     var body: some View {
         Group {
             if let lyrics, !lyrics.lines.isEmpty {
-                let active = lyrics.activeLine(at: music.time)
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: lineSpacing) {
-                            ForEach(lyrics.parsedLines) { l in
+                            ForEach(lines) { l in
                                 Text(l.text.isEmpty ? "♪" : l.text)
                                     .font(lineFont)
                                     .foregroundStyle(!lyrics.synced || l.id == active ? Color.primary : Color.secondary.opacity(0.6))
@@ -318,6 +335,7 @@ struct LyricsView: View {
                         withAnimation(.easeInOut(duration: 0.4)) { proxy.scrollTo(active, anchor: .center) }
                     }
                 }
+                .background { ActiveLyricLine(lyrics: lyrics, active: $active) }
             } else if loaded {
                 ContentUnavailableView("No lyrics", systemImage: "quote.bubble", description: Text("This track has no lyrics in its file or a .lrc file next to it."))
             } else {
@@ -327,7 +345,10 @@ struct LyricsView: View {
         .task(id: itemID) {
             loaded = false
             lyrics = nil // the last track's lyrics don't linger
+            lines = []
+            active = nil
             lyrics = try? await app.lyrics(itemID)
+            lines = lyrics?.parsedLines ?? []
             loaded = true
         }
     }

@@ -932,7 +932,8 @@ struct VodPlayerView: View {
     @State private var plays = 0
     /// nil: from the viewer's resume point.
     @State private var startMs: Int64?
-    @State private var player = AVPlayer()
+    @State private var box = PlayerBox()
+    private var player: AVPlayer { box.player }
     @State private var session: String?
     /// Where the session started, until the player gets there (nil: there, or from the beginning).
     @State private var target: Int64?
@@ -966,9 +967,9 @@ struct VodPlayerView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            // On the TV the player's transport bar keeps focus: it goes while Up Next is up,
-            // so the remote reaches the Up Next cards.
-            if !(isTV && upNext != nil) {
+            // On the TV the player's transport bar keeps focus: it goes while Up Next or the
+            // time limit is up, so the remote reaches their buttons.
+            if !(isTV && (upNext != nil || timeLimit != nil)) {
                 VodPlayerController(player: player, chrome: chromeModel)
                     .ignoresSafeArea()
                     .accessibilityIdentifier("vod.player")
@@ -1037,10 +1038,13 @@ struct VodPlayerView: View {
         next = nil
         do {
             let s: (id: String, url: URL, startMs: Int64)
+            // In tasks of their own, so closing doesn't call off the request: the session it
+            // starts is known, and stopped below.
+            let resumeAt = startMs
             switch current {
-            case .movie(let m): s = try await app.playVod(m.id, startMs: startMs)
+            case .movie(let m): s = try await Task { try await app.playVod(m.id, startMs: resumeAt) }.value
             case .episode(let e):
-                s = try await app.playVodEpisode(e.id, startMs: startMs)
+                s = try await Task { try await app.playVodEpisode(e.id, startMs: resumeAt) }.value
                 Task { next = try? await app.vodNextEpisode(e.id) }
             }
             if Task.isCancelled || closing { await app.stopVod(s.id); return }

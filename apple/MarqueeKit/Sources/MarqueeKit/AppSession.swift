@@ -297,7 +297,7 @@ public final class AppSession {
         guard server?.id == record.id, let current = token, current == sentToken else { return }
         switch response {
         case .ok(let ok):
-            if let user = try? ok.body.json { me = user }
+            if let user = try? ok.body.json { update(me: user) }
             state = .signedIn
             // Back in touch: send what was changed while offline (USER-18).
             Task { await OfflineSync.shared.flush() }
@@ -426,7 +426,16 @@ public final class AppSession {
         guard let me = try? await client?.getMe().ok.body.json else { return }
         // Signed out, or another person signed in, while it was asked: the answer is stale.
         guard sentToken != nil, token == sentToken else { return }
-        self.me = me
+        update(me: me)
+    }
+
+    /// Takes a fresh /me unless only its last-seen time moved: the app's pages and every poster
+    /// read who's signed in, and would all redraw for nothing each time the app came back.
+    private func update(me fresh: User) {
+        var a = fresh, b = me
+        a.lastSeenAt = nil
+        b?.lastSeenAt = nil
+        if a != b { me = fresh }
     }
 
     /// Fetches /system/info again: the admin may have changed a switch it carries, such as
@@ -440,8 +449,8 @@ public final class AppSession {
 
     /// How image, person photo and avatar URLs authenticate: the image key from /me (D85),
     /// which grants those images and nothing else, or the token until the key is known.
+    /// The stored key, which `me` keeps up to date, so artwork doesn't depend on the rest of `me`.
     private var imageAuth: URLQueryItem {
-        if let key = me?.imageKey, !key.isEmpty { return .init(name: "key", value: key) }
         if let imageKey { return .init(name: "key", value: imageKey) }
         return .init(name: "token", value: token)
     }
@@ -478,7 +487,7 @@ public final class AppSession {
 
     /// Whether image URLs authenticate with the image key (true) or still with the bearer
     /// token (false: /me hasn't answered yet). Token URLs shouldn't go into a disk cache.
-    public var imageURLsUseKey: Bool { !(me?.imageKey ?? "").isEmpty || imageKey != nil }
+    public var imageURLsUseKey: Bool { imageKey != nil }
 
     public func personPhotoURL(_ personID: Int64, width: Int) -> URL? {
         guard let baseURL else { return nil }

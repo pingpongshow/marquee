@@ -275,8 +275,10 @@ public final class Downloads {
         session.getAllTasks { tasks in
             for t in tasks where t.taskDescription == String(itemID) { t.cancel() }
         }
-        for name in [e.file, e.poster].compactMap({ $0 }) {
-            try? FileManager.default.removeItem(at: Self.directory.appending(path: name))
+        // Off the main thread: a film is gigabytes, and deleting it held up the app.
+        let files = [e.file, e.poster].compactMap { $0 }.map { Self.directory.appending(path: $0) }
+        Self.io.async {
+            for f in files { try? FileManager.default.removeItem(at: f) }
         }
         deleteResume(itemID)
         if let job = e.jobID, let client = app?.client {
@@ -532,6 +534,9 @@ public final class Downloads {
 private final class SessionBridge: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     weak var owner: Downloads?
     var completion: (() -> Void)?
+    /// When each download last passed on its progress. Only touched on the session's own
+    /// (serial) delegate queue.
+    private var lastSent: [Int64: Date] = [:]
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         guard let id = downloadTask.taskDescription.flatMap(Int64.init) else { return }
@@ -551,6 +556,11 @@ private final class SessionBridge: NSObject, URLSessionDownloadDelegate, @unchec
                     totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         guard let id = downloadTask.taskDescription.flatMap(Int64.init), totalBytesExpectedToWrite > 0 else { return }
         let f = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        // At most four times a second: on a fast network this is called hundreds of times a
+        // second, and each call was a trip to the main thread.
+        let now = Date()
+        if f < 1, let last = lastSent[id], now.timeIntervalSince(last) < 0.25 { return }
+        lastSent[id] = f < 1 ? now : nil
         Task { @MainActor in self.owner?.progressed(itemID: id, fraction: f) }
     }
 

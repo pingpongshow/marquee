@@ -62,6 +62,9 @@ struct LibraryGrid: View {
     @State private var error: String?
     /// Each item's place in the grid (for paging) and the duplicate check.
     @State private var positions: [Int64: Int] = [:]
+    /// How many the server has sent: the next page's offset. Items it sent twice (ties while
+    /// the library changes) are dropped from `items`, so its count would ask for overlapping pages.
+    @State private var fetched = 0
     /// Bumped by every reload, so a page that arrives for an older sort is dropped.
     @State private var generation = 0
     /// The Random sort's shuffle, new on each reload, so every page continues the same one.
@@ -193,7 +196,7 @@ struct LibraryGrid: View {
     private func reloadIfChanged() async {
         if loadedKey == queryKey {
             // Back from an item: carry on with a page that was cut short, if any.
-            if items.count < total || items.isEmpty { await loadMore() }
+            if fetched < total || items.isEmpty { await loadMore() }
             return
         }
         loadedKey = queryKey
@@ -206,19 +209,20 @@ struct LibraryGrid: View {
         loading = false // a load for the old sort may still be running; it's dropped
         items = []
         positions = [:]
+        fetched = 0
         total = 0
         await loadMore()
     }
 
     private func loadMore() async {
-        guard !loading, items.isEmpty || items.count < total else { return }
+        guard !loading, items.isEmpty || fetched < total else { return }
         let gen = generation
         loading = true
         defer { if gen == generation { loading = false } }
         do {
             // Collections have no favourites or ratings of their own: their sorts fall back.
             let sort: ItemSort = showCollections && (self.sort == ._hyphen_favorited || self.sort == ._hyphen_myRating) ? .title : self.sort
-            let page = try await app.items(library: libraryID, sort: sort, offset: items.count, limit: Self.page,
+            let page = try await app.items(library: libraryID, sort: sort, offset: fetched, limit: Self.page,
                                            watch: unwatchedOnly && !showCollections ? .unwatched : nil,
                                            genre: showCollections ? nil : genre, type: showCollections ? .collection : type,
                                            decade: showCollections ? nil : decade, minMyRating: ratedOnly && !showCollections ? 8 : nil,
@@ -230,8 +234,11 @@ struct LibraryGrid: View {
                 fresh.append(item)
             }
             items += fresh
+            fetched += page.items.count
             total = page.total
             error = nil
+            // A page of nothing new adds no tile to trigger the next one: ask for it now.
+            if fresh.isEmpty, !page.items.isEmpty, fetched < total { Task { await loadMore() } }
         } catch {
             // Cancelled (the sort changed) or overtaken by a newer load: not an error.
             if gen == generation, !Task.isCancelled { self.error = error.localizedDescription }

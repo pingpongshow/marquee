@@ -81,6 +81,9 @@ public final class VideoPlayback {
     /// server's remembered ones).
     @ObservationIgnored private var chosenOffsets: (subtitle: Int, audio: Int)?
     @ObservationIgnored private var offsetRestart: Task<Void, Never>?
+    /// Counts starts: one overtaken by a newer start (a quick second timing step, a skipped
+    /// trailer) stops its own session instead of replacing the newer one's.
+    @ObservationIgnored private var startGeneration = 0
     /// Night mode switched in the player; kept for the rest of this player (nil = the
     /// person's preference, decided by the server).
     @ObservationIgnored private var chosenNightMode: Bool?
@@ -136,12 +139,20 @@ public final class VideoPlayback {
         return kbps
     }
 
+    /// The item's details when the player already has them (it checked for trailers), so
+    /// starting it doesn't ask the server again.
+    public func use(_ detail: ItemDetail) {
+        if item == nil { item = detail }
+    }
+
     /// Starts playback of an item. `startMs` nil resumes where the user left off.
     public func start(itemID: Int64, startMs: Int64? = nil, audio: Int64? = nil, subtitle: Int64? = nil, fileID: Int64? = nil) async {
         errorMessage = nil
         finished = false
         setNearEnd(false)
         guard !stopped, let client = app.client else { return }
+        startGeneration += 1
+        let generation = startGeneration
         if fallbackItemID != itemID {
             fallback = 0
             fallbackItemID = itemID
@@ -168,8 +179,10 @@ public final class VideoPlayback {
                 return
             }
             let s = try response.ok.body.json
-            await stopSession()
-            if stopped {
+            // Checked before and after ending the old session: an overtaken start leaves the
+            // newer one's session alone and ends its own.
+            if generation == startGeneration { await stopSession() }
+            if stopped || generation != startGeneration {
                 _ = try? await client.stopPlayback(path: .init(sessionId: s.id))
                 return
             }
@@ -185,10 +198,13 @@ public final class VideoPlayback {
             player.replaceCurrentItem(with: playerItem)
             if s.startMs > 0 { await player.seek(to: CMTime(seconds: Double(s.startMs) / 1000, preferredTimescale: 600)) }
             // stop() ran during the seek: it has already let go of the item and ended the session.
-            guard !stopped else { return }
+            // A newer start has replaced the item and the session.
+            guard !stopped, generation == startGeneration else { return }
             player.play()
             loadNext(itemID)
         } catch {
+            // Overtaken or called off (a newer timing step cancelled this one): not a failure.
+            guard generation == startGeneration, !Task.isCancelled, (error as? URLError)?.code != .cancelled else { return }
             errorMessage = (error as? MarqueeError)?.message ?? "Couldn't start playback: \(error.localizedDescription)"
         }
     }

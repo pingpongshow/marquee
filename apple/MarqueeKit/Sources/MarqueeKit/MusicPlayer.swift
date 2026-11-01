@@ -65,7 +65,14 @@ public final class MusicPlayer {
         case endOfTrack
     }
 
-    public private(set) var queue = PlayQueue()
+    public private(set) var queue = PlayQueue() {
+        didSet {
+            // Kept apart from the queue, so what shows only the track playing (the Apple TV's
+            // sidebar, the bars along the bottom) redraws when it changes, not at every top-up.
+            let c = queue.current
+            if c != current || c?.dj != current?.dj { current = c }
+        }
+    }
     public private(set) var source: Source?
     /// Sleep timer: pause at a time or when the current track ends.
     public var sleep: Sleep? { didSet { scheduleSleep() } }
@@ -105,7 +112,7 @@ public final class MusicPlayer {
     public private(set) var playing = false
     public private(set) var time: Double = 0
     public private(set) var duration: Double = 0
-    public var current: PlayQueue.Entry? { queue.current }
+    public private(set) var current: PlayQueue.Entry?
     /// A short message when a track couldn't play (shown in Now Playing for a few seconds).
     public private(set) var error: String?
     @ObservationIgnored private var errorTask: Task<Void, Never>?
@@ -717,13 +724,15 @@ public final class MusicPlayer {
                 preloadRetryAt = Date().addingTimeInterval(min(60, 2 * pow(2, Double(min(preloadFailures, 6) - 1))))
                 return
             }
-            // The queue changed while it loaded (play next, shuffle, a move or a removal): this
-            // track no longer follows, so drop it and preload the one that does.
+            // The queue changed while it loaded (play next, shuffle, a move or a removal), or the
+            // current track was loaded again (a retry): this one no longer fits, so drop it and
+            // preload what follows now. (A rebuild's own preload of the same track waited for
+            // this one, so nothing else would queue it and the next track started with a gap.)
             let fi = queue.followingIndex
             guard remote == nil, player.currentItem === cur, player.items().count == 1,
                   queue.entries.indices.contains(fi), queue.entries[fi].id == want.id else {
                 endSession(for: item)
-                if remote == nil, player.currentItem === cur { refreshFollowing() }
+                if remote == nil, player.currentItem != nil { refreshFollowing() }
                 return
             }
             // (Failures are counted until the track starts, so one that keeps failing backs off.)

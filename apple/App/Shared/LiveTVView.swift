@@ -2,6 +2,13 @@ import AVKit
 import MarqueeKit
 import SwiftUI
 
+/// The player of a video view, made the first time it's used: `@State var player = AVPlayer()`
+/// made a new one (and threw it away) every time the view was rebuilt, as Live TV's is each
+/// minute its channels refresh.
+final class PlayerBox {
+    lazy var player = AVPlayer()
+}
+
 /// Live TV (LIVE-2): a Guide and What's On, a live preview on iPhone/iPad, and
 /// full-screen watching (swipe to change channel; channel up/down on Apple TV). Movies on demand (VOD) have their own page.
 struct LiveTVView: View {
@@ -284,7 +291,10 @@ struct LiveTVView: View {
     private func refreshChannels() async {
         guard enabled == true else { return }
         let group = ["all", "favorites", "recent", "hidden"].contains(filter) ? nil : filter
-        if let list = try? await app.liveChannels(group: group, favorites: filter == "favorites", recent: filter == "recent", hidden: filter == "hidden") {
+        // Only when something changed: setting the list rebuilds the whole guide (and the
+        // player's channel list), under the focus.
+        if let list = try? await app.liveChannels(group: group, favorites: filter == "favorites", recent: filter == "recent", hidden: filter == "hidden"),
+           list != channels {
             channels = list
         }
     }
@@ -473,7 +483,8 @@ struct LivePreview: View {
     @Environment(MusicPlayer.self) private var music
     let channel: LiveChannel
     let onExpand: () -> Void
-    @State private var player = AVPlayer()
+    @State private var box = PlayerBox()
+    private var player: AVPlayer { box.player }
     @State private var session: String?
     @State private var muted = true
     @State private var error: String?
@@ -519,7 +530,10 @@ struct LivePreview: View {
         var retried = false
         while !Task.isCancelled {
             do {
-                let s = try await app.playLive(channel.id)
+                // In a task of its own, so moving on doesn't call off the request: the session
+                // it starts is known, and stopped below (else it held a tuner until it timed out).
+                let id = channel.id
+                let s = try await Task { try await app.playLive(id) }.value
                 // Moved on (another channel, or the preview went away) while tuning: let it go.
                 if Task.isCancelled { await app.stopLive(s.id); return }
                 session = s.id
@@ -554,7 +568,8 @@ struct LiveWatchView: View {
     @Environment(\.dismiss) private var dismiss
     let channels: [LiveChannel]
     @State private var current: Int64
-    @State private var player = AVPlayer()
+    @State private var box = PlayerBox()
+    private var player: AVPlayer { box.player }
     @State private var session: String?
     @State private var error: String?
     /// The time limit refused the channel (kids' profiles): shown full screen.
@@ -601,10 +616,13 @@ struct LiveWatchView: View {
                 .accessibilityValue(channel?.name ?? "")
                 .accessibilityIdentifier("liveWatch.player")
             #else
-            VideoPlayer(player: player).ignoresSafeArea()
-                .accessibilityLabel("Live TV")
-                .accessibilityValue(channel?.name ?? "")
-                .accessibilityIdentifier("liveWatch.player")
+            // Gone while the time limit is up: its transport bar kept the focus from Close.
+            if timeLimit == nil {
+                VideoPlayer(player: player).ignoresSafeArea()
+                    .accessibilityLabel("Live TV")
+                    .accessibilityValue(channel?.name ?? "")
+                    .accessibilityIdentifier("liveWatch.player")
+            }
             #endif
             #if os(iOS)
             header
@@ -748,7 +766,11 @@ struct LiveWatchView: View {
         var retried = false
         while !Task.isCancelled {
             do {
-                let s = try await app.playLive(current)
+                // In a task of its own, so changing channel doesn't call off the request: the
+                // session it starts is known, and stopped below (else it held a tuner until it
+                // timed out, and quick channel changes ran out of connections).
+                let id = current
+                let s = try await Task { try await app.playLive(id) }.value
                 // Changed channel or closed while tuning: stop the session that just started.
                 if Task.isCancelled { await app.stopLive(s.id); return }
                 session = s.id

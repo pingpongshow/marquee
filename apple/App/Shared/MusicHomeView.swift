@@ -671,7 +671,8 @@ struct MusicFavoritesView: View {
     }
 
     private func tracks(_ list: [Item]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        // Lazy: up to 500 favourites, each with artwork; only the rows on screen are built.
+        LazyVStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 Button { music.play(list, source: "Favourites") } label: { Label("Play", systemImage: "play.fill") }
                     .buttonStyle(.borderedProminent)
