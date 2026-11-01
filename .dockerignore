@@ -6,6 +6,7 @@ server/internal/web/dist/index.html
 docs
 apple
 android
+screenshots
 **/.DS_Store
 .e2e
 deploy/config

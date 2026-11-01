@@ -19,6 +19,8 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - **Live TV, DVR and on-demand films and shows** from any M3U/XMLTV source or Dispatcharr, with commercials cut from recordings and films on demand saved straight into your library.
 - **A household, not just a login:** profiles with optional PINs, kids' profiles with limits, per-person progress, ratings and recommendations.
 
+![Marquee's Home page in the web app](screenshots/web-home.jpg)
+
 ---
 
 > **New here?** The **[Marquee guide](guide/README.md)** walks through installing, setting up and every setting, including Dispatcharr, Live TV and VOD.
@@ -28,6 +30,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - [The guide](guide/README.md)
 - [Features](#features)
 - [Apps](#apps)
+- [Screenshots](#screenshots)
 - [Requirements](#requirements)
 - [Install the server](#install-the-server)
 - [Organising your media](#organising-your-media)
@@ -101,6 +104,38 @@ Marquee organises the films, shows, music and recordings already on your disks a
 | **Apple TV** | Top Shelf, Quick Connect sign-in, remote-controllable. |
 | **Android phone and tablet** | Downloads, Android Auto, Chromecast. |
 | **Android TV** | A D-pad interface with the same features as phones, remote-controllable. |
+
+## Screenshots
+
+The screenshots show a demo library of made-up titles with generated artwork.
+
+### Web
+
+| | |
+|---|---|
+| ![A title page in the web app](screenshots/web-title.jpg) | ![The Movies library in the web app](screenshots/web-movies.jpg) |
+| ![Music in the web app](screenshots/web-music.jpg) | ![The Live TV guide in the web app](screenshots/web-live-tv.jpg) |
+
+### iPhone and iPad
+
+| | | | |
+|---|---|---|---|
+| ![Home on iPhone](screenshots/iphone-home.jpg) | ![A title page on iPhone](screenshots/iphone-title.jpg) | ![An album on iPhone](screenshots/iphone-album.jpg) | ![Now Playing on iPhone](screenshots/iphone-now-playing.jpg) |
+
+![Home on iPad](screenshots/ipad-home.jpg)
+
+### Apple TV
+
+| | |
+|---|---|
+| ![Home on Apple TV](screenshots/tv-home.jpg) | ![The Apple TV sidebar](screenshots/tv-sidebar.jpg) |
+| ![A title page on Apple TV](screenshots/tv-title.jpg) | ![The Live TV guide on Apple TV](screenshots/tv-live-tv.jpg) |
+
+### Android
+
+| | | |
+|---|---|---|
+| ![Home on Android](screenshots/android-home.jpg) | ![A title page on Android](screenshots/android-title.jpg) | ![Music on Android](screenshots/android-music.jpg) |
 
 ## Requirements
 
@@ -377,6 +412,7 @@ The API is defined in [`api/openapi.yaml`](api/openapi.yaml); the server stubs a
 | `deploy/` | Dockerfile, compose files and example settings |
 | `guide/` | The user guide: install, setup and every setting |
 | `scripts/` | Development helpers: end-to-end test setup, fake IPTV and Bazarr servers |
+| `screenshots/` | The screenshots in this README (a demo library of made-up titles) |
 
 ## Contributing
 
