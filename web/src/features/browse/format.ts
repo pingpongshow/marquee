@@ -43,9 +43,12 @@ export function subtitleFor(item: ItemSummary) {
 
 const langNames: Record<string, string> = {
   eng: "English", spa: "Spanish", fre: "French", fra: "French", ger: "German", deu: "German", ita: "Italian", jpn: "Japanese",
-  kor: "Korean", chi: "Chinese", zho: "Chinese", por: "Portuguese", rus: "Russian", dut: "Dutch", swe: "Swedish",
+  kor: "Korean", chi: "Chinese", zho: "Chinese", por: "Portuguese", rus: "Russian", dut: "Dutch", nld: "Dutch", swe: "Swedish",
+  dan: "Danish", nor: "Norwegian", nob: "Norwegian", fin: "Finnish", pol: "Polish", cze: "Czech", ces: "Czech", hun: "Hungarian",
+  gre: "Greek", ell: "Greek", tur: "Turkish", ara: "Arabic", heb: "Hebrew", hin: "Hindi", tha: "Thai", vie: "Vietnamese",
+  ind: "Indonesian", may: "Malay", msa: "Malay", ukr: "Ukrainian", rum: "Romanian", ron: "Romanian", ice: "Icelandic", isl: "Icelandic",
 };
-export const languageName = (code?: string) => (code ? (langNames[code] ?? code.toUpperCase()) : "Unknown");
+export const languageName = (code?: string) => (code && code !== "und" ? (langNames[code] ?? code.toUpperCase()) : "Unknown");
 
 /** Names a version for pickers: its edition label, else resolution, HDR and codec (LIB-7). */
 export function versionLabel(v: { label?: string; files: { height?: number; width?: number; hdrFormat?: string; videoCodec?: string }[] }) {
@@ -78,6 +81,41 @@ export function channelsLabel(n?: number) {
   if (!n) return "";
   if (n === 1) return "Mono";
   return n >= 6 ? `${n - 1}.1` : `${n}.0`;
+}
+
+const audioCodecs: Record<string, string> = {
+  truehd: "Dolby TrueHD", eac3: "Dolby Digital Plus", ac3: "Dolby Digital", aac: "AAC", flac: "FLAC", opus: "Opus",
+  mp3: "MP3", mp2: "MP2", vorbis: "Vorbis", alac: "ALAC",
+};
+
+/** An audio codec's everyday name: "Dolby TrueHD Atmos", "DTS-HD MA", "PCM". */
+export function audioCodecName(codec: string, profile?: string) {
+  if (codec === "dts") return profile?.includes("MA") ? "DTS-HD MA" : profile?.includes("HD") ? "DTS-HD" : profile?.includes("X") ? "DTS:X" : "DTS";
+  if (codec.startsWith("pcm_")) return "PCM";
+  const name = audioCodecs[codec] ?? codec.toUpperCase();
+  return profile?.includes("Atmos") ? `${name} Atmos` : name;
+}
+
+// Track titles worth showing: what the track is, not the release group or its format again.
+const usefulTrackTitle = /commentary|descripti|narrat|isolated|score|brazil|latin|castil|european|canad|quebec|mandarin|cantonese/i;
+
+/** An audio track on a title's page: "English · Dolby TrueHD 7.1 · Commentary". */
+export function audioTrackLabel(s: { language?: string; codec: string; profile?: string; channels?: number; title?: string }) {
+  const codec = [audioCodecName(s.codec, s.profile), s.channels === 2 ? "Stereo" : channelsLabel(s.channels)].filter(Boolean).join(" ");
+  const title = s.title?.trim();
+  return [languageName(s.language), codec, title && usefulTrackTitle.test(title) ? title : ""].filter(Boolean).join(" · ");
+}
+
+/** A title's subtitles by language, each once: "English", "English (SDH)", "French (Forced)". */
+export function subtitleLanguages(streams: { kind: string; language?: string; forced: boolean; hearingImpaired: boolean }[]) {
+  const out: string[] = [];
+  for (const s of streams) {
+    if (s.kind !== "subtitle") continue;
+    const flags = [s.forced ? "Forced" : "", s.hearingImpaired ? "SDH" : ""].filter(Boolean).join(", ");
+    const label = languageName(s.language) + (flags ? ` (${flags})` : "");
+    if (!out.includes(label)) out.push(label);
+  }
+  return out;
 }
 
 /** Splits a server path into its file name and folder. */

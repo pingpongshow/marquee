@@ -150,6 +150,21 @@ class MarqueeUiTest {
         rule.waitUntil(20_000) { scrollTo(hasText(name, substring = true)) }
     }
 
+    /** A movie's page lists its audio tracks and subtitles (both versions of 00 Preview Test have
+     *  one untagged mono AAC track and no subtitles: listed once, and "None"). */
+    @Test fun titlePageListsTracks() {
+        connectAndSignIn()
+        openLibrary("Movies")
+        rule.waitText("00 Preview Test")
+        tap("00 Preview Test")
+        val tracks = hasTestTag("trackList")
+        rule.waitUntil(15_000) { scrollTo(tracks) }
+        rule.onNode(tracks).assertIsDisplayed()
+        rule.onNode(tracks and hasText("Unknown · AAC Mono", substring = true)).assertExists()
+        rule.onNode(tracks and hasText("None", substring = true)).assertExists()
+        shot("tracks-title-page")
+    }
+
     @Test fun browseAndPlay() {
         connectAndSignIn()
         openLibrary("Movies")

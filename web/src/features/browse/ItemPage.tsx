@@ -20,7 +20,7 @@ import { PlayButtons } from "./PlayButtons";
 import { AlsoOnVod } from "../livetv/VodSuggestions";
 import { isWatched } from "./watched";
 import { Poster } from "./Poster";
-import { formatBytes, formatDuration, formatTrackTime, languageName, subtitleFor } from "./format";
+import { audioTrackLabel, formatBytes, formatDuration, formatTrackTime, languageName, subtitleFor, subtitleLanguages } from "./format";
 import { audioQualityLabel, audioQualityShort, useShowAudioQuality } from "../player/audioQuality";
 
 function Breadcrumbs({ item }: { item: ItemDetail }) {
@@ -114,6 +114,22 @@ function MediaInfo({ item, isAdmin }: { item: ItemDetail; isAdmin: boolean }) {
         ))}
       </div>
     </details>
+  );
+}
+
+/** The audio tracks and subtitles a video has, on its page (all versions, each once). */
+function Tracks({ item }: { item: ItemDetail }) {
+  const streams = item.versions.flatMap((v) => v.files[0]?.streams ?? []);
+  if (!streams.some((s) => s.kind === "video")) return null;
+  const audio = [...new Set(streams.filter((s) => s.kind === "audio").map(audioTrackLabel))];
+  const subs = subtitleLanguages(streams);
+  return (
+    <dl className="mt-5 grid max-w-3xl grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm" data-testid="tracks">
+      <dt className="text-faint">Audio</dt>
+      <dd className="space-y-0.5">{audio.length ? audio.map((a) => <div key={a}>{a}</div>) : <span className="text-muted">None</span>}</dd>
+      <dt className="text-faint">Subtitles</dt>
+      <dd className={subs.length ? "" : "text-muted"}>{subs.length ? subs.join(", ") : "None"}</dd>
+    </dl>
   );
 }
 
@@ -539,6 +555,7 @@ export function ItemPage() {
               </p>
             )
           )}
+          <Tracks item={d} />
         </div>
       </div>
       <Children item={d} />

@@ -277,10 +277,33 @@ struct ItemDetailView: View {
                 Text(summary).font(.body).foregroundStyle(.primary.opacity(0.9)).frame(maxWidth: 900, alignment: .leading)
             }
             if d.base.isPlayableVideo { trackPickers(d) }
+            if let tracks = TrackSummary(versions: d.info.versions) { trackList(tracks) }
             fileProblems(d)
         }
         .padding(.horizontal, sidePadding)
         .padding(.top, 24)
+    }
+
+    /// The audio tracks and subtitles the title has (every version's, each once).
+    private func trackList(_ t: TrackSummary) -> some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 6) {
+            GridRow {
+                Text("Audio").foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    if t.audio.isEmpty { Text("None").foregroundStyle(.secondary) }
+                    ForEach(t.audio, id: \.self) { Text($0) }
+                }
+            }
+            GridRow {
+                Text("Subtitles").foregroundStyle(.secondary)
+                Text(t.subtitles.isEmpty ? "None" : t.subtitles.joined(separator: ", "))
+                    .foregroundStyle(t.subtitles.isEmpty ? .secondary : .primary)
+            }
+        }
+        .font(.callout)
+        .frame(maxWidth: 900, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("trackList")
     }
 
     /// What Library Health found wrong with this title's files (admins only: the server sends

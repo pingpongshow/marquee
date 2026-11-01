@@ -240,6 +240,23 @@ final class Batch5UITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(checked, 3)
     }
 
+    // MARK: - Tracks on a title's page
+
+    /// A movie's page lists its audio tracks and subtitles (both versions of 00 Preview Test
+    /// have one untagged mono AAC track and no subtitles: listed once, and "None").
+    func testTitlePageListsTracks() throws {
+        let user = try temporaryUser()
+        signIn(user)
+        openMovie("00 Preview Test")
+        let tracks = app.descendants(matching: .any)["trackList"]
+        for _ in 0..<4 where !tracks.waitForExistence(timeout: 3) { app.swipeUp() }
+        XCTAssertTrue(tracks.waitForExistence(timeout: 10), "the page lists the tracks")
+        XCTAssertTrue(tracks.label.contains("Unknown · AAC Mono"), tracks.label)
+        XCTAssertTrue(tracks.label.contains("Subtitles"), tracks.label)
+        XCTAssertTrue(tracks.label.contains("None"), tracks.label)
+        shot("t1-title-tracks")
+    }
+
     // MARK: - D. Trailer
 
     func testTrailerPlaysLocalTrailer() throws {

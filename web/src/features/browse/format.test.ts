@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { channelsLabel, resolutionLabel, splitPath, versionLabel } from "./format";
+import { audioTrackLabel, channelsLabel, resolutionLabel, splitPath, subtitleLanguages, versionLabel } from "./format";
 
 describe("file details", () => {
   it("names resolutions", () => {
@@ -22,5 +22,26 @@ describe("file details", () => {
   });
   it("labels versions as before", () => {
     expect(versionLabel({ label: "Extended", files: [{ width: 3840, height: 2160, hdrFormat: "dolby_vision", videoCodec: "hevc" }] })).toBe("Extended (4K · Dolby Vision · HEVC)");
+  });
+});
+
+describe("tracks on a title's page", () => {
+  it("names audio tracks", () => {
+    expect(audioTrackLabel({ language: "eng", codec: "truehd", channels: 8 })).toBe("English · Dolby TrueHD 7.1");
+    expect(audioTrackLabel({ language: "eng", codec: "ac3", channels: 2, title: "Director's Commentary" })).toBe("English · Dolby Digital Stereo · Director's Commentary");
+    expect(audioTrackLabel({ language: "fre", codec: "dts", profile: "DTS-HD MA", channels: 6, title: "French 5.1" })).toBe("French · DTS-HD MA 5.1");
+    expect(audioTrackLabel({ language: "jpn", codec: "pcm_s16le", channels: 6, title: "Surround" })).toBe("Japanese · PCM 5.1");
+    expect(audioTrackLabel({ language: "eng", codec: "eac3", profile: "Dolby Digital Plus + Dolby Atmos", channels: 6, title: "MiNX - Small HD episodes" })).toBe(
+      "English · Dolby Digital Plus Atmos 5.1",
+    );
+    expect(audioTrackLabel({ language: "por", codec: "aac", channels: 2, title: "Brazilian" })).toBe("Portuguese · AAC Stereo · Brazilian");
+    expect(audioTrackLabel({ codec: "aac" })).toBe("Unknown · AAC");
+  });
+  it("lists subtitle languages once each", () => {
+    const sub = (language: string | undefined, forced = false, hearingImpaired = false) => ({ kind: "subtitle", language, forced, hearingImpaired });
+    expect(
+      subtitleLanguages([{ kind: "audio", language: "eng", forced: false, hearingImpaired: false }, sub("eng"), sub("eng"), sub("eng", false, true), sub("fre", true), sub("und")]),
+    ).toEqual(["English", "English (SDH)", "French (Forced)", "Unknown"]);
+    expect(subtitleLanguages([])).toEqual([]);
   });
 });

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import app.marquee.core.TrackSummary
 import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Explore
@@ -307,6 +308,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             }
             d.summary?.takeIf { it.isNotBlank() }?.let { s -> item { Text(s, Modifier.padding(horizontal = sidePadding), maxLines = 8, overflow = TextOverflow.Ellipsis) } }
         }
+        TrackSummary.forPage(d.versions)?.let { t -> item { TrackList(t, Modifier.padding(horizontal = sidePadding)) } }
         // What Library Health found wrong with the files (admins only: the server sends problems to them alone).
         val problems = d.versions.flatMap { v -> v.files.flatMap { it.problems.orEmpty() } }
         if (problems.isNotEmpty()) item { FileProblems(problems) { check -> nav.navigate("health/$check") } }
@@ -493,6 +495,26 @@ private fun TvHeader(d: ItemDetail, square: Boolean, ratings: @Composable () -> 
                 // Wraps rather than squeezing labels when an album or artist has many actions.
                 FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
             }
+        }
+    }
+}
+
+/** The audio tracks and subtitles the title has (every version's, each once). */
+@Composable
+private fun TrackList(t: TrackSummary, modifier: Modifier = Modifier) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(modifier.widthIn(max = 720.dp).semantics(mergeDescendants = true) {}.testTag("trackList"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row {
+            Text("Audio", Modifier.width(96.dp), color = muted, style = MaterialTheme.typography.bodyMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                if (t.audio.isEmpty()) Text("None", color = muted, style = MaterialTheme.typography.bodyMedium)
+                t.audio.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            }
+        }
+        Row {
+            Text("Subtitles", Modifier.width(96.dp), color = muted, style = MaterialTheme.typography.bodyMedium)
+            Text(t.subtitles.joinToString(", ").ifEmpty { "None" }, color = if (t.subtitles.isEmpty()) muted else Color.Unspecified,
+                style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
