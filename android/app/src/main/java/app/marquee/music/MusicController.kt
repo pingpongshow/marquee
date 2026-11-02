@@ -561,7 +561,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
         val heart = marquee.favorites.marks.value[id]
         if (on) marquee.favorites.mark(id, false)
         return scope.launch {
-            val ok = withContext(Dispatchers.IO) { runCatching { if (on) marquee.items.addDislike(id) else marquee.items.removeDislike(id) }.isSuccess }
+            // Kept on the device and sent later when the server can't be reached (USER-18).
+            val ok = marquee.sync.saveShowing(marquee.sync.dislike(id, on))
             if (!ok) {
                 undo()
                 if (on) { if (heart == null) marquee.favorites.forget(id) else marquee.favorites.mark(id, heart) }

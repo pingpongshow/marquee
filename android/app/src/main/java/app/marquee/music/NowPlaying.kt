@@ -114,7 +114,7 @@ fun MiniPlayer(onOpen: () -> Unit) {
                 // Its own for each track: a popover left open closes when the song changes, and what it picks is for this song.
                 key(n.id) {
                     RatingPopover(marks.rating(n.id, rating), n.title, { music.rate(n.id, it) }, compact = true, disliked = marks.disliked(n.id, disliked ?: n.disliked),
-                        onDislike = if (offline) null else { on -> music.setDisliked(n.id, n.title, on) })
+                        onDislike = { on -> music.setDisliked(n.id, n.title, on) })
                 }
                 IconButton(onClick = music::toggle, Modifier.size(40.dp)) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pause" else "Play") }
                 IconButton(onClick = music::next, Modifier.size(40.dp)) { Icon(Icons.Filled.SkipNext, "Next track") }
@@ -196,7 +196,7 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
                 Box(Modifier.height(48.dp).then(if (disliked) Modifier.width(((starSize + 14) * 5).dp) else Modifier), contentAlignment = Alignment.Center) {
                     if (disliked) key(n.id) {
                         RatingPopover(shownRating, n.title, { music.rate(n.id, it) }, disliked = true,
-                            onDislike = if (offline) null else { on -> music.setDisliked(n.id, n.title, on) })
+                            onDislike = { on -> music.setDisliked(n.id, n.title, on) })
                     } else RatingStars(shownRating, { music.rate(n.id, it) }, size = starSize)
                 }
                 // The heart (USER-12), from the track's current state.

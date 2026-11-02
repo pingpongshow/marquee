@@ -45,6 +45,7 @@ import android.view.KeyEvent
 import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
+import app.marquee.core.PendingChange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import java.util.concurrent.TimeUnit
@@ -3465,6 +3466,44 @@ class MarqueeUiTest {
      * A thumbs down from the mini player (MUSIC-25). On a radio it skips the song, drops its upcoming
      * copies and clears its heart and high stars; on a plain list it stays, and favouriting takes it back.
      */
+    // A thumbs down made offline shows at once, waits, and reaches the server on reconnecting (USER-18).
+    @Test fun thumbsDownQueuedOffline() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        fun onMain(block: () -> Unit) = InstrumentationRegistry.getInstrumentation().runOnMainSync(block)
+        fun item(id: Long) = org.json.JSONObject(adminApi("GET", "/items/$id", asToken = appToken))
+        val leaves = tracksOf(308)
+        fun clean() = leaves.take(4).forEach {
+            adminApi("DELETE", "/items/${it.getLong("id")}/dislike", asToken = appToken)
+            adminApi("DELETE", "/items/${it.getLong("id")}/favorite", asToken = appToken)
+        }
+        try {
+            clean()
+            val songs = leaves.take(4).map { app.marquee.items.getItem(it.getLong("id")).summary() }
+            onMain { app.music.enqueue(songs, next = false) }
+            rule.waitUntil(20_000) { app.music.now.value != null }
+            val song = app.music.now.value!!
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rate ${song.title}") and hasClickAction(), 15_000)
+
+            app.marquee.simulateOffline = true
+            rule.onNode(hasContentDescription("Rate ${song.title}") and hasClickAction()).performClick()
+            rule.waitText("Thumbs down")
+            tap("Thumbs down")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Thumbs down on ${song.title}"), 10_000)
+            rule.waitUntil(10_000) { app.marquee.sync.queued(song.id, PendingChange.Kind.Dislike) != null }
+            assertTrue("not on the server yet", !item(song.id).optBoolean("disliked"))
+
+            app.marquee.simulateOffline = false
+            kotlinx.coroutines.runBlocking { app.marquee.sync.syncNow() }
+            rule.waitUntil(20_000) { item(song.id).optBoolean("disliked") }
+            rule.waitUntil(10_000) { app.marquee.sync.queued(song.id, PendingChange.Kind.Dislike) == null }
+        } finally {
+            app.marquee.simulateOffline = false
+            clean()
+        }
+    }
+
     @Test fun thumbsDownFromMiniPlayer() {
         connectAndSignIn()
         val app = context.applicationContext as MarqueeApplication

@@ -384,6 +384,7 @@ class Marquee(context: Context) {
     private suspend fun reconnectNow(quiet: Boolean = false) {
         val record = server ?: run { _state.value = State.NoServer; return }
         if (!quiet) _state.value = State.Connecting
+        sync.showWaitingDislikes()
         suspend fun reachable(): Pair<String, SystemInfo>? {
             for (url in record.candidates) probe(url)?.let { return url to it }
             return null

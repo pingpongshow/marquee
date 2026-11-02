@@ -128,7 +128,6 @@ fun TrackMenu(track: ItemSummary, onMoved: (() -> Unit)? = null) {
     var playlist by remember { mutableStateOf(false) }
     var journey by remember { mutableStateOf(false) }
     val favorite = favoriteAction(track)
-    val offline by marquee.offline.collectAsState()
     val marks by marquee.dislikes.marks.collectAsState()
     val disliked = marks.disliked(track.id, track.disliked)
     Box {
@@ -138,8 +137,7 @@ fun TrackMenu(track: ItemSummary, onMoved: (() -> Unit)? = null) {
             DropdownMenuItem({ Text("Add to queue") }, { music.enqueue(listOf(track), next = false); open = false })
             DropdownMenuItem({ Text("Add to playlist…") }, { playlist = true; open = false })
             favorite?.let { f -> DropdownMenuItem({ Text(f.label) }, { f.run(); open = false }) }
-            // Needs the server: a thumbs down isn't queued while offline.
-            if (track.type == app.marquee.api.models.ItemType.TRACK && !offline) DropdownMenuItem({ Text(app.marquee.music.dislikeLabel(disliked)) },
+            if (track.type == app.marquee.api.models.ItemType.TRACK) DropdownMenuItem({ Text(app.marquee.music.dislikeLabel(disliked)) },
                 { music.setDisliked(track.id, track.title, !disliked); open = false },
                 leadingIcon = { Icon(if (disliked) Icons.Filled.ThumbDown else Icons.Filled.ThumbDownOffAlt, null) })
             DropdownMenuItem({ Text("Sound Journey…") }, { journey = true; open = false })

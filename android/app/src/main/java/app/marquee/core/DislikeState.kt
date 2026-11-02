@@ -52,6 +52,14 @@ class DislikeState {
     fun rated(id: Long, rating: Double?): () -> Unit = change(id) { it.rated(id, rating) }
     fun favourited(id: Long): () -> Unit = change(id) { it.favourited(id) }
 
+    /** Shows thumbs downs still waiting to be sent, as after a restart; changes made since stay. */
+    @Synchronized fun showWaiting(waiting: List<PendingChange>) {
+        val marks = _marks.value
+        val add = waitingDislikes(waiting).filterKeys { it !in marks.dislikes }
+        if (add.isEmpty()) return
+        _marks.value = add.entries.fold(marks) { m, (id, on) -> m.thumbsDown(id, on) }
+    }
+
     /** Another profile's marks mean nothing to the next one. */
     @Synchronized fun clear() { _marks.value = Marks() }
 
@@ -64,5 +72,19 @@ class DislikeState {
     companion object {
         /** 3.5 stars on the server's 0–10 scale (topRatingSQL): where a rating and a thumbs down clear each other. */
         const val TOP_RATING = 7.0
+
+        /**
+         * What waiting changes leave of each song's thumbs down: the latest of a thumbs down, a
+         * heart or a rating of 3.5 or more decides, as each takes back the others (USER-18).
+         */
+        fun waitingDislikes(changes: List<PendingChange>): Map<Long, Boolean> {
+            val out = HashMap<Long, Boolean>()
+            for (c in changes.sortedBy { it.seq }) when {
+                c.kind == PendingChange.Kind.Dislike -> out[c.item] = c.on
+                c.kind == PendingChange.Kind.Favorite && c.on && c.item in out -> out[c.item] = false
+                c.kind == PendingChange.Kind.Rating && (c.rating ?: 0.0) >= TOP_RATING && c.item in out -> out[c.item] = false
+            }
+            return out
+        }
     }
 }

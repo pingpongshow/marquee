@@ -82,7 +82,6 @@ fun ItemRatings(d: ItemDetail, community: CommunityRating?, onRated: () -> Unit,
         mutableStateOf(marquee.sync.queued(d.id, app.marquee.core.PendingChange.Kind.Rating)?.let { it.rating } ?: d.userRating?.takeIf { it > 0 })
     }
     val marks by marquee.dislikes.marks.collectAsState()
-    val offline by marquee.offline.collectAsState()
     val track = d.type == ItemType.TRACK
     fun rate(r: Double?) {
         val before = rating
@@ -106,7 +105,7 @@ fun ItemRatings(d: ItemDetail, community: CommunityRating?, onRated: () -> Unit,
             val shown = marks.rating(d.id, rating)
             // A song's thumbs down (MUSIC-25): where the stars would be once given, which still open to rate it.
             if (track && marks.disliked(d.id, d.disliked)) app.marquee.music.RatingPopover(shown, d.title, ::rate, disliked = true,
-                onDislike = if (offline) null else { on -> scope.launch { music.setDisliked(d.id, d.title, on).join(); onRated() } })
+                onDislike = { on -> scope.launch { music.setDisliked(d.id, d.title, on).join(); onRated() } })
             else {
                 RatingStars(shown, ::rate, size = if (marquee.isTv) 20 else 22)
                 if (track) DislikeButton(d.id, d.title, d.disliked, small = true, onDone = onRated)

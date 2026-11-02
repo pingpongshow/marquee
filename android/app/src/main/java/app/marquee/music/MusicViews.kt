@@ -355,7 +355,6 @@ fun TrackRating(track: app.marquee.api.models.ItemSummary, modifier: Modifier = 
     }
     val music = LocalMusic.current
     val marks by marquee.dislikes.marks.collectAsState()
-    val offline by marquee.offline.collectAsState()
     fun rate(r: Double?) {
         val before = rating
         rating = r
@@ -374,7 +373,7 @@ fun TrackRating(track: app.marquee.api.models.ItemSummary, modifier: Modifier = 
     // A narrow phone's row gives the title the room the five small stars would take.
     val narrow = !marquee.isTv && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 400
     RatingPopover(marks.rating(track.id, rating), track.title, ::rate, modifier, compact = narrow, disliked = marks.disliked(track.id, track.disliked),
-        onDislike = if (offline) null else { on -> music.setDisliked(track.id, track.title, on) })
+        onDislike = { on -> music.setDisliked(track.id, track.title, on) })
 }
 
 /** The menu line for a song's thumbs down. */
@@ -384,7 +383,7 @@ fun dislikeLabel(disliked: Boolean) = if (disliked) "Take back thumbs down" else
  * A rating that takes little room: the stars (or an empty star to rate), opening a small popover
  * of stars to choose from. [compact] shows one star and the number, for the now-playing bar.
  * A song with a thumbs down ([disliked]) shows that instead; [onDislike] offers giving it or
- * taking it back in the popover (null while offline, as it needs the server).
+ * taking it back in the popover.
  */
 @Composable
 fun RatingPopover(rating: Double?, title: String, onRate: (Double?) -> Unit, modifier: Modifier = Modifier, compact: Boolean = false,

@@ -65,16 +65,14 @@ fun FavoriteButton(item: ItemSummary, modifier: Modifier = Modifier, small: Bool
     FavoriteButton(item.id, item.title, item.favorite, modifier, small)
 
 /**
- * The thumbs down on a song (MUSIC-25), beside its heart: filled when given. Needs the server (it
- * isn't queued), so it goes while offline. [onDone] runs once the server has it.
+ * The thumbs down on a song (MUSIC-25), beside its heart: filled when given. Made offline, it's
+ * queued to send later. [onDone] runs once the server has it or it's queued.
  */
 @Composable
 fun DislikeButton(id: Long, title: String, server: Boolean?, modifier: Modifier = Modifier, small: Boolean = false, onDone: () -> Unit = {}) {
     val marquee = LocalMarquee.current
     val music = LocalMusic.current
-    val offline by marquee.offline.collectAsState()
     val marks by marquee.dislikes.marks.collectAsState()
-    if (offline) return
     val on = marks.disliked(id, server)
     IconButton({ marquee.scope.launch { music.setDisliked(id, title, !on).join(); onDone() } },
         modifier.focusRing().then(if (small) Modifier.size(36.dp) else Modifier).semantics { stateDescription = if (on) "Thumbs down" else "No thumbs down" }) {

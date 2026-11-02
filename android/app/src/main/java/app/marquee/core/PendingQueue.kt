@@ -36,7 +36,7 @@ data class PendingChange(
     /** Order the changes were made in; set by the queue. */
     val seq: Long = 0,
 ) {
-    enum class Kind { Rating, Watched, Watchlist, Comment, Progress, Favorite }
+    enum class Kind { Rating, Watched, Watchlist, Comment, Progress, Favorite, Dislike }
 
     /** Only the latest change per key is kept. */
     data class Key(val server: String, val user: Long, val item: Long, val kind: Kind, val reviewUser: Long?)
