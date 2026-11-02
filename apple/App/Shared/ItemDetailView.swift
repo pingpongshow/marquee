@@ -12,8 +12,9 @@ struct ItemDetailView: View {
     let id: Int64
     @State private var detail: ItemDetail?
     @State private var children: [Item] = []
-    @State private var popular: [Item] = []
-    @State private var allPopular = false
+    /// An artist's top songs (MUSIC-24), the first of them, and how many there are in all.
+    @State private var topSongs: [Item] = []
+    @State private var topSongsTotal = 0
     @State private var related: [Item] = []
     /// Also on VOD: films or series on demand like this movie or show (LIVE-6).
     @State private var vodSimilar: [VodSuggestion] = []
@@ -126,14 +127,16 @@ struct ItemDetailView: View {
             // Everything else in parallel.
             async let kids: [Item] = d.base.childCount > 0 ? app.children(id) : []
             async let rel: [Item]? = wantsRelated ? try? app.related(id) : []
-            async let pop: [Item]? = d.type == .artist ? try? app.popularTracks(id) : []
+            async let top: ItemPage? = d.type == .artist ? try? app.topSongs(id, limit: Self.topSongsShown) : nil
             async let sounds: [Item]? = d.type == .artist || d.type == .album ? try? app.soundsLike(id, limit: 15) : []
             async let found = collectionMembers(d.info.collections ?? [])
             async let trail: ItemTrailer? = d.type == .movie || d.type == .show ? try? app.trailer(id) : nil
             async let onVod: [VodSuggestion]? = d.type == .movie || d.type == .show ? try? app.itemVodSimilar(id) : []
             children = try await kids
             related = await rel ?? []
-            popular = await pop ?? []
+            let songs = await top
+            topSongs = songs?.items ?? []
+            topSongsTotal = songs?.total ?? 0
             soundsLike = await sounds ?? []
             series = await found
             trailer = await trail
@@ -408,6 +411,7 @@ struct ItemDetailView: View {
                 .buttonStyle(.borderedProminent)
             Button { run { music.play(try await app.leaves(d.id), shuffle: true, source: d.title) } } label: { Label("Shuffle", systemImage: "shuffle") }
                 .buttonStyle(.bordered)
+            if d.type == .artist { radioButton(d) }
         case .track:
             Button { music.play([d.base]) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
         case .collection:
@@ -420,7 +424,7 @@ struct ItemDetailView: View {
             Button { playHere(d, startMs: 0) } label: { Label("From start", systemImage: "arrow.counterclockwise") }.buttonStyle(.bordered)
         }
         if let trailer, d.type == .movie || d.type == .show { TrailerButton(trailer: trailer, title: d.title) }
-        if [.album, .artist, .track].contains(d.type) { radioButton(d) }
+        if [.album, .track].contains(d.type) { radioButton(d) }
         #if os(iOS)
         if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {
             DownloadButton(item: d.base)
@@ -484,7 +488,7 @@ struct ItemDetailView: View {
                 music.playStation(st, radio: req)
             }
         } label: {
-            Label("Radio", systemImage: "dot.radiowaves.left.and.right")
+            Label(d.type == .artist ? "Artist Radio" : "Radio", systemImage: "dot.radiowaves.left.and.right")
         }
         .buttonStyle(.bordered)
     }
@@ -663,7 +667,7 @@ struct ItemDetailView: View {
         if !children.isEmpty {
             switch d.type {
             case .artist:
-                if !popular.isEmpty { popularSection(d) }
+                if !topSongs.isEmpty { topSongsSection(d) }
                 // Sections by release type (MusicBrainz, META-3).
                 ForEach(releaseSections(children), id: \.title) { section in
                     ShelfRow(title: section.title) {
@@ -706,34 +710,27 @@ struct ItemDetailView: View {
         #endif
     }
 
-    /// The artist's most-listened tracks (ListenBrainz, MUSIC-15): five, or all ten.
-    @ViewBuilder private func popularSection(_ d: ItemDetail) -> some View {
+    /// How many top songs the artist page shows; More has the rest.
+    private static let topSongsShown = 15
+
+    /// The artist's top songs for this person, best first (MUSIC-24).
+    private func topSongsSection(_ d: ItemDetail) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Popular").font(.title3.bold()).padding(.horizontal, sidePadding).padding(.bottom, 6)
-            ForEach(Array((allPopular ? popular : Array(popular.prefix(5))).enumerated()), id: \.element.id) { i, t in
-                HStack(spacing: 4) {
-                    Button { music.play(popular, start: i, source: "\(d.title) – Popular") } label: {
-                        HStack(spacing: 14) {
-                            Text("\(i + 1)").font(.callout.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28, alignment: .trailing)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(t.title).lineLimit(1).foregroundStyle(music.current?.item.id == t.id ? Color.marqueeGold : .primary)
-                                if let album = t.parentTitle { Text(album).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
-                            }
-                            Spacer()
-                        }
-                        .padding(.leading, sidePadding).padding(.vertical, 8)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    RowRating(item: t)
+            Text("Top Songs").font(.title3.bold()).padding(.horizontal, sidePadding).padding(.bottom, 6)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(Array(topSongs.enumerated()), id: \.element.id) { i, t in
+                TrackRow(track: t, onMove: moveAction, rank: i + 1) {
+                    music.play(topSongs, start: i, source: "\(d.title) – Top Songs")
                 }
-                .padding(.trailing, sidePadding - 6)
             }
-            if popular.count > 5 {
-                Button(allPopular ? "Show Fewer" : "Show All \(popular.count)") { allPopular.toggle() }
+            if topSongsTotal > Self.topSongsShown {
+                NavigationLink("More", value: Route.topSongs(artist: d.id, name: d.title))
                     .font(.callout).padding(.horizontal, sidePadding).padding(.top, 4)
+                    .accessibilityIdentifier("topSongs.more")
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("topSongs")
     }
 
     @ViewBuilder private func cast(_ d: ItemDetail) -> some View {
@@ -822,6 +819,9 @@ struct TrackRow: View {
     var album: Item?
     /// Admins: "Move to Album…" in the track's menu.
     var onMove: ((Item) -> Void)?
+    /// Its place among an artist's top songs, shown instead of its track number; with it the
+    /// album is named, as there's no album page around it.
+    var rank: Int?
     let play: () -> Void
 
     var body: some View {
@@ -829,10 +829,16 @@ struct TrackRow: View {
         HStack(spacing: 4) {
             Button(action: play) {
                 HStack(spacing: 14) {
-                    Text(track.index.map(String.init) ?? "").font(.callout.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28, alignment: .trailing)
+                    // Wider only for what doesn't fit (a top song past 99), never over two lines.
+                    Text((rank ?? track.index).map(String.init) ?? "").font(.callout.monospacedDigit()).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                        .frame(minWidth: isTV ? 44 : 28, alignment: .trailing)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(track.title).lineLimit(1).foregroundStyle(music.current?.item.id == track.id ? Color.marqueeGold : .primary)
-                        if let credit = track.artistCredit, credit != album?.artistCredit { Text(credit).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                        if rank != nil, let name = track.parentTitle {
+                            Text(name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        } else if rank == nil, let credit = track.artistCredit, credit != album?.artistCredit {
+                            Text(credit).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
                     }
                     Spacer()
                     if music.showAudioQuality, let f = track.audioFormat {
@@ -853,10 +859,62 @@ struct TrackRow: View {
                     Button { onMove(track) } label: { Label("Move to Album…", systemImage: "square.stack") }
                 }
             }
+            #if os(iOS)
+            TrackRadioButton(track: track)
+            #endif
             RowFavorite(item: track)
             RowRating(item: track, gap: isTV ? 8 : 4)
         }
         .padding(.trailing, sidePadding - 6)
+    }
+}
+
+/// All of an artist's top songs (MUSIC-24), loaded a page at a time as the list scrolls.
+struct TopSongsView: View {
+    @Environment(AppSession.self) private var app
+    @Environment(MusicPlayer.self) private var music
+    let artistID: Int64
+    let artistName: String
+    @State private var songs: [Item] = []
+    @State private var total = 0
+    @State private var loaded = false
+    @State private var loading = false
+    @State private var error: String?
+
+    private static let page = 100
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                if let error, songs.isEmpty { ErrorBanner(message: error).padding(sidePadding) }
+                ForEach(Array(songs.enumerated()), id: \.element.id) { i, t in
+                    TrackRow(track: t, rank: i + 1) {
+                        music.play(songs, start: i, source: "\(artistName) – Top Songs")
+                    }
+                    .onAppear { if i >= songs.count - 20 { Task { await loadMore() } } }
+                }
+                if loading { ProgressView().frame(maxWidth: .infinity).padding() }
+            }
+            .padding(.vertical, 8)
+        }
+        .navigationTitle("Top Songs")
+        .task { if !loaded { await loadMore() } }
+    }
+
+    private func loadMore() async {
+        guard !loading, !loaded || songs.count < total else { return }
+        loading = true
+        defer { loading = false }
+        do {
+            let p = try await app.topSongs(artistID, offset: songs.count, limit: Self.page)
+            songs += p.items
+            total = p.items.isEmpty ? songs.count : p.total // nothing more came: no asking again
+            loaded = true
+            error = nil
+        } catch is CancellationError {
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }
 

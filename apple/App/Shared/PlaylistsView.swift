@@ -1,6 +1,19 @@
 import MarqueeKit
 import SwiftUI
 
+/// Bumped when a playlist leaves or joins the person's own (accepted, or removed from a pushed
+/// page): the lists showing them load again.
+@MainActor @Observable
+final class PlaylistChanges {
+    static let shared = PlaylistChanges()
+    var version = 0
+
+    func changed() {
+        version += 1
+        HomeChanges.shared.version += 1
+    }
+}
+
 struct PlaylistMosaic: View {
     @Environment(AppSession.self) private var app
     let playlist: Playlist
@@ -59,18 +72,102 @@ struct PlaylistCard: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(playlist.title).font(.subheadline.weight(.medium)).lineLimit(1)
             Text("\(playlist.itemCount) \(playlist.kind == .audio ? "tracks" : "items")").font(.caption).foregroundStyle(.secondary)
+            if let owner = playlist.sharedBy {
+                Text(owner).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    .accessibilityIdentifier("playlist.sharedBy")
+            }
         }
+    }
+}
+
+extension Playlist {
+    /// "Shared by <owner>", on a playlist someone else shared with this person.
+    var sharedBy: String? {
+        guard readOnly == true else { return nil }
+        return ownerName.map { "Shared by \($0)" } ?? "Shared with you"
+    }
+}
+
+/// A playlist someone shared with this person, waiting for them to accept (MUSIC-24).
+private struct PlaylistInviteRow: View {
+    let playlist: Playlist
+    let accept: () -> Void
+    let decline: () -> Void
+
+    #if os(tvOS)
+    private let cover: CGFloat = 140
+    #else
+    private let cover: CGFloat = 64
+    #endif
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 16) {
+                titles
+                Spacer(minLength: 16)
+                buttons
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                titles
+                buttons
+            }
+        }
+        .padding(isTV ? 24 : 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("playlistInvite.\(playlist.id)")
+        #if os(tvOS)
+        .focusSection()
+        #endif
+    }
+
+    private var titles: some View {
+        HStack(spacing: 12) {
+            PlaylistMosaic(playlist: playlist, size: cover)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(playlist.title).font(.subheadline.weight(.semibold)).lineLimit(2)
+                Text(playlist.sharedBy ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(playlist.itemCount == 1 ? "1 \(playlist.kind == .audio ? "track" : "item")" : "\(playlist.itemCount) \(playlist.kind == .audio ? "tracks" : "items")")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+    }
+
+    private var buttons: some View {
+        HStack(spacing: isTV ? 24 : 10) {
+            Button("Accept", action: accept)
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("playlistInvite.accept")
+            Button("Decline", action: decline)
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("playlistInvite.decline")
+        }
+        .fixedSize()
     }
 }
 
 struct PlaylistsView: View {
     @Environment(AppSession.self) private var app
     @State private var playlists: [Playlist] = []
+    /// Playlists shared with this person, waiting for an answer (MUSIC-24).
+    @State private var invites: [Playlist] = []
     @State private var loaded = false
     @State private var error: String?
 
     var body: some View {
         ScrollView {
+            if !invites.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Shared with you").font(.title2.bold())
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(invites, id: \.id) { p in
+                        PlaylistInviteRow(playlist: p, accept: { accept(p) }, decline: { decline(p) })
+                    }
+                }
+                .padding(.horizontal, sidePadding)
+                .padding(.top, sidePadding)
+            }
             // Video playlists first (movies and episodes, a few at most), then the music ones.
             LazyVGrid(columns: [GridItem(.adaptive(minimum: cell), spacing: 16, alignment: .top)], alignment: .leading, spacing: 20) {
                 section("Video Playlists", kind: .video)
@@ -87,7 +184,7 @@ struct PlaylistsView: View {
                 }
             } else if !loaded {
                 ProgressView().padding(.top, 60)
-            } else if playlists.isEmpty {
+            } else if playlists.isEmpty, invites.isEmpty {
                 ContentUnavailableView("No playlists", systemImage: "music.note.list", description: Text("Use “Add to Playlist” on any track, album, movie or episode."))
                     #if os(tvOS)
                     // Something to hold focus: with nothing focusable the TV's sidebar closed
@@ -97,8 +194,44 @@ struct PlaylistsView: View {
             }
         }
         .navigationTitle("Playlists")
-        .task { if !loaded { await load() } }
+        .task {
+            if !loaded {
+                await load()
+            } else {
+                await loadInvites() // each time the page is back: someone may have shared one
+            }
+        }
         .refreshable { await load() }
+        .onChange(of: PlaylistChanges.shared.version) { Task { await load() } }
+    }
+
+    private func accept(_ p: Playlist) {
+        invites.removeAll { $0.id == p.id }
+        ActionError.run {
+            do {
+                _ = try await app.acceptPlaylistShare(p.id)
+                PlaylistChanges.shared.changed()
+            } catch {
+                await loadInvites()
+                throw error
+            }
+        }
+    }
+
+    private func decline(_ p: Playlist) {
+        invites.removeAll { $0.id == p.id }
+        ActionError.run {
+            do {
+                try await app.removePlaylistShare(p.id)
+            } catch {
+                await loadInvites()
+                throw error
+            }
+        }
+    }
+
+    private func loadInvites() async {
+        if let list = try? await app.playlistInvites() { invites = list }
     }
 
     @ViewBuilder private func section(_ title: String, kind: Schemas.PlaylistKind) -> some View {
@@ -118,6 +251,7 @@ struct PlaylistsView: View {
     }
 
     private func load() async {
+        async let asked: Void = loadInvites()
         do {
             playlists = try await app.playlists()
             error = nil
@@ -125,6 +259,7 @@ struct PlaylistsView: View {
         } catch {
             self.error = error.localizedDescription
         }
+        await asked
         loaded = true
     }
 
@@ -139,14 +274,21 @@ struct PlaylistView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     @Environment(VideoPresenter.self) private var video
+    @Environment(\.dismiss) private var dismiss
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(Downloads.self) private var downloads
     #endif
     let id: Int64
     @State private var playlist: Playlist?
     @State private var entries: [PlaylistEntry] = []
     @State private var loaded = false
     @State private var error: String?
+    /// Someone else's playlist, shared with this person: asking whether to remove it.
+    @State private var confirmingRemove = false
+    #if os(iOS)
+    @State private var sharing = false
+    #endif
 
     var body: some View {
         List {
@@ -173,6 +315,9 @@ struct PlaylistView: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu { ItemMenuItems(item: e.item) }
+                    #if os(iOS)
+                    if e.item._type == .track { TrackRadioButton(track: e.item) }
+                    #endif
                     if FavoriteStore.canFavorite(e.item) { RowFavorite(item: e.item) }
                     if e.item._type == .track { RowRating(item: e.item, gap: isTV ? 8 : 4) }
                 }
@@ -195,6 +340,29 @@ struct PlaylistView: View {
         .navigationTitle(playlist?.title ?? "Playlist")
         .task { if !loaded { await load() } }
         .refreshable { await load() }
+        #if os(iOS)
+        .sheet(isPresented: $sharing) {
+            if let playlist { PlaylistShareSheet(playlist: playlist) { Task { await load() } } }
+        }
+        #endif
+        .alert("Remove “\(playlist?.title ?? "")”?", isPresented: $confirmingRemove) {
+            Button("Remove", role: .destructive) { remove() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("It goes from your playlists. You'd need \(playlist?.ownerName ?? "the owner") to share it again to get it back.")
+        }
+    }
+
+    /// Takes a playlist someone shared off this person's list; theirs stays as it is.
+    private func remove() {
+        ActionError.run {
+            try await app.removePlaylistShare(id)
+            #if os(iOS)
+            downloads.unsyncPlaylist(id)
+            #endif
+            PlaylistChanges.shared.changed()
+            dismiss()
+        }
     }
 
     /// iPhone (any width, either orientation): cover, then the title, then the actions, each
@@ -232,7 +400,18 @@ struct PlaylistView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(p.title).font(.title2.bold()).lineLimit(3)
             Text("\(p.itemCount) items · \(formatDuration(ms: p.durationMs))").foregroundStyle(.secondary).lineLimit(1)
+            if let shared = p.sharedBy ?? sharedWith(p) {
+                Text(shared).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                    .accessibilityIdentifier("playlist.sharedBy")
+            }
         }
+    }
+
+    /// Who your own playlist is shared with, when it is.
+    private func sharedWith(_ p: Playlist) -> String? {
+        if p.sharedWithAll == true { return "Shared with everyone" }
+        guard let n = p.shareCount, n > 0 else { return nil }
+        return "Shared with \(n) \(n == 1 ? "person" : "people")"
     }
 
     /// Play and Shuffle first; Download and Pin to Home turn icon-only when there's no room.
@@ -243,8 +422,18 @@ struct PlaylistView: View {
         } secondary: {
             #if os(iOS)
             PlaylistDownloadButton(id: id)
+            if let p = playlist, p.readOnly != true {
+                Button { sharing = true } label: { Label("Share", systemImage: "person.2") }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("playlist.share")
+            }
             #endif
             PinToHomeButton(rowID: AppSession.pinnedRowID(playlist: id))
+            if playlist?.readOnly == true {
+                Button { confirmingRemove = true } label: { Label("Remove", systemImage: "minus.circle") }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("playlist.remove")
+            }
         }
     }
 
@@ -293,6 +482,110 @@ struct PlaylistView: View {
 }
 
 #if os(iOS)
+/// Choose who your playlist is shared with (MUSIC-24): people by name, whether each has accepted,
+/// and everyone on the server for admins. Saved as each switch changes.
+struct PlaylistShareSheet: View {
+    @Environment(AppSession.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    let playlist: Playlist
+    /// Who it's shared with changed.
+    let onChange: () -> Void
+    @State private var targets: [PlaylistShareTarget] = []
+    @State private var sharing: PlaylistSharing?
+    @State private var saving = false
+    @State private var error: String?
+
+    private var everyone: Bool { sharing?.all ?? false }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let error { ErrorBanner(message: error) }
+                if let sharing {
+                    if app.me?.isAdmin == true {
+                        Section {
+                            Toggle("Everyone", isOn: Binding(get: { sharing.all }, set: { save(all: $0) }))
+                                .accessibilityIdentifier("share.everyone")
+                        } footer: {
+                            Text("Everyone on this server is offered it, including people added later.")
+                        }
+                    }
+                    Section {
+                        ForEach(targets, id: \.id) { person(sharing, $0) }
+                        if targets.isEmpty { Text("There's nobody else on this server.").foregroundStyle(.secondary) }
+                    } header: {
+                        Text("People")
+                    } footer: {
+                        Text("They see it once they accept, and can play it but not change it.")
+                    }
+                } else if error == nil {
+                    ProgressView()
+                }
+            }
+            .disabled(saving)
+            .navigationTitle("Share “\(playlist.title)”")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task { await load() }
+        }
+    }
+
+    private func person(_ sharing: PlaylistSharing, _ t: PlaylistShareTarget) -> some View {
+        let share = sharing.shares.first { $0.userId == t.id }
+        let on = sharing.all || share != nil
+        return Toggle(isOn: Binding(get: { on }, set: { save(person: t.id, $0) })) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(t.name)
+                if on {
+                    let accepted = share?.status == .accepted
+                    Text(accepted ? "Accepted" : "Pending").font(.caption).foregroundStyle(accepted ? Color.green : .secondary)
+                        .accessibilityIdentifier("share.status.\(t.id)")
+                }
+            }
+        }
+        // Everyone has it anyway while it's shared with everyone.
+        .disabled(sharing.all)
+        .accessibilityIdentifier("share.person.\(t.id)")
+    }
+
+    private func load() async {
+        do {
+            async let people = app.playlistShareTargets()
+            async let current = app.playlistSharing(playlist.id)
+            (targets, sharing) = try await (people, current)
+            error = nil
+        } catch is CancellationError {
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func save(person id: Int64, _ on: Bool) {
+        var ids = (sharing?.shares ?? []).map(\.userId).filter { $0 != id }
+        if on { ids.append(id) }
+        save(ids: ids, all: everyone)
+    }
+
+    private func save(all: Bool) {
+        save(ids: (sharing?.shares ?? []).map(\.userId), all: all)
+    }
+
+    /// What comes back says who it's now shared with, and shows; on failure, what was there stays.
+    private func save(ids: [Int64], all: Bool) {
+        saving = true
+        Task {
+            defer { saving = false }
+            do {
+                sharing = try await app.setPlaylistSharing(playlist.id, userIDs: ids, all: app.me?.isAdmin == true ? all : nil)
+                error = nil
+                onChange()
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+}
+
 /// Keep a playlist on the device, in sync with its changes (MUSIC-19).
 struct PlaylistDownloadButton: View {
     @Environment(Downloads.self) private var downloads

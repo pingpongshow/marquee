@@ -91,6 +91,10 @@ public final class AppSession {
     public private(set) var longPollClient: Client?
     /// True while the address is being re-checked in the background (the app stays usable).
     public private(set) var isReconnecting = false
+    /// The server can't be reached (see ServerReachability): the app shows what's downloaded
+    /// until it can, and signs nobody out. Only changes when it flips, so what reads it doesn't
+    /// redraw at every check.
+    public private(set) var isOffline = false
     /// Called when the signed-in person goes away or changes (sign out, profile switch,
     /// forgetting the server), so playback that belongs to them can stop.
     @ObservationIgnored public var onUserChange: (() -> Void)?
@@ -110,6 +114,11 @@ public final class AppSession {
     @ObservationIgnored private var reconnectTask: Task<Void, Never>?
     /// The server `reconnectTask` is connecting to.
     @ObservationIgnored private var reconnectServerID: String?
+    @ObservationIgnored private var reachability = ServerReachability()
+    /// A check of the addresses waiting to happen (a failed request, a failed check to confirm).
+    @ObservationIgnored private var checkSoon: Task<Void, Never>?
+    /// While offline: keeps checking, so the app comes back by itself.
+    @ObservationIgnored private var offlineChecks: Task<Void, Never>?
     /// The URL sessions behind `client` and `longPollClient`, invalidated when they're replaced.
     @ObservationIgnored private var urlSessions: [URLSession] = []
 
@@ -129,22 +138,76 @@ public final class AppSession {
             let kinds: [NWInterface.InterfaceType] = [.wifi, .cellular, .wiredEthernet, .other, .loopback]
             let signature = "\(path.status)|" + kinds.filter { path.usesInterfaceType($0) }.map { "\($0)" }.joined(separator: ",")
                 + "|" + path.availableInterfaces.map(\.name).joined(separator: ",")
-            Task { @MainActor in self?.pathChanged(signature) }
+            let satisfied = path.status == .satisfied
+            Task { @MainActor in self?.pathChanged(signature, satisfied: satisfied) }
         }
         pathMonitor.start(queue: .global(qos: .utility))
     }
 
-    private func pathChanged(_ signature: String) {
+    private func pathChanged(_ signature: String, satisfied: Bool) {
         let first = lastPath == nil
         guard signature != lastPath else { return }
         lastPath = signature
-        guard !first, server != nil else { return }
+        guard server != nil else { return }
+        guard !first else {
+            // The first check is already on its way; no network is known at once.
+            if !satisfied { updateReachability { $0.networkChanged(satisfied: false) } }
+            return
+        }
         pathDebounce?.cancel()
         pathDebounce = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1.5))
             guard !Task.isCancelled, let self, self.server != nil else { return }
+            self.updateReachability { $0.networkChanged(satisfied: satisfied) }
             await self.reconnect()
         }
+    }
+
+    // MARK: - Offline
+
+    private func updateReachability(_ change: (inout ServerReachability) -> Void) {
+        change(&reachability)
+        if isOffline != reachability.isOffline { isOffline = reachability.isOffline }
+        if isOffline { keepChecking() }
+    }
+
+    /// Checks the addresses shortly; several calls meanwhile make one check.
+    private func checkAddresses(after seconds: Double) {
+        guard checkSoon == nil else { return }
+        checkSoon = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard let self else { return }
+            self.checkSoon = nil
+            guard self.server != nil else { return }
+            await self.reconnect()
+        }
+    }
+
+    /// While offline: 5 seconds between checks to begin with, up to half a minute.
+    private func keepChecking() {
+        guard offlineChecks == nil else { return }
+        offlineChecks = Task { [weak self] in
+            var wait = 5.0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(wait))
+                guard let self, self.isOffline, self.server != nil else { break }
+                await self.reconnect()
+                wait = min(30, wait * 1.5)
+            }
+            self?.offlineChecks = nil
+        }
+    }
+
+    /// An API request failed for want of the network: one error isn't offline, so see whether
+    /// the server still answers.
+    private func requestFailedForNetwork() {
+        guard server != nil, reachability.checkAfterRequestFailure else { return }
+        checkAddresses(after: 1)
+    }
+
+    private func resetReachability() {
+        reachability = ServerReachability()
+        isOffline = false
     }
 
     // MARK: - Devices
@@ -175,7 +238,11 @@ public final class AppSession {
                             configuration: .init(dateTranscoder: FlexibleDateTranscoder()),
                             transport: URLSessionTransport(configuration: .init(session: session)),
                             middlewares: [AuthMiddleware(token: { [box = tokenBox] in box.token })]
-                                + (OfflineSync.simulateOffline ? [OfflineChangesMiddleware()] : []))
+                                + (OfflineSync.simulateOffline ? [OfflineChangesMiddleware()] : [])
+                                // Last: nearest the network, so it only sees real failures.
+                                + [ReachabilityMiddleware { [weak self] in
+                                    Task { @MainActor in self?.requestFailedForNetwork() }
+                                }])
         return (client, session)
     }
 
@@ -248,6 +315,7 @@ public final class AppSession {
             baseURL = nil
             info = nil
             me = nil
+            resetReachability()
         }
         // A reconnect already running is for the server as it was: the next one starts afresh.
         reconnectServerID = nil
@@ -274,8 +342,9 @@ public final class AppSession {
     private func performReconnect() async {
         guard var record = server else { state = .noServer; return }
         // Only the first connection shows "Connecting…"; once there's a client the app stays
-        // up (a playing video, where you are) while the address is re-checked.
-        if client == nil { state = .connecting }
+        // up (a playing video, where you are) while the address is re-checked. Started offline,
+        // there's no client but the offline library is up: that stays too.
+        if client == nil, !isOffline { state = .connecting }
         isReconnecting = true
         defer { isReconnecting = false }
         var chosen: (URL, Schemas.SystemInfo)?
@@ -286,9 +355,13 @@ public final class AppSession {
             if server?.id == record.id {
                 lastError = "Can't reach \(record.name). Check that you're on the home network or connected to Tailscale."
                 state = token == nil ? .signedOut : .signedIn
+                updateReachability { $0.checked(reached: false) }
+                // Not offline on one failed check: a second soon decides.
+                if !isOffline { checkAddresses(after: 2) }
             }
             return
         }
+        updateReachability { $0.checked(reached: true) }
         // Learn the remote address the server advertises (Settings → Remote Access).
         if record.remoteURL == nil, let r = info.remoteUrl, let u = URL(string: r) {
             record.remoteURL = u
@@ -424,6 +497,7 @@ public final class AppSession {
         if let id = server?.id { ServerStore.forget(id) }
         server = nil
         reconnectServerID = nil
+        resetReachability()
         dropClients()
         baseURL = nil
         info = nil

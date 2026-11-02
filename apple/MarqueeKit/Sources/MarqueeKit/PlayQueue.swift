@@ -181,4 +181,15 @@ public struct PlayQueue: Sendable, Equatable {
         if index + 1 < entries.count { return index + 1 }
         return repeatMode != .off && !entries.isEmpty ? 0 : -1
     }
+
+    /// What a radio asks the server to leave out: the tracks queued, oldest first, each once
+    /// where it was queued last, and only the latest `limit` (a station runs for ever, and the
+    /// server repeats what's oldest here once everything has played).
+    public func stationExclude(limit: Int = 2000) -> [Int64] {
+        var seen = Set<Int64>(), latest: [Int64] = []
+        for e in entries.reversed() where latest.count < limit {
+            if seen.insert(e.item.id).inserted { latest.append(e.item.id) }
+        }
+        return latest.reversed()
+    }
 }

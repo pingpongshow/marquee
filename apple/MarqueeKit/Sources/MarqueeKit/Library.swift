@@ -6,6 +6,9 @@ public typealias Hub = Components.Schemas.Hub
 public typealias HomeEntry = Components.Schemas.HomeEntry
 public typealias Playlist = Components.Schemas.Playlist
 public typealias PlaylistEntry = Components.Schemas.PlaylistEntry
+public typealias PlaylistSharing = Components.Schemas.PlaylistSharing
+public typealias PlaylistShareTarget = Components.Schemas.PlaylistShareTarget
+public typealias ItemPage = Components.Schemas.ItemPage
 public typealias Person = Components.Schemas.PersonDetail
 public typealias SearchResults = Components.Schemas.SearchResults
 public typealias PlaybackSession = Components.Schemas.PlaybackSession
@@ -71,6 +74,12 @@ public extension AppSession {
     /// An artist's most-listened tracks in the library (MUSIC-15).
     func popularTracks(_ artistID: Int64) async throws -> [Item] {
         try await api.listPopularTracks(path: .init(itemId: artistID)).ok.body.json.items
+    }
+
+    /// An artist's top songs for this person (MUSIC-24): their favourites, songs they rated 3.5
+    /// stars or more, and what's popular, best first.
+    func topSongs(_ artistID: Int64, offset: Int = 0, limit: Int) async throws -> ItemPage {
+        try await api.listTopSongs(path: .init(itemId: artistID), query: .init(offset: offset, limit: limit)).ok.body.json
     }
 
     /// Playable items under a container, in play order.
@@ -192,6 +201,52 @@ public extension AppSession {
 
     func createPlaylist(title: String, kind: Schemas.PlaylistKind, items: [Int64]) async throws -> Playlist {
         try await api.createPlaylist(body: .json(.init(title: title, kind: kind, itemIds: items))).created.body.json
+    }
+
+    // MARK: Sharing playlists (MUSIC-24)
+
+    /// Who your playlist is shared with.
+    func playlistSharing(_ id: Int64) async throws -> PlaylistSharing {
+        try await api.getPlaylistSharing(path: .init(playlistId: id)).ok.body.json
+    }
+
+    /// Chooses who your playlist is shared with. They see it once they accept. `all` (everyone
+    /// on the server) is for admins; the server refuses it from anyone else, and nil leaves it.
+    func setPlaylistSharing(_ id: Int64, userIDs: [Int64], all: Bool?) async throws -> PlaylistSharing {
+        switch try await api.setPlaylistSharing(path: .init(playlistId: id), body: .json(.init(userIds: userIDs, all: all))) {
+        case let .ok(ok): return try ok.body.json
+        case let .forbidden(r): throw MarqueeError((try? r.body.json.message) ?? "Only an administrator can share a playlist with everyone.")
+        case .notFound: throw MarqueeError("This playlist is gone.")
+        default: throw MarqueeError("Couldn't save who it's shared with.")
+        }
+    }
+
+    /// The people on this server you can share a playlist with.
+    func playlistShareTargets() async throws -> [PlaylistShareTarget] {
+        try await api.listPlaylistShareTargets().ok.body.json
+    }
+
+    /// Playlists shared with you that you haven't accepted yet.
+    func playlistInvites() async throws -> [Playlist] {
+        try await api.listPlaylistInvites().ok.body.json
+    }
+
+    /// Accepts a playlist shared with you: it joins your playlists, read-only.
+    func acceptPlaylistShare(_ id: Int64) async throws -> Playlist {
+        switch try await api.acceptPlaylistShare(path: .init(playlistId: id)) {
+        case let .ok(ok): return try ok.body.json
+        case .notFound: throw MarqueeError("This playlist is no longer shared with you.")
+        default: throw MarqueeError("Couldn't accept the playlist.")
+        }
+    }
+
+    /// Declines a playlist shared with you, or removes it from your playlists. The owner's stays;
+    /// getting it back takes them sharing it again.
+    func removePlaylistShare(_ id: Int64) async throws {
+        switch try await api.removePlaylistShare(path: .init(playlistId: id)) {
+        case .noContent, .notFound: return
+        default: throw MarqueeError("Couldn't remove the playlist.")
+        }
     }
 
     func approveQuickConnect(code: String) async throws -> String {

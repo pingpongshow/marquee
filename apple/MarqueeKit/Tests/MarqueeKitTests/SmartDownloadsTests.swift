@@ -77,9 +77,26 @@ struct SmartDownloadsTests {
         var s = SmartDownloadSettings()
         #expect(s.wifiOnly && s.episodesPerShow == 3 && !s.showsEnabled && !s.musicEnabled)
         s.showsBudget = .percentOfFree(25)
-        s.quality = .high
         let back = try JSONDecoder().decode(SmartDownloadSettings.self, from: JSONEncoder().encode(s))
         #expect(back == s)
+    }
+
+    /// Episodes now use Settings' video quality: the picker's old saved value is ignored.
+    @Test func oldSavedQualityIsIgnored() throws {
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(SmartDownloadSettings())) as? [String: Any] ?? [:]
+        json["quality"] = "low"
+        json["wifiOnly"] = false
+        let back = try JSONDecoder().decode(SmartDownloadSettings.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(!back.wifiOnly)
+    }
+
+    @Test func songEstimatesFollowTheQualityUpToTheFilesOwnBitrate() {
+        let four = Int64(240_000)
+        #expect(SmartSelection.estimatedBytes(durationMs: four, quality: .high, isTrack: true) == 7_680_000)
+        #expect(SmartSelection.estimatedBytes(durationMs: four, quality: .medium, isTrack: true) == 4_800_000)
+        #expect(SmartSelection.estimatedBytes(durationMs: four, quality: .low, isTrack: true) == 2_880_000)
+        // A 128 kbps file isn't made bigger by High.
+        #expect(SmartSelection.estimatedBytes(durationMs: four, quality: .high, isTrack: true, audioKbps: 128) == 3_840_000)
     }
 }
 

@@ -211,8 +211,7 @@ final class MarqueeUITests: XCTestCase {
         }
         let download = app.buttons["Download"]
         XCTAssertTrue(download.waitForExistence(timeout: 10))
-        download.tap()
-        app.buttons["Medium (720p)"].tap()
+        download.tap() // one tap: at the quality chosen in Settings
         XCTAssertTrue(app.buttons["Downloaded"].waitForExistence(timeout: 120), "conversion and download finish")
         shot("d1-downloaded")
 

@@ -1,23 +1,70 @@
 import Foundation
 import MarqueeAPI
 import Observation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 public typealias DownloadInfo = Components.Schemas.Download
 
-/// Offline downloads (M7, MUSIC-14): videos (original or converted on the server) and music
-/// tracks kept on this device, plus progress made while offline, synced when the server is
+/// Offline downloads (M7, MUSIC-14): videos and music tracks, original or converted on the
+/// server, kept on this device, plus progress made while offline, synced when the server is
 /// reachable again. Files live in Application Support so the system doesn't purge them.
 @MainActor @Observable
 public final class Downloads {
+    /// What a quality setting is for: songs and videos have one each.
+    public enum Kind: Sendable {
+        case song, video
+    }
+
     public enum Quality: String, Codable, CaseIterable, Sendable {
         case original, high, medium, low
-        public var label: String {
-            switch self {
-            case .original: "Original"
-            case .high: "High (1080p)"
-            case .medium: "Medium (720p)"
-            case .low: "Low (480p)"
+
+        public func label(_ kind: Kind) -> String {
+            switch (self, kind) {
+            case (.original, _): "Original"
+            case (.high, .song): "High (256 kbps)"
+            case (.medium, .song): "Medium (160 kbps)"
+            case (.low, .song): "Low (96 kbps)"
+            case (.high, .video): "High (1080p)"
+            case (.medium, .video): "Medium (720p)"
+            case (.low, .video): "Low (480p)"
             }
+        }
+
+        /// About how much room it takes: per four-minute song, or per hour of video. An
+        /// original is as big as its file, so that's only a rough idea.
+        public func sizeGuide(_ kind: Kind) -> String {
+            let about = self == .original ? "Varies, often" : "About"
+            switch kind {
+            case .song:
+                let bytes = SmartSelection.estimatedBytes(durationMs: 240_000, quality: self, isTrack: true)
+                return "\(about) \(String(format: "%.0f", Double(bytes) / 1_000_000)) MB a song"
+            case .video:
+                let bytes = SmartSelection.estimatedBytes(durationMs: 3_600_000, quality: self)
+                return "\(about) \(String(format: "%.1f", Double(bytes) / 1_000_000_000)) GB an hour"
+            }
+        }
+
+        /// The next quality down, Low being the lowest.
+        var lower: Quality {
+            switch self {
+            case .original: .high
+            case .high: .medium
+            case .medium, .low: .low
+            }
+        }
+
+        /// Free space under this (16 GB) takes the recommendation one step lower.
+        public static let lowStorageBytes: Int64 = 16_000_000_000
+
+        /// The quality recommended, and used until the person chooses: songs High; videos Medium
+        /// on iPhone and High on iPad; one step lower with little free space (`freeBytes` nil
+        /// when it can't be told).
+        public static func recommended(_ kind: Kind, isPad: Bool, freeBytes: Int64?) -> Quality {
+            let wide: Quality = kind == .song || isPad ? .high : .medium
+            if let freeBytes, freeBytes < lowStorageBytes { return wide.lower }
+            return wide
         }
     }
 
@@ -38,6 +85,8 @@ public final class Downloads {
         public var size: Int64
         public var jobID: String?
         public var url: String? // server path to fetch
+        /// The file's name on the server, when it's ready: its extension is the one to keep.
+        public var fileName: String?
         public var added: Date
         public var resumeMs: Int64?
         /// Downloaded because a synced playlist has it (removed when no synced playlist does).
@@ -114,8 +163,48 @@ public final class Downloads {
     private static var indexURL: URL { directory.appending(path: "index.json") }
     private static var playlistsURL: URL { directory.appending(path: "playlists.json") }
 
+    private static var playlistInfoURL: URL { directory.appending(path: "playlist-info.json") }
+
     /// Playlists kept on the device (MUSIC-19): playlist id -> its items when last synced.
     public private(set) var syncedPlaylists: [Int64: Set<Int64>] = [:]
+
+    /// A kept playlist as the offline library shows it. Known once it has synced.
+    public struct SyncedPlaylist: Codable, Sendable {
+        public let id: Int64
+        public let title: String
+        public let isAudio: Bool
+        public let items: [Int64]
+        public init(id: Int64, title: String, isAudio: Bool, items: [Int64]) {
+            self.id = id
+            self.title = title
+            self.isAudio = isAudio
+            self.items = items
+        }
+    }
+
+    @ObservationIgnored private var playlistInfo: [Int64: SyncedPlaylist] = [:]
+
+    /// The song and video qualities chosen in Settings; nil until chosen (the recommended one
+    /// is used). What's already downloaded keeps the quality it came at.
+    public private(set) var songChoice = Downloads.savedChoice(Downloads.songQualityKey)
+    public private(set) var videoChoice = Downloads.savedVideoChoice()
+
+    private static let songQualityKey = "marquee.downloads.songQuality"
+    private static let videoQualityKey = "marquee.downloads.videoQuality"
+
+    private static func savedChoice(_ key: String) -> Quality? {
+        UserDefaults.standard.string(forKey: key).flatMap(Quality.init(rawValue:))
+    }
+
+    /// 1.6.0 kept a video quality in Smart Downloads' settings: it carries over, once.
+    private static func savedVideoChoice() -> Quality? {
+        if let chosen = savedChoice(videoQualityKey) { return chosen }
+        guard let data = UserDefaults.standard.data(forKey: "marquee.smartDownloads"),
+              let old = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let q = (old["quality"] as? String).flatMap(Quality.init(rawValue:)) else { return nil }
+        UserDefaults.standard.set(q.rawValue, forKey: videoQualityKey)
+        return q
+    }
 
     public init() {
         if let data = try? Data(contentsOf: Self.indexURL), let list = try? JSONDecoder().decode([Entry].self, from: data) {
@@ -123,6 +212,9 @@ public final class Downloads {
         }
         if let data = try? Data(contentsOf: Self.playlistsURL), let m = try? JSONDecoder().decode([Int64: Set<Int64>].self, from: data) {
             syncedPlaylists = m
+        }
+        if let data = try? Data(contentsOf: Self.playlistInfoURL), let m = try? JSONDecoder().decode([Int64: SyncedPlaylist].self, from: data) {
+            playlistInfo = m
         }
         let config = URLSessionConfiguration.background(withIdentifier: "app.marquee.downloads")
         config.sessionSendsLaunchEvents = true
@@ -184,10 +276,50 @@ public final class Downloads {
         }
     }
 
+    // MARK: - Quality
+
+    public func quality(_ kind: Kind) -> Quality {
+        (kind == .song ? songChoice : videoChoice) ?? recommendedQuality(kind)
+    }
+
+    public func recommendedQuality(_ kind: Kind) -> Quality {
+        .recommended(kind, isPad: Self.isPad, freeBytes: Self.freeBytes)
+    }
+
+    public func setQuality(_ quality: Quality, for kind: Kind) {
+        switch kind {
+        case .song:
+            songChoice = quality
+            UserDefaults.standard.set(quality.rawValue, forKey: Self.songQualityKey)
+        case .video:
+            videoChoice = quality
+            UserDefaults.standard.set(quality.rawValue, forKey: Self.videoQualityKey)
+        }
+    }
+
+    private static var isPad: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
+        #endif
+    }
+
+    /// The device's free space, nil when it can't be told.
+    static var freeBytes: Int64? {
+        #if os(tvOS)
+        let values = try? directory.resourceValues(forKeys: [.volumeAvailableCapacityKey])
+        return (values?.volumeAvailableCapacity).map(Int64.init)
+        #else
+        let values = try? directory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        return values?.volumeAvailableCapacityForImportantUsage
+        #endif
+    }
+
     // MARK: - Playlists
 
-    /// Keeps a playlist on the device: downloads what's new in it and drops what left it
-    /// (tracks downloaded on their own are never removed). Videos come at Medium quality.
+    /// Keeps a playlist on the device: downloads what's new in it, at the qualities chosen in
+    /// Settings, and drops what left it (tracks downloaded on their own are never removed).
     public func syncPlaylist(_ id: Int64) async {
         guard let app, let entriesNow = try? await app.playlistItems(id) else { return }
         let items = entriesNow.map(\.item).filter { [.track, .movie, .episode, .video].contains($0._type) }
@@ -195,8 +327,13 @@ public final class Downloads {
         let before = syncedPlaylists[id] ?? []
         syncedPlaylists[id] = now
         savePlaylists()
+        // What the offline library needs to show it without the server.
+        if let p = try? await app.playlist(id) {
+            playlistInfo[id] = SyncedPlaylist(id: id, title: p.title, isAudio: p.kind == .audio, items: items.map(\.id))
+            savePlaylists()
+        }
         for it in items where entries[it.id] == nil {
-            try? await download(it, quality: it._type == .track ? .original : .medium)
+            try? await download(it)
             entries[it.id]?.viaPlaylist = true
         }
         save()
@@ -206,6 +343,7 @@ public final class Downloads {
     /// Stops keeping a playlist; its tracks go unless another synced playlist has them.
     public func unsyncPlaylist(_ id: Int64) {
         guard let ids = syncedPlaylists.removeValue(forKey: id) else { return }
+        playlistInfo[id] = nil
         savePlaylists()
         dropOrphans(Array(ids))
     }
@@ -227,17 +365,44 @@ public final class Downloads {
 
     private func savePlaylists() {
         if let data = try? JSONEncoder().encode(syncedPlaylists) { try? data.write(to: Self.playlistsURL, options: .atomic) }
+        if let data = try? JSONEncoder().encode(playlistInfo) { try? data.write(to: Self.playlistInfoURL, options: .atomic) }
+    }
+
+    /// What's on the device, for the offline library.
+    public var offlineLibrary: OfflineLibrary {
+        OfflineLibrary(items: entries.values.filter { $0.state == .done }.map(\.item),
+                       // One kept since before 1.7.0 has no saved details until it next syncs online.
+                       playlists: syncedPlaylists.map { id, items in
+                           playlistInfo[id] ?? SyncedPlaylist(id: id, title: "Playlist", isAudio: items.contains { entries[$0]?.item._type == .track }, items: Array(items))
+                       })
     }
 
     // MARK: - Starting and removing
 
-    /// Downloads an item (a movie, episode or track) at a quality. Tracks are always original.
-    public func download(_ item: Item, quality: Quality) async throws {
+    /// Downloads an item (a movie, episode or track) at the quality chosen in Settings for its
+    /// kind. Anything but Original is converted on the server first.
+    public func download(_ item: Item) async throws {
+        try await start(item, replacing: nil)
+    }
+
+    private func start(_ item: Item, replacing old: Entry?) async throws {
         guard let app, let client = app.client else { throw MarqueeError("Not connected") }
-        let q: Quality = item._type == .track ? .original : quality
+        let q = quality(item._type == .track ? .song : .video)
         let info = try await client.createDownload(body: .json(.init(itemId: item.id, quality: .init(rawValue: q.rawValue)!))).ok.body.json
-        var entry = Entry(item: item, quality: q, state: .preparing(0), file: nil, poster: nil, size: info.size ?? 0,
-                          jobID: info.id.hasPrefix("original-") ? nil : info.id, url: info.url, added: Date())
+        var entry = Entry(item: item, quality: q, state: .preparing(0), file: nil, poster: old?.poster, size: info.size ?? 0,
+                          jobID: info.id.hasPrefix("original-") ? nil : info.id, url: info.url, fileName: info.fileName, added: old?.added ?? Date())
+        if let old {
+            // Tried again: still what it was (a smart download, a synced playlist's).
+            entry.viaPlaylist = old.viaPlaylist
+            entry.trackGainDb = old.trackGainDb
+            entry.albumGainDb = old.albumGainDb
+            entry.peak = old.peak
+            entry.gainsChecked = old.gainsChecked
+            entry.smart = old.smart
+            entry.smartOwner = old.smartOwner
+            // The server keeps failed conversions a while: this one's done with.
+            if let job = old.jobID, job != entry.jobID { Task { _ = try? await client.deleteDownload(path: .init(downloadId: job)) } }
+        }
         if info.status == .ready, let url = info.url {
             entry.state = .downloading(0)
             entries[item.id] = entry
@@ -255,10 +420,22 @@ public final class Downloads {
     }
 
     /// Downloads every playable item under a container (season, show, album, artist, playlist).
-    public func download(children items: [Item], quality: Quality) async {
+    public func download(children items: [Item]) async {
         for it in items where entries[it.id] == nil {
-            try? await download(it, quality: quality)
+            try? await download(it)
         }
+    }
+
+    /// Tries a failed download again (a conversion that failed, a transfer that did).
+    public func retry(_ itemID: Int64) async throws {
+        guard let e = entries[itemID], case .failed = e.state else { return }
+        try await start(e.item, replacing: e)
+    }
+
+    /// Tries every failed download again.
+    public func retryFailed() async {
+        let failed = entries.values.filter { if case .failed = $0.state { return true }; return false }
+        for e in failed { try? await retry(e.id) }
     }
 
     /// Tags a download as smart downloads' (kind "shows" or "music"), or clears the tag (nil):
@@ -343,6 +520,15 @@ public final class Downloads {
 
     public var totalBytes: Int64 { entries.values.filter { $0.state == .done }.reduce(0) { $0 + $1.size } }
 
+    /// How many downloads have finished.
+    public var doneCount: Int { entries.values.filter { $0.state == .done }.count }
+
+    /// A download's picture on the device, for showing it offline.
+    public static func posterFile(_ itemID: Int64) -> URL? {
+        let u = directory.appending(path: "\(itemID)-poster.jpg")
+        return FileManager.default.fileExists(atPath: u.path) ? u : nil
+    }
+
     // MARK: - Offline progress
 
     /// Where to resume a downloaded item: progress made offline, else the server's.
@@ -375,41 +561,58 @@ public final class Downloads {
         }
     }
 
-    /// Checks the conversions under way; false when the server couldn't be reached.
+    /// Checks the conversions under way, all with one request however many there are (an album
+    /// can queue hundreds); false when the server couldn't be reached.
     private func checkConversions() async -> Bool {
-        guard let client = app?.client else { return false }
-        var asked = false, reached = false
-        for e in entries.values {
-            guard case .preparing = e.state, let job = e.jobID else { continue }
-            asked = true
-            let response: Operations.GetDownload.Output
-            do { response = try await client.getDownload(path: .init(downloadId: job)) } catch { continue }
-            // Signed out: stop, and start again on signing in (attach).
-            if case .unauthorized = response { continue }
-            reached = true
-            if case .notFound = response {
+        guard let client = app?.client, !(app?.isOffline ?? false) else { return false }
+        // Only what was waiting before asking: a job queued since may not be in the answer.
+        let waiting = entries.values.filter { if case .preparing = $0.state { return $0.jobID != nil }; return false }
+        guard !waiting.isEmpty else { return true }
+        let response: Operations.ListDownloads.Output
+        do { response = try await client.listDownloads() } catch { return false }
+        // Signed out: stop, and start again on signing in (attach).
+        if case .unauthorized = response { return false }
+        guard let list = try? response.ok.body.json else { return true } // a server error: next time
+        let jobs = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var changed = false
+        for e in waiting {
+            guard case .preparing = entries[e.id]?.state, entries[e.id]?.jobID == e.jobID, let job = e.jobID else { continue }
+            guard let info = jobs[job] else {
+                // The list holds the latest 2000: beyond that a job may just not be in it.
+                guard list.count < Self.jobListLimit else { continue }
                 // The server no longer has the conversion (removed, or expired): asking again
                 // would poll for ever.
-                entries[e.id]?.state = .failed("The server no longer has this download. Remove it and download it again.")
+                entries[e.id]?.state = .failed("The server no longer has this download. Try again, or remove it.")
                 entries[e.id]?.jobID = nil
+                changed = true
                 continue
             }
-            guard let info = try? response.ok.body.json else { continue }
             switch info.status {
             case .ready:
                 entries[e.id]?.url = info.url
+                entries[e.id]?.fileName = info.fileName
                 entries[e.id]?.size = info.size ?? 0
                 entries[e.id]?.state = .downloading(0)
                 if let u = info.url { fetch(itemID: e.id, path: u) }
+                changed = true
             case .failed:
                 entries[e.id]?.state = .failed(info.error ?? "Conversion failed")
+                changed = true
             default:
-                entries[e.id]?.state = .preparing(Double(info.progress))
+                // Unchanged for most of an album while it waits: no redraw for those.
+                let p = Double(info.progress)
+                if entries[e.id]?.state != .preparing(p) {
+                    entries[e.id]?.state = .preparing(p)
+                    changed = true
+                }
             }
         }
-        save()
-        return reached || !asked
+        if changed { save() }
+        return true
     }
+
+    /// The most jobs GET /downloads lists.
+    private static let jobListLimit = 2000
 
     // MARK: - Transfers
 
@@ -456,7 +659,7 @@ public final class Downloads {
             try? FileManager.default.removeItem(at: temp)
             return
         }
-        let ext = (suggested as NSString?)?.pathExtension.nilIfEmpty ?? (e.quality == .original ? "mkv" : "mp4")
+        let ext = Self.fileExtension(serverName: e.fileName, suggested: suggested, quality: e.quality, isTrack: e.item._type == .track)
         let name = "\(itemID).\(ext)"
         let dest = Self.directory.appending(path: name)
         try? FileManager.default.removeItem(at: dest)
@@ -476,6 +679,16 @@ public final class Downloads {
         if let job = e.jobID, let client = app?.client {
             Task { _ = try? await client.deleteDownload(path: .init(downloadId: job)) }
         }
+    }
+
+    /// The extension to keep a download under (the player goes by it): the server's name for the
+    /// file, else what the transfer suggested, else what its conversion makes (songs M4A, videos MP4).
+    nonisolated static func fileExtension(serverName: String?, suggested: String?, quality: Quality, isTrack: Bool) -> String {
+        for name in [serverName, suggested] {
+            if let ext = (name as NSString?)?.pathExtension, !ext.isEmpty { return ext }
+        }
+        if isTrack { return "m4a" }
+        return quality == .original ? "mkv" : "mp4"
     }
 
     fileprivate func failed(itemID: Int64, message: String, network: Bool = false, resumeData: Data? = nil, url: URL? = nil) {
@@ -580,8 +793,4 @@ private final class SessionBridge: NSObject, URLSessionDownloadDelegate, @unchec
         completion = nil
         DispatchQueue.main.async { done?() }
     }
-}
-
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

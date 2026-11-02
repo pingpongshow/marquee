@@ -71,7 +71,7 @@ public final class TimeLimits {
     @discardableResult
     public func refresh(_ app: AppSession) async -> TimeLimitStatus? {
         select(app)
-        guard let client = app.client else { return status }
+        guard let client = app.client, !app.isOffline else { return status }
         let asked = key
         guard case let .ok(ok) = try? await client.myTimeLimit(), let fresh = try? ok.body.json else { return status }
         guard asked == key else { return status } // another person signed in meanwhile

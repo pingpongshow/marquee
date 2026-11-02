@@ -114,6 +114,15 @@ struct MainView: View {
         // top bar fits only about six tabs; the sidebar lists them all, and Back from the top of
         // a page (or Left from its leftmost item) opens it. iPhone keeps its tab bar.
         .tabViewStyle(.sidebarAdaptable)
+        #if os(iOS)
+        // Offline, the Offline Library takes over; the tabs stay underneath, hidden, so where you
+        // were is still there when the server comes back.
+        .opacity(app.isOffline ? 0 : 1)
+        .allowsHitTesting(!app.isOffline)
+        .accessibilityHidden(app.isOffline)
+        .overlay { if app.isOffline { OfflineMainView() } }
+        .offlineBanner()
+        #endif
         .environment(video)
         // A rating request after a movie or episode ended (USER-19).
         .ratingPromptOverlay(active: linkedItem == nil)
@@ -130,7 +139,11 @@ struct MainView: View {
                     await app.refreshMe()
                 }
             }
+            // Offline: see at once whether the server can be reached now.
+            if old != new, new == .active, app.isOffline { Task { await app.reconnect() } }
         }
+        // Back online: Home shows what's new, and what failed meanwhile loads.
+        .onChange(of: app.isOffline) { if !app.isOffline { HomeChanges.shared.version += 1 } }
         // A video played: its watched state is the server's again.
         .onChange(of: video.request) { old, new in
             if new == nil, let old { WatchStore.shared.played(old.itemID) }
@@ -140,7 +153,7 @@ struct MainView: View {
             #endif
         }
         // Again whenever the connection changes (another address, reconnected, signed in).
-        .task(id: "\(app.baseURL?.absoluteString ?? "")|\(app.state)|\(app.me?.id ?? 0)") { await loadAll() }
+        .task(id: "\(app.baseURL?.absoluteString ?? "")|\(app.state)|\(app.me?.id ?? 0)|\(app.isOffline)") { await loadAll() }
         .sheet(item: $playlistPicker.item) { item in AddToPlaylistSheet(item: item) }
         .sheet(item: $journey.from) { item in JourneySheet(from: item) }
         .alert("Something went wrong", isPresented: Binding(get: { actionError.message != nil }, set: { if !$0 { actionError.message = nil } })) {
@@ -260,7 +273,7 @@ struct MainView: View {
     }
 
     private func loadAll() async {
-        guard app.client != nil else { return }
+        guard app.client != nil, !app.isOffline else { return }
         async let requests = try? app.requestsStatus()
         async let live = try? app.liveStatus()
         async let vod = try? app.vodStatus()

@@ -8,6 +8,8 @@ enum Route: Hashable {
     case person(Int64)
     case playlist(Int64)
     case playlists
+    /// All of an artist's top songs (MUSIC-24), from the artist page's More.
+    case topSongs(artist: Int64, name: String)
     case downloads
     case discover
     /// Live TV, listed with the libraries.
@@ -46,6 +48,8 @@ enum SettingsPage: Hashable {
     case equalizer
     /// Smart downloads (iPhone/iPad): next episodes and favourite music kept on the device.
     case smartDownloads
+    /// The quality songs or videos download at (iPhone/iPad).
+    case downloadQuality(song: Bool)
 }
 
 /// The full lists behind a music library's landing page.
@@ -80,6 +84,7 @@ private func routeView(_ route: Route) -> some View {
     case .person(let id): PersonView(id: id)
     case .playlist(let id): PlaylistView(id: id)
     case .playlists: PlaylistsView()
+    case let .topSongs(artist, name): TopSongsView(artistID: artist, artistName: name)
     #if os(iOS)
     case .downloads: DownloadsView()
     #else
@@ -135,8 +140,9 @@ private func settingsPage(_ page: SettingsPage) -> some View {
     case .integrations: IntegrationsView()
     case .equalizer: EqualizerView()
     case .smartDownloads: SmartDownloadsSettingsView()
+    case let .downloadQuality(song): DownloadQualityView(kind: song ? .song : .video)
     #else
-    case .librarySettings, .libraryHealth, .integrations, .equalizer, .smartDownloads: EmptyView()
+    case .librarySettings, .libraryHealth, .integrations, .equalizer, .smartDownloads, .downloadQuality: EmptyView()
     #endif
     }
 }

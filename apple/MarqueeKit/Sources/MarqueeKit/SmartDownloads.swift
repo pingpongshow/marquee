@@ -45,8 +45,6 @@ public struct SmartDownloadSettings: Codable, Equatable, Sendable {
     public var musicBudget: SmartBudget = .gigabytes(2)
     /// Only download on Wi-Fi (or Ethernet), not over mobile data.
     public var wifiOnly = true
-    /// Episodes' quality (tracks are always the original).
-    public var quality: Downloads.Quality = .medium
 
     public static let episodeChoices = [1, 2, 3, 5]
 
@@ -128,13 +126,20 @@ public enum SmartSelection {
     }
 
     /// About how big a download will be: its length at the quality's bitrate (the server's
-    /// conversions: 1080p ≈ 4.7 Mbps, 720p ≈ 2.4, 480p ≈ 1.1, audio included). Originals are
-    /// guessed at 10 Mbps for video and the file's own bitrate (else 1 Mbps) for music.
+    /// conversions: 1080p ≈ 4.7 Mbps, 720p ≈ 2.4, 480p ≈ 1.1, audio included; songs 256, 160 and
+    /// 96 kbps, never above the file's own). Originals are guessed at 10 Mbps for video and the
+    /// file's own bitrate (else 1 Mbps) for music.
     public static func estimatedBytes(durationMs: Int64?, quality: Downloads.Quality, isTrack: Bool = false, audioKbps: Int? = nil) -> Int64 {
         let ms = max(0, durationMs ?? (isTrack ? 240_000 : 45 * 60_000))
         let kbps: Int64
         if isTrack {
-            kbps = Int64(audioKbps.flatMap { $0 > 0 ? $0 : nil } ?? 1000)
+            let own = Int64(audioKbps.flatMap { $0 > 0 ? $0 : nil } ?? 1000)
+            switch quality {
+            case .original: kbps = own
+            case .high: kbps = min(own, 256)
+            case .medium: kbps = min(own, 160)
+            case .low: kbps = min(own, 96)
+            }
         } else {
             switch quality {
             case .original: kbps = 10_000
@@ -235,7 +240,7 @@ public final class SmartDownloads {
         // Switched off: what it downloaded goes.
         for kind in Kind.allCases where !enabled(kind) { removeOwn(kind, keeping: [], app: app) }
         guard settings.showsEnabled || settings.musicEnabled else { note = nil; return }
-        guard app.client != nil, let me = app.me else { note = "Waiting for the server."; return }
+        guard app.client != nil, !app.isOffline, let me = app.me else { note = "Waiting for the server."; return }
         // Plays made offline reach the server first, so what was watched is known.
         await OfflineSync.shared.flush()
         let mayDownload = !settings.wifiOnly || onWiFi
@@ -248,15 +253,7 @@ public final class SmartDownloads {
         kind == .shows ? settings.showsEnabled : settings.musicEnabled
     }
 
-    private var freeBytes: Int64 {
-        #if os(tvOS)
-        let values = try? Downloads.directory.resourceValues(forKeys: [.volumeAvailableCapacityKey])
-        return Int64(values?.volumeAvailableCapacity ?? 0)
-        #else
-        let values = try? Downloads.directory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        return values?.volumeAvailableCapacityForImportantUsage ?? 0
-        #endif
-    }
+    private var freeBytes: Int64 { Downloads.freeBytes ?? 0 }
 
     /// The space an item takes against a kind's budget.
     private func cost(_ item: Item, kind: Kind, estimate: () -> Int64) -> Int64 {
@@ -279,11 +276,11 @@ public final class SmartDownloads {
     }
 
     /// Starts downloads (at most `limit` a run; the next run carries on).
-    private func start(_ items: [Item], kind: Kind, app: AppSession, quality: Downloads.Quality, limit: Int) async {
+    private func start(_ items: [Item], kind: Kind, app: AppSession, limit: Int) async {
         let me = owner(app)
         for item in items.prefix(limit) where downloads.entries[item.id] == nil {
             do {
-                try await downloads.download(item, quality: quality)
+                try await downloads.download(item)
                 downloads.markSmart(item.id, kind: kind.rawValue, owner: me)
             } catch {
                 note = "Couldn't download \(item.title): \(error.localizedDescription)"
@@ -303,7 +300,7 @@ public final class SmartDownloads {
             seen.insert(show)
             shows.append((show, entry.lastWatchedAt))
         }
-        let perShow = settings.episodesPerShow, quality = settings.quality
+        let perShow = settings.episodesPerShow, quality = downloads.quality(.video)
         var candidates: [SmartSelection.Show] = []
         var items: [Int64: Item] = [:]
         var estimate: Int64 = 0
@@ -327,7 +324,7 @@ public final class SmartDownloads {
         removeOwn(.shows, keeping: wanted, app: app)
         guard mayDownload else { return }
         let add = SmartSelection.additions(wanted: wanted, present: Set(downloads.entries.keys))
-        await start(add.compactMap { items[$0] }, kind: .shows, app: app, quality: quality, limit: 40)
+        await start(add.compactMap { items[$0] }, kind: .shows, app: app, limit: 40)
     }
 
     // MARK: Music
@@ -337,13 +334,14 @@ public final class SmartDownloads {
         let music = libraries.filter { $0._type == .music }
         guard !music.isEmpty else { removeOwn(.music, keeping: [], app: app); return }
         let budget = settings.musicBudget.bytes(free: freeBytes, held: bytes(.music))
+        let quality = downloads.quality(.song)
         var items: [Int64: Item] = [:]
         var estimate: Int64 = 0
         func candidates(_ tracks: [Item]) -> [SmartSelection.Candidate] {
             tracks.filter { $0._type == .track && items[$0.id] == nil }.map { t in
                 items[t.id] = t
                 let c = SmartSelection.Candidate(id: t.id, bytes: cost(t, kind: .music) {
-                    SmartSelection.estimatedBytes(durationMs: t.durationMs, quality: .original, isTrack: true, audioKbps: t.audioFormat?.bitrateKbps)
+                    SmartSelection.estimatedBytes(durationMs: t.durationMs, quality: quality, isTrack: true, audioKbps: t.audioFormat?.bitrateKbps)
                 })
                 estimate += c.bytes
                 return c
@@ -394,6 +392,6 @@ public final class SmartDownloads {
         removeOwn(.music, keeping: wanted, app: app)
         guard mayDownload else { return }
         let add = SmartSelection.additions(wanted: wanted, present: Set(downloads.entries.keys))
-        await start(add.compactMap { items[$0] }, kind: .music, app: app, quality: .original, limit: 200)
+        await start(add.compactMap { items[$0] }, kind: .music, app: app, limit: 200)
     }
 }

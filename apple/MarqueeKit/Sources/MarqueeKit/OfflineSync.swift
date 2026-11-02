@@ -267,7 +267,8 @@ public final class OfflineSync {
             change.server = s.server
             change.user = s.user
         }
-        guard let client = app?.client else { enqueue(change); return false }
+        // Offline: no point waiting for a request to time out.
+        guard let client = app?.client, app?.isOffline != true else { enqueue(change); return false }
         let status: Int, message: String?
         do {
             (status, message) = try await Self.send(change, client)
@@ -317,7 +318,8 @@ public final class OfflineSync {
         defer { flushing = false; isSyncing = false }
         repeat {
             flushAgain = false
-            guard let app, app.state == .signedIn, app.client != nil, !queue.entries.isEmpty else { return }
+            // While offline they wait: a reconnect sends them as soon as the server is back.
+            guard let app, app.state == .signedIn, app.client != nil, !app.isOffline, !queue.entries.isEmpty else { return }
             if app.me == nil { await app.refreshMe() }
             guard let client = app.client, let server = app.server?.id, let user = app.me?.id else { return }
             var sent = false, unreachable = false

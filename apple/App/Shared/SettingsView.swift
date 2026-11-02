@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(MusicPlayer.self) private var music
     #if os(iOS)
     @Environment(SmartDownloads.self) private var smart
+    @Environment(Downloads.self) private var downloads
     #endif
     @State private var local = QualityPreference.local
     @State private var remote = QualityPreference.remote
@@ -18,34 +19,37 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Signed in") {
-                HStack(spacing: 14) {
-                    AvatarView(name: app.me?.displayName ?? "?", url: app.me?.avatarUrl, size: 48)
-                    VStack(alignment: .leading) {
-                        Text(app.me?.displayName ?? "").font(.headline)
-                        Text("@\(app.me?.username ?? "")").font(.caption).foregroundStyle(.secondary)
+            // Offline: only what works without the server.
+            if !app.offlineUI {
+                Section("Signed in") {
+                    HStack(spacing: 14) {
+                        AvatarView(name: app.me?.displayName ?? "?", url: app.me?.avatarUrl, size: 48)
+                        VStack(alignment: .leading) {
+                            Text(app.me?.displayName ?? "").font(.headline)
+                            Text("@\(app.me?.username ?? "")").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
+                    NavigationLink("Your Stats", value: Route.settings(.stats))
+                    if app.me?.isAdmin == true {
+                        NavigationLink("Requests", value: Route.settings(.requests))
+                        NavigationLink("Users and Friends", value: Route.settings(.users))
+                        NavigationLink("Cinema Trailers", value: Route.settings(.cinema))
+                        #if os(iOS)
+                        NavigationLink("Library Settings", value: Route.settings(.librarySettings))
+                        NavigationLink("Library Health", value: Route.settings(.libraryHealth))
+                        NavigationLink("Integrations", value: Route.settings(.integrations))
+                        #endif
+                    }
+                    NavigationLink("Edit Home", value: Route.settings(.editHome))
+                    NavigationLink("Subtitle Appearance", value: Route.settings(.subtitleAppearance))
+                    Button("Switch Profile") { switching = true }
+                    Button("Sign Out", role: .destructive) { Task { await app.signOut() } }
                 }
-                NavigationLink("Your Stats", value: Route.settings(.stats))
-                if app.me?.isAdmin == true {
-                    NavigationLink("Requests", value: Route.settings(.requests))
-                    NavigationLink("Users and Friends", value: Route.settings(.users))
-                    NavigationLink("Cinema Trailers", value: Route.settings(.cinema))
-                    #if os(iOS)
-                    NavigationLink("Library Settings", value: Route.settings(.librarySettings))
-                    NavigationLink("Library Health", value: Route.settings(.libraryHealth))
-                    NavigationLink("Integrations", value: Route.settings(.integrations))
-                    #endif
-                }
-                NavigationLink("Edit Home", value: Route.settings(.editHome))
-                NavigationLink("Subtitle Appearance", value: Route.settings(.subtitleAppearance))
-                Button("Switch Profile") { switching = true }
-                Button("Sign Out", role: .destructive) { Task { await app.signOut() } }
             }
             PendingSyncSection()
             Section {
                 LabeledContent("Server", value: app.server?.name ?? "")
-                LabeledContent("Connected via", value: app.isRemote ? "Tailscale (away)" : "Home network")
+                LabeledContent("Connected via", value: app.offlineUI ? "Offline" : app.isRemote ? "Tailscale (away)" : "Home network")
                 if let u = app.server?.lanURL { LabeledContent("Home address", value: u.absoluteString) }
                 if let u = app.server?.remoteURL { LabeledContent("Away address", value: u.absoluteString) }
                 LabeledContent("Server version", value: app.info?.version ?? "")
@@ -68,50 +72,52 @@ struct SettingsView: View {
             } footer: {
                 Text("Original plays files untouched when this device supports them. Automatic picks the best quality your connection allows.")
             }
-            Section {
-                Toggle("Play trailers before movies", isOn: Binding(get: { app.cinemaTrailersPreference }, set: { on in
-                    Task {
-                        do { try await app.setCinemaTrailers(on); trailersError = nil } catch { trailersError = error.localizedDescription }
-                    }
-                }))
-                if let trailersError { Text(trailersError).font(.caption).foregroundStyle(.red) }
-            } footer: {
-                Text("When the server has cinema trailers on, they play before a movie you start from the beginning.")
-            }
-            Section {
-                Toggle("Night mode by default", isOn: Binding(get: { app.nightModePreference }, set: { on in
-                    Task {
-                        do { try await app.setNightMode(on); nightError = nil } catch { nightError = error.localizedDescription }
-                    }
-                }))
-                .accessibilityIdentifier("nightModePreference")
-                if let nightError { Text(nightError).font(.caption).foregroundStyle(.red) }
-            } footer: {
-                Text("Quieter loud scenes, clearer dialogue. You can still switch it for one video in the player's audio options.")
-            }
-            // Rating requests when a movie or episode ends (USER-19): the server-wide switch
-            // for admins, and everyone's own choice while the server has it on.
-            if app.me?.isAdmin == true || app.serverAsksForRatings {
+            if !app.offlineUI {
                 Section {
-                    if app.me?.isAdmin == true {
-                        Toggle("Ask people to rate movies and episodes when they finish them", isOn: Binding(get: { app.serverAsksForRatings }, set: { on in
-                            Task {
-                                do { try await app.saveRatingPromptSetting(on); ratingError = nil } catch { ratingError = error.localizedDescription }
-                            }
-                        }))
-                        .accessibilityIdentifier("serverRatingPrompt")
-                    }
-                    if app.serverAsksForRatings {
-                        Toggle("Ask me to rate after watching", isOn: Binding(get: { app.ratingPromptPreference }, set: { on in
-                            Task {
-                                do { try await app.setRatingPrompt(on); ratingError = nil } catch { ratingError = error.localizedDescription }
-                            }
-                        }))
-                        .accessibilityIdentifier("ratingPromptPreference")
-                    }
-                    if let ratingError { Text(ratingError).font(.caption).foregroundStyle(.red) }
+                    Toggle("Play trailers before movies", isOn: Binding(get: { app.cinemaTrailersPreference }, set: { on in
+                        Task {
+                            do { try await app.setCinemaTrailers(on); trailersError = nil } catch { trailersError = error.localizedDescription }
+                        }
+                    }))
+                    if let trailersError { Text(trailersError).font(.caption).foregroundStyle(.red) }
                 } footer: {
-                    Text(app.me?.isAdmin == true ? "When a movie or episode ends, a small card asks for stars. Each person can turn it off for themselves." : "When a movie or episode ends, a small card asks for stars.")
+                    Text("When the server has cinema trailers on, they play before a movie you start from the beginning.")
+                }
+                Section {
+                    Toggle("Night mode by default", isOn: Binding(get: { app.nightModePreference }, set: { on in
+                        Task {
+                            do { try await app.setNightMode(on); nightError = nil } catch { nightError = error.localizedDescription }
+                        }
+                    }))
+                    .accessibilityIdentifier("nightModePreference")
+                    if let nightError { Text(nightError).font(.caption).foregroundStyle(.red) }
+                } footer: {
+                    Text("Quieter loud scenes, clearer dialogue. You can still switch it for one video in the player's audio options.")
+                }
+                // Rating requests when a movie or episode ends (USER-19): the server-wide switch
+                // for admins, and everyone's own choice while the server has it on.
+                if app.me?.isAdmin == true || app.serverAsksForRatings {
+                    Section {
+                        if app.me?.isAdmin == true {
+                            Toggle("Ask people to rate movies and episodes when they finish them", isOn: Binding(get: { app.serverAsksForRatings }, set: { on in
+                                Task {
+                                    do { try await app.saveRatingPromptSetting(on); ratingError = nil } catch { ratingError = error.localizedDescription }
+                                }
+                            }))
+                            .accessibilityIdentifier("serverRatingPrompt")
+                        }
+                        if app.serverAsksForRatings {
+                            Toggle("Ask me to rate after watching", isOn: Binding(get: { app.ratingPromptPreference }, set: { on in
+                                Task {
+                                    do { try await app.setRatingPrompt(on); ratingError = nil } catch { ratingError = error.localizedDescription }
+                                }
+                            }))
+                            .accessibilityIdentifier("ratingPromptPreference")
+                        }
+                        if let ratingError { Text(ratingError).font(.caption).foregroundStyle(.red) }
+                    } footer: {
+                        Text(app.me?.isAdmin == true ? "When a movie or episode ends, a small card asks for stars. Each person can turn it off for themselves." : "When a movie or episode ends, a small card asks for stars.")
+                    }
                 }
             }
             Section {
@@ -131,6 +137,18 @@ struct SettingsView: View {
             }
             #if os(iOS)
             Section {
+                NavigationLink(value: Route.downloads) {
+                    LabeledContent("Downloaded", value: "\(downloads.doneCount) \(downloads.doneCount == 1 ? "item" : "items") · \(ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file))")
+                }
+                .accessibilityIdentifier("settings.downloaded")
+                NavigationLink(value: Route.settings(.downloadQuality(song: true))) {
+                    LabeledContent("Song quality", value: downloads.quality(.song).label(.song))
+                }
+                .accessibilityIdentifier("settings.songQuality")
+                NavigationLink(value: Route.settings(.downloadQuality(song: false))) {
+                    LabeledContent("Video quality", value: downloads.quality(.video).label(.video))
+                }
+                .accessibilityIdentifier("settings.videoQuality")
                 NavigationLink(value: Route.settings(.smartDownloads)) {
                     LabeledContent("Smart downloads", value: smart.settings.showsEnabled || smart.settings.musicEnabled ? "On" : "Off")
                 }
@@ -138,29 +156,33 @@ struct SettingsView: View {
             } header: {
                 Text("Downloads")
             } footer: {
-                Text("Keeps the next episodes of the shows you're watching, and your favourite music, on this device.")
+                Text("Smart downloads keep the next episodes of the shows you're watching, and your favourite music, on this device.")
             }
-            Section {
-                HStack {
-                    TextField("Code shown on the TV", text: $linkCode)
-                        .textInputAutocapitalization(.characters).autocorrectionDisabled()
-                        .font(.body.monospaced())
-                    Button("Link") {
-                        Task {
-                            do { linkResult = "\(try await app.approveQuickConnect(code: linkCode)) is signed in."; linkCode = "" } catch { linkResult = error.localizedDescription }
+            if !app.offlineUI {
+                Section {
+                    HStack {
+                        TextField("Code shown on the TV", text: $linkCode)
+                            .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                            .font(.body.monospaced())
+                        Button("Link") {
+                            Task {
+                                do { linkResult = "\(try await app.approveQuickConnect(code: linkCode)) is signed in."; linkCode = "" } catch { linkResult = error.localizedDescription }
+                            }
                         }
+                        .disabled(linkCode.replacingOccurrences(of: " ", with: "").count != 6)
                     }
-                    .disabled(linkCode.replacingOccurrences(of: " ", with: "").count != 6)
+                    if let linkResult { Text(linkResult).font(.caption).foregroundStyle(.secondary) }
+                } header: {
+                    Text("Link a TV")
+                } footer: {
+                    Text("On your Apple TV, choose Quick Connect and enter its code here.")
                 }
-                if let linkResult { Text(linkResult).font(.caption).foregroundStyle(.secondary) }
-            } header: {
-                Text("Link a TV")
-            } footer: {
-                Text("On your Apple TV, choose Quick Connect and enter its code here.")
             }
             #endif
             Section {
-                Button("Use a Different Server", role: .destructive) { app.forgetServer() }
+                if !app.offlineUI {
+                    Button("Use a Different Server", role: .destructive) { app.forgetServer() }
+                }
             } footer: {
                 Text("Marquee \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
             }

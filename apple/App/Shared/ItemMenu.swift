@@ -22,6 +22,42 @@ final class ActionError {
     }
 }
 
+extension MusicPlayer {
+    /// Starts a station from a track, album or artist; what went wrong, if it can't, is shown.
+    func startRadio(_ item: Item, app: AppSession) {
+        let req = RadioRequest(seed: .item, itemId: item.id, limit: 50)
+        ActionError.run {
+            let st = try await app.radio(req)
+            guard !st.items.isEmpty else { throw MarqueeError("Couldn't find anything to play for this station.") }
+            self.playStation(st, radio: req)
+        }
+    }
+}
+
+#if os(iOS)
+/// The small button on a track's row: a radio seeded with that track. (On the TV it stays in the
+/// row's menu, as Start Radio: the row's focus targets are enough already.)
+struct TrackRadioButton: View {
+    @Environment(AppSession.self) private var app
+    @Environment(MusicPlayer.self) private var music
+    let track: Item
+
+    var body: some View {
+        Button { music.startRadio(track, app: app) } label: {
+            Image(systemName: "music.note")
+                .font(.system(size: 13))
+                .foregroundStyle(.tertiary)
+                .frame(minWidth: 30, minHeight: 30)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityLabel("Track Radio")
+        .accessibilityIdentifier("trackRadio.\(track.id)")
+    }
+}
+#endif
+
 /// Queue and playlist actions for any item (context menus and "…" buttons).
 struct ItemMenuItems: View {
     @Environment(AppSession.self) private var app
@@ -34,7 +70,7 @@ struct ItemMenuItems: View {
     var body: some View {
         if item.isMusic {
             if [.track, .album, .artist].contains(item._type) {
-                Button { startRadio() } label: { Label("Start Radio", systemImage: "dot.radiowaves.left.and.right") }
+                Button { music.startRadio(item, app: app) } label: { Label("Start Radio", systemImage: "dot.radiowaves.left.and.right") }
             }
             if item._type == .track {
                 Button { JourneyPicker.shared.from = item } label: { Label("Sound Journey…", systemImage: "point.topleft.down.to.point.bottomright.curvepath") }
@@ -85,15 +121,6 @@ struct ItemMenuItems: View {
                     Label("Mark Unwatched", systemImage: "circle")
                 }
             }
-        }
-    }
-
-    private func startRadio() {
-        let req = RadioRequest(seed: .item, itemId: item.id, limit: 50)
-        ActionError.run {
-            let st = try await app.radio(req)
-            guard !st.items.isEmpty else { throw MarqueeError("Couldn't find anything to play for this station.") }
-            music.playStation(st, radio: req)
         }
     }
 
@@ -150,7 +177,8 @@ struct AddToPlaylistSheet: View {
             }
             .navigationTitle("Add to Playlist")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-            .task { playlists = (try? await app.playlists(kind: kind)) ?? [] }
+            // Playlists shared with this person can't be changed by them.
+            .task { playlists = ((try? await app.playlists(kind: kind)) ?? []).filter { $0.readOnly != true } }
         }
     }
 

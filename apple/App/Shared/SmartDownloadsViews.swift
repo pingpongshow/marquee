@@ -3,7 +3,7 @@ import MarqueeKit
 import SwiftUI
 
 /// Settings → Downloads → Smart downloads: two switches (shows, music), each with its own
-/// storage budget, plus Wi-Fi only and the episodes' quality.
+/// storage budget, plus Wi-Fi only. They download at the qualities chosen under Downloads.
 struct SmartDownloadsSettingsView: View {
     @Environment(SmartDownloads.self) private var smart
     @Environment(AppSession.self) private var app
@@ -40,9 +40,6 @@ struct SmartDownloadsSettingsView: View {
             }
             Section {
                 Toggle("Wi-Fi only", isOn: $smart.settings.wifiOnly)
-                Picker("Episode quality", selection: $smart.settings.quality) {
-                    ForEach(Downloads.Quality.allCases, id: \.self) { q in Text(q.label).tag(q) }
-                }
             } footer: {
                 Text(footer)
             }
@@ -71,7 +68,7 @@ struct SmartDownloadsSettingsView: View {
     }
 
     private var footer: String {
-        var s = "Smart downloads run while the app is open: when it starts or comes back, and after a video ends. Turning a switch off removes what it downloaded."
+        var s = "Smart downloads run while the app is open: when it starts or comes back, and after a video ends. They use the song and video quality under Downloads. Turning a switch off removes what it downloaded."
         if smart.running { s += "\nChecking now…" } else if let note = smart.note { s += "\n\(note)" }
         return s
     }

@@ -98,6 +98,8 @@ struct RowFavorite: View {
     @Environment(AppSession.self) private var app
     let item: Item
     var size: CGFloat = isTV ? 22 : 13
+    /// How much takes the tap (or the focus).
+    var target: CGFloat = isTV ? 50 : 30
     var identifier: String?
 
     var body: some View {
@@ -106,7 +108,7 @@ struct RowFavorite: View {
             Image(systemName: on ? "heart.fill" : "heart")
                 .font(.system(size: size, weight: .regular))
                 .foregroundStyle(on ? AnyShapeStyle(Color.marqueeGold) : AnyShapeStyle(.tertiary))
-                .frame(minWidth: isTV ? 50 : 30, minHeight: isTV ? 50 : 30)
+                .frame(minWidth: target, minHeight: target)
                 .contentShape(Rectangle())
         }
         #if os(iOS)

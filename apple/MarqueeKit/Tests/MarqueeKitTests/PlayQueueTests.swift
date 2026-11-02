@@ -167,3 +167,70 @@ private func ids(_ q: PlayQueue) -> [Int64] { q.entries.map(\.item.id) }
     #expect(ids(q) == [1, 30])
     #expect(q.current?.item.id == 1)
 }
+
+// Endless radio: the server repeats tracks once everything has played.
+
+@Test func aRepeatedTrackIsAnEntryOfItsOwn() {
+    var q = PlayQueue()
+    q.load([track(1), track(2)], from: .init(context: "radio:item"))
+    q.append([track(1), track(2), track(1)], from: .init(context: "radio:item"))
+    #expect(ids(q) == [1, 2, 1, 2, 1])
+    #expect(Set(q.entries.map(\.id)).count == 5)
+}
+
+@Test func aQueueMovesThroughRepeatsOneEntryAtATime() {
+    var q = PlayQueue()
+    q.load([track(1), track(1), track(1)])
+    let last = q.entries[2].id
+    q.jump(last)
+    #expect(q.index == 2)
+    #expect(q.followingIndex == -1)
+    q.append([track(1)])
+    #expect(q.followingIndex == 3)
+    q.setIndex(q.followingIndex)
+    #expect(q.current?.id != last)
+    // Removing one of them leaves the others.
+    q.remove(q.entries[0].id)
+    #expect(ids(q) == [1, 1, 1])
+    #expect(q.index == 2)
+}
+
+@Test func replacingAStationsTracksOnlyTakesTheOnesStillToCome() {
+    var q = PlayQueue()
+    q.load([track(1), track(2), track(1)], start: 1, from: .init(context: "radio:item"))
+    q.replaceUpcomingStation(with: [track(1), track(3)], from: .init(context: "radio:item"))
+    #expect(ids(q) == [1, 2, 1, 3])
+    #expect(q.current?.item.id == 2)
+    #expect(Set(q.entries.map(\.id)).count == 4)
+}
+
+@Test func repeatsSurviveShuffleBothWays() {
+    var q = PlayQueue()
+    q.load([track(1), track(2), track(1), track(2)], start: 0, from: .init(context: nil))
+    q.toggleShuffle()
+    q.append([track(1)], from: .init(context: nil))
+    #expect(q.entries.count == 5)
+    q.toggleShuffle()
+    #expect(ids(q) == [1, 2, 1, 2, 1])
+}
+
+@Test func stationExcludeIsOldestFirstWithEachTrackAtItsLatestPlace() {
+    var q = PlayQueue()
+    q.load([track(1), track(2), track(3)], from: .init(context: nil))
+    q.append([track(2), track(4), track(1)], from: .init(context: nil))
+    #expect(q.stationExclude() == [3, 2, 4, 1])
+    #expect(PlayQueue().stationExclude().isEmpty)
+}
+
+@Test func stationExcludeKeepsOnlyTheMostRecent2000() {
+    var q = PlayQueue()
+    q.load((1...2500).map { track(Int64($0)) })
+    let exclude = q.stationExclude()
+    #expect(exclude.count == 2000)
+    #expect(exclude.first == 501)
+    #expect(exclude.last == 2500)
+    // Repeats don't use up the limit.
+    q.append((2401...2500).map { track(Int64($0)) })
+    #expect(q.stationExclude().count == 2000)
+    #expect(q.stationExclude().first == 501)
+}

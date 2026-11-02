@@ -31,7 +31,7 @@ struct ArtworkView: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             placeholder
-            CachedImage(url: app.imageURL(artID, width: Int(width))) { phase in
+            CachedImage(url: artworkURL) { phase in
                 if let image = phase.image { image.resizable().scaledToFill().accessibilityIdentifier("artwork.loaded") }
             }
         }
@@ -50,6 +50,14 @@ struct ArtworkView: View {
             }
         }
         .opacity(item.available ? 1 : 0.4)
+    }
+
+    /// The server's picture; offline, the one kept with a download.
+    private var artworkURL: URL? {
+        #if os(iOS)
+        if app.isOffline { return Downloads.posterFile(item.id) }
+        #endif
+        return app.imageURL(artID, width: Int(width))
     }
 
     /// Artists are round (the corner radius makes a circle).
@@ -189,6 +197,17 @@ extension CachedImage where Content == AnyView {
     }
 }
 
+extension AppSession {
+    /// Whether to show the offline app: iPhone and iPad only, the Apple TV has no downloads.
+    var offlineUI: Bool {
+        #if os(iOS)
+        isOffline
+        #else
+        false
+        #endif
+    }
+}
+
 /// Ratings changed in this session, so every row and page showing an item agrees before
 /// its list is fetched again.
 @MainActor @Observable
@@ -325,6 +344,8 @@ struct RowRating: View {
     let item: Item
     /// The space kept before the stars (in a row: between them and the duration).
     var gap: CGFloat = isTV ? 16 : 10
+    /// One star instead of five, for the mini player: filled when it's rated.
+    var compact = false
 
     var body: some View {
         let current = RatingStore.shared.rating(item.id, item.userRating)
@@ -334,20 +355,28 @@ struct RowRating: View {
                 Text("No rating").tag(0.0)
             }
         } label: {
-            Group {
-                if let r = current, r > 0 {
-                    RatingGlyphs(rating: r)
-                } else {
-                    Image(systemName: "star").font(.system(size: isTV ? 18 : 11, weight: .regular)).foregroundStyle(.tertiary)
+            if compact {
+                Image(systemName: (current ?? 0) > 0 ? "star.fill" : "star")
+                    .font(.title3)
+                    .foregroundStyle((current ?? 0) > 0 ? AnyShapeStyle(Color.marqueeGold) : AnyShapeStyle(.secondary))
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            } else {
+                Group {
+                    if let r = current, r > 0 {
+                        RatingGlyphs(rating: r)
+                    } else {
+                        Image(systemName: "star").font(.system(size: isTV ? 18 : 11, weight: .regular)).foregroundStyle(.tertiary)
+                    }
                 }
+                // One width rated or not, so durations beside it line up down a list; wide enough
+                // for five stars (and never narrower than them), with a fixed gap before it so the
+                // duration beside it never touches the stars.
+                .frame(minWidth: isTV ? 110 : 56, alignment: isTV && (current ?? 0) <= 0 ? .center : .trailing)
+                .padding(.leading, gap)
+                .frame(minHeight: isTV ? 50 : 30)
+                .contentShape(Rectangle())
             }
-            // One width rated or not, so durations beside it line up down a list; wide enough
-            // for five stars (and never narrower than them), with a fixed gap before it so the
-            // duration beside it never touches the stars.
-            .frame(minWidth: isTV ? 110 : 56, alignment: isTV && (current ?? 0) <= 0 ? .center : .trailing)
-            .padding(.leading, gap)
-            .frame(minHeight: isTV ? 50 : 30)
-            .contentShape(Rectangle())
         }
         .menuIndicator(.hidden)
         #if os(iOS)

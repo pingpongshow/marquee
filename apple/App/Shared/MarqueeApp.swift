@@ -33,7 +33,7 @@ struct MarqueeApp: App {
         // UI tests start from a clean slate.
         if ProcessInfo.processInfo.arguments.contains("-marquee-reset") {
             for s in ServerStore.servers { ServerStore.forget(s.id) }
-            for key in ["marquee.showAudioQuality", "marquee.dj"] { UserDefaults.standard.removeObject(forKey: key) }
+            for key in ["marquee.showAudioQuality", "marquee.dj", "marquee.downloads.songQuality", "marquee.downloads.videoQuality"] { UserDefaults.standard.removeObject(forKey: key) }
             // And the VOD pages' remembered category, sort and filters.
             for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("marquee.vod.") {
                 UserDefaults.standard.removeObject(forKey: key)
@@ -67,6 +67,8 @@ struct MarqueeApp: App {
                 .tint(.accentColor) // tvOS keeps the system's white focus style
                 .onChange(of: app.state, initial: true) { if app.state == .signedIn { downloads.attach(app); runSmart() } }
                 .onChange(of: app.client == nil) { if app.client != nil { downloads.attach(app); runSmart() } }
+                // Back from offline with the same client: what waited for the server carries on.
+                .onChange(of: app.isOffline) { if !app.isOffline, app.client != nil { downloads.attach(app); runSmart() } }
                 // No background refresh: smart downloads catch up whenever the app comes back.
                 .onChange(of: scenePhase) { old, new in if old != new, new == .active { runSmart() } }
                 .onChange(of: app.me?.id) { runSmart() }
@@ -77,7 +79,7 @@ struct MarqueeApp: App {
 
     #if os(iOS)
     private func runSmart() {
-        guard app.state == .signedIn, app.client != nil, app.me != nil else { return }
+        guard app.state == .signedIn, app.client != nil, !app.isOffline, app.me != nil else { return }
         Task { await smart.run(app) }
     }
     #endif

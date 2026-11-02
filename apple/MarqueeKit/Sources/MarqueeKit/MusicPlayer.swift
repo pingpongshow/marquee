@@ -142,6 +142,10 @@ public final class MusicPlayer {
     @ObservationIgnored private var refillGeneration = 0
     /// Bumped whenever something else starts playing, so a station's late top-up is dropped.
     @ObservationIgnored private var sourceGeneration = 0
+    /// The radio's queue ran out (top-ups failed, or came back empty): it carries on as soon as
+    /// one brings something.
+    @ObservationIgnored private var radioRanOut = false
+    @ObservationIgnored private var radioRetry: Task<Void, Never>?
     /// Skips and plays-through of the radio playing, which steer its top-ups (MUSIC-17).
     @ObservationIgnored private var steering = RadioSteering()
     /// The entry last counted as played through (the 80% mark passes on every tick after it).
@@ -383,7 +387,7 @@ public final class MusicPlayer {
     /// Moves on to the next track (Next, or a track that wouldn't play).
     private func skipForward() {
         let i = queue.skipIndex
-        guard i >= 0 else { return }
+        guard i >= 0 else { topUpRadio(); return } // a radio's next tracks may be on their way
         // The next track is already preloaded: move on to it rather than start it again.
         let items = player.items()
         if remote == nil, items.count >= 2, let cur = player.currentItem, items[0] === cur,
@@ -492,7 +496,7 @@ public final class MusicPlayer {
             await applyLevel(item)
             return item
         }
-        guard let client = app.client else { return nil }
+        guard let client = app.client, !app.isOffline else { return nil }
         // The context goes with preloads too: the play counts once the track starts (MUSIC-17).
         guard let s = try? await client.startPlayback(body: .json(.init(itemId: entry.item.id, startMs: 0, preload: preload,
                                                                          profile: AppleDeviceProfile.current(),
@@ -559,6 +563,7 @@ public final class MusicPlayer {
             player.removeAllItems()
             playing = false
             updateNowPlaying()
+            waitForRadio()
         }
     }
 
@@ -591,6 +596,7 @@ public final class MusicPlayer {
         buildGeneration += 1
         let gen = buildGeneration
         remoteQueueEnded = false
+        radioRanOut = false
         report("paused")
         for item in player.items() { endSession(for: item) }
         player.removeAllItems()
@@ -647,6 +653,7 @@ public final class MusicPlayer {
             startFailures = 0
             playing = false
             updateNowPlaying()
+            waitForRadio()
         }
     }
 
@@ -655,7 +662,7 @@ public final class MusicPlayer {
     private func nextPlayable() -> Int? {
         let n = queue.entries.count
         guard n > 1, queue.index >= 0 else { return nil }
-        let offline = app.client == nil || app.lastError != nil
+        let offline = app.isOffline
         let wrap = queue.repeatMode != .off
         for step in 1..<n {
             let i = queue.index + step
@@ -708,13 +715,20 @@ public final class MusicPlayer {
         let i = queue.followingIndex
         guard i >= 0 else {
             playing = false
+            if sleep == .endOfTrack {
+                sleep = nil
+            } else if source?.radio != nil {
+                waitForRadio()
+                updateNowPlaying()
+                return
+            }
             remoteQueueEnded = true
-            if sleep == .endOfTrack { sleep = nil }
             updateNowPlaying()
             return
         }
         queue.setIndex(i)
         rebuild()
+        topUpRadio() // here the player's own track change doesn't do it
     }
 
     /// Makes sure the item after the current one is the entry that should follow.
@@ -812,8 +826,14 @@ public final class MusicPlayer {
                 }
             } else {
                 // Reached the end of the queue; a sleep timer for the end of the track is done too.
+                // (Paused too: left waiting for an item, the player counted as playing.)
+                player.pause()
                 playing = false
-                if sleep == .endOfTrack { sleep = nil }
+                if sleep == .endOfTrack {
+                    sleep = nil
+                } else {
+                    waitForRadio()
+                }
                 updateNowPlaying()
             }
             return
@@ -851,9 +871,9 @@ public final class MusicPlayer {
         if cur.dj != nil { djCount = 0; return }
         djCount += 1
         let nextIsDJ = queue.upcoming.first?.dj != nil
-        guard djCount >= 3, !nextIsDJ, let client = app.client else { return }
+        guard djCount >= 3, !nextIsDJ, let client = app.client, !app.isOffline else { return }
         djBusy = true
-        let exclude = queue.entries.map(\.item.id)
+        let exclude = queue.stationExclude()
         Task {
             defer { djBusy = false }
             guard let pick = try? await client.musicDJ(body: .json(.init(trackId: cur.item.id, mode: .init(rawValue: dj.rawValue)!, exclude: exclude))).ok.body.json,
@@ -870,6 +890,7 @@ public final class MusicPlayer {
     private func newSource(_ s: Source?) {
         source = s
         sourceGeneration += 1
+        radioRanOut = false
         steering = RadioSteering()
         playedThrough = nil
     }
@@ -902,16 +923,18 @@ public final class MusicPlayer {
 
     /// Continues a radio station when fewer than five tracks are left. `early` (two quick
     /// skips in a row) asks now and replaces the station's tracks still to come, so it
-    /// changes course at once rather than after what's already queued.
+    /// changes course at once rather than after what's already queued. Stations never end: the
+    /// server comes round to tracks again once everything has played, so whatever it sends is
+    /// queued, repeats included; a top-up that fails or brings nothing is tried again at the
+    /// next track.
     private func topUpRadio(early: Bool = false) {
-        guard var radio = source?.radio else { return }
+        guard var radio = source?.radio, !app.isOffline else { return }
         guard early || (!refilling && queue.entries.count - queue.index <= 5) else { return }
         refilling = true
         refillGeneration += 1
         let gen = refillGeneration
         let run = sourceGeneration
-        let exclude = queue.entries.map(\.item.id)
-        radio.exclude = exclude
+        radio.exclude = queue.stationExclude()
         steering.apply(to: &radio)
         radio.limit = 25
         if early { steering.toppedUp() }
@@ -919,16 +942,39 @@ public final class MusicPlayer {
         let from = PlayQueue.FromStation(context: source?.context)
         Task {
             defer { if gen == refillGeneration { refilling = false } }
-            guard let st = try? await app.radio(radio), run == sourceGeneration, gen == refillGeneration else { return }
-            let fresh = st.items.filter { !exclude.contains($0.id) }
-            guard !fresh.isEmpty else { return }
+            guard let st = try? await app.radio(radio), run == sourceGeneration, gen == refillGeneration, !st.items.isEmpty else { return }
             let wasEmpty = queue.current == nil
             if early, !wasEmpty {
-                queue.replaceUpcomingStation(with: fresh, from: from)
+                queue.replaceUpcomingStation(with: st.items, from: from)
             } else {
-                queue.append(fresh, from: from)
+                queue.append(st.items, from: from)
             }
-            wasEmpty ? rebuild() : refreshFollowing()
+            if radioRanOut {
+                // The queue had ended waiting for this: on to the first of what came.
+                queue.setIndex(queue.followingIndex)
+                rebuild()
+            } else {
+                wasEmpty ? rebuild() : refreshFollowing()
+            }
+        }
+    }
+
+    /// The queue has ended. On a radio that's not the end: keeps asking for more until it comes
+    /// (2, 4, 8… seconds, up to a minute), or something else plays.
+    private func waitForRadio() {
+        guard source?.radio != nil else { return }
+        radioRanOut = true
+        topUpRadio()
+        radioRetry?.cancel()
+        let run = sourceGeneration
+        radioRetry = Task { [weak self] in
+            var wait = 2.0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(wait))
+                guard !Task.isCancelled, let self, self.radioRanOut, run == self.sourceGeneration else { return }
+                self.topUpRadio()
+                wait = min(60, wait * 2)
+            }
         }
     }
 
@@ -1254,7 +1300,9 @@ public final class MusicPlayer {
         artworkLoading = t.id
         artworkItem = nil
         artwork = nil
-        guard let url = app.imageURL(t.images?.poster, pixels: 600) else { return }
+        // Offline: the picture kept with the download, if there is one.
+        let local = app.isOffline ? downloads?.posterURL(t.id) : nil
+        guard let url = local ?? app.imageURL(t.images?.poster, pixels: 600) else { return }
         let id = t.id
         artworkTask = Task { [weak self] in
             // A failed fetch isn't retried for this track (updates come every second while casting).

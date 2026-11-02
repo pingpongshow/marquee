@@ -254,7 +254,7 @@ public final class VideoPlayback {
         setNearEnd(false)
         offline = (itemID, downloads)
         offlineTitle = downloads.entries[itemID]?.item.title
-        if app.client != nil { item = try? await app.item(itemID) }
+        if app.client != nil, !app.isOffline { item = try? await app.item(itemID) }
         // The time limit applies to downloads too: asked when the server can be reached, else
         // the last answer kept on the device.
         await TimeLimits.shared.refresh(app)

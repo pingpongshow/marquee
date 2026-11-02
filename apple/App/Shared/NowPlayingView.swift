@@ -10,9 +10,10 @@ struct MiniPlayerBar: View {
 
     var body: some View {
         if let t = music.current?.item {
-            HStack(spacing: 12) {
+            // The title gives way: on an iPhone the buttons leave it only a little room.
+            HStack(spacing: 2) {
                 Button { openNowPlaying() } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 10) {
                         ArtworkView(item: t, shape: .square, width: 44).frame(width: 44)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(t.title).font(.subheadline.weight(.semibold)).lineLimit(1)
@@ -24,14 +25,24 @@ struct MiniPlayerBar: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("miniPlayer")
-                Button { music.toggle() } label: { Image(systemName: music.playing ? "pause.fill" : "play.fill").font(.title3).frame(width: 36, height: 36) }
+                .padding(.trailing, 6)
+                if !app.offlineUI {
+                    Button { PlaylistPicker.shared.item = t } label: { Image(systemName: "plus").font(.title3).frame(width: 36, height: 36).contentShape(Rectangle()) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Add to Playlist")
+                        .accessibilityIdentifier("mini.addToPlaylist")
+                }
+                RowFavorite(item: t, size: 19, target: 36, identifier: "mini.favorite")
+                // Its own identity per track, so a menu left open as the track changes can't rate the next one.
+                RowRating(item: t, compact: true).id(t.id)
+                Button { music.toggle() } label: { Image(systemName: music.playing ? "pause.fill" : "play.fill").font(.title3).frame(width: 36, height: 36).contentShape(Rectangle()) }
                     .buttonStyle(.plain)
                     .accessibilityLabel(music.playing ? "Pause" : "Play")
-                Button { music.next() } label: { Image(systemName: "forward.fill").font(.title3).frame(width: 36, height: 36) }
+                Button { music.next() } label: { Image(systemName: "forward.fill").font(.title3).frame(width: 36, height: 36).contentShape(Rectangle()) }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Next track")
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
             .overlay(alignment: .bottom) { MiniPlayerProgress().padding(.horizontal, 10) }
@@ -204,6 +215,9 @@ struct NowPlayingView: View {
     @Environment(AppSession.self) private var app
     @State private var panel: Panel = .player
     @State private var saveRequest: SavePlaylistRequest?
+    /// The playing track being added to a playlist. Its sheet is shown from here: this view is
+    /// itself a sheet or cover of MainView, where the other Add to Playlist sheet lives.
+    @State private var adding: Item?
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSize
     #endif
@@ -255,6 +269,11 @@ struct NowPlayingView: View {
             }
             .background { backdrop(t) }
             .savePlaylistFlow($saveRequest)
+            .sheet(item: $adding) { AddToPlaylistSheet(item: $0) }
+            #if os(iOS)
+            .offlineBanner()
+            .onChange(of: app.isOffline) { if app.isOffline, panel == .lyrics { panel = .player } }
+            #endif
         } else {
             ContentUnavailableView("Nothing playing", systemImage: "music.note")
         }
@@ -271,7 +290,7 @@ struct NowPlayingView: View {
             HStack(spacing: Self.headerSpacing) {
                 Spacer(minLength: 0)
                 AirPlayButton().headerButton()
-                CastButton(tint: .secondaryLabel).padding(5).headerButton()
+                if !app.isOffline { CastButton(tint: .secondaryLabel).padding(5).headerButton() }
             }
             .frame(width: Self.headerGroup)
         }
@@ -315,7 +334,8 @@ struct NowPlayingView: View {
     #if os(iOS)
     private var panelPicker: some View {
         Picker("Show", selection: $panel.animation()) {
-            ForEach(Panel.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            // Lyrics come from the server.
+            ForEach(Panel.allCases.filter { $0 != .lyrics || !app.isOffline }, id: \.self) { Text($0.rawValue).tag($0) }
         }
         .pickerStyle(.segmented)
         .accessibilityIdentifier("nowPlayingPanel")
@@ -466,11 +486,11 @@ struct NowPlayingView: View {
                 HStack(spacing: 18) {
                     HStack(spacing: 10) { favorite(t); RatingStars(itemID: t.id, rating: t.userRating).id(t.id) }
                     Spacer(minLength: 8)
-                    actionMenus
+                    actionMenus(t)
                 }
                 VStack(spacing: 12) {
                     HStack(spacing: 10) { favorite(t); RatingStars(itemID: t.id, rating: t.userRating).id(t.id) }
-                    actionMenus
+                    actionMenus(t)
                 }
             }
             .font(.title3)
@@ -479,6 +499,7 @@ struct NowPlayingView: View {
             #else
             HStack(spacing: 24) {
                 favorite(t)
+                addToPlaylist(t)
                 Button { panel = panel == .lyrics ? .queue : .lyrics } label: {
                     Label(panel == .lyrics ? "Show Up Next" : "Lyrics", systemImage: panel == .lyrics ? "list.bullet" : "quote.bubble")
                         .labelStyle(.iconOnly)
@@ -508,19 +529,35 @@ struct NowPlayingView: View {
         #endif
     }
 
+    /// Adds the playing song to a playlist.
+    private func addToPlaylist(_ t: Item) -> some View {
+        Button { adding = t } label: {
+            Label("Add to Playlist", systemImage: "plus.circle").labelStyle(.iconOnly)
+        }
+        #if os(iOS)
+        .buttonStyle(.plain)
+        #endif
+        .accessibilityLabel("Add to Playlist")
+        .accessibilityIdentifier("np.addToPlaylist")
+    }
+
     #if os(iOS)
-    private var actionMenus: some View {
+    /// Offline, only what works without the server.
+    private func actionMenus(_ t: Item) -> some View {
         HStack(spacing: 18) {
+            if !app.isOffline { addToPlaylist(t) }
             SleepMenu().labelStyle(.iconOnly)
-            DJMenu()
+            if !app.isOffline { DJMenu() }
             CrossfadeMenu()
-            Menu {
-                Button("Save as Playlist…", systemImage: "text.badge.plus") { saveRequest = music.queueAsPlaylist }
-            } label: {
-                Image(systemName: "ellipsis.circle")
+            if !app.isOffline {
+                Menu {
+                    Button("Save as Playlist…", systemImage: "text.badge.plus") { saveRequest = music.queueAsPlaylist }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityLabel("More")
+                .accessibilityIdentifier("np.more")
             }
-            .accessibilityLabel("More")
-            .accessibilityIdentifier("np.more")
         }
         .fixedSize()
     }
@@ -541,11 +578,13 @@ struct NowPlayingView: View {
             if let cur = music.current {
                 Section("Now playing") { row(cur, current: true) }
             }
-            Section {
-                Button { saveRequest = music.queueAsPlaylist } label: {
-                    Label("Save Queue as Playlist", systemImage: "text.badge.plus")
+            if !app.offlineUI {
+                Section {
+                    Button { saveRequest = music.queueAsPlaylist } label: {
+                        Label("Save Queue as Playlist", systemImage: "text.badge.plus")
+                    }
+                    .accessibilityIdentifier("saveQueue")
                 }
-                .accessibilityIdentifier("saveQueue")
             }
             Section("Up next") {
                 ForEach(Array(music.queue.upcoming)) { e in row(e, current: false) }

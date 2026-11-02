@@ -11,15 +11,33 @@ struct DownloadsView: View {
 
     var body: some View {
         let all = downloads.entries.values.sorted { $0.added > $1.added }
-        let busy = all.filter { $0.state != .done }
+        let failed = all.filter { if case .failed = $0.state { return true }; return false }
+        let busy = all.filter { e in
+            if case .failed = e.state { return false }
+            return e.state != .done
+        }
         let videos = all.filter { $0.state == .done && $0.item._type != .track }
         let tracks = all.filter { $0.state == .done && $0.item._type == .track }
         List {
-            if app.client == nil {
+            if app.isOffline {
                 Label("You're offline. Downloads play without the server; what you watch syncs when you're back.", systemImage: "wifi.slash")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             SmartDownloadsSection()
+            if !failed.isEmpty {
+                Section {
+                    ForEach(failed) { row($0) }
+                } header: {
+                    HStack {
+                        Text("Couldn't download")
+                        Spacer()
+                        if failed.count > 1 {
+                            Button("Try All Again") { Task { await downloads.retryFailed() } }
+                                .accessibilityIdentifier("downloads.retryAll")
+                        }
+                    }
+                }
+            }
             if !busy.isEmpty {
                 Section("In progress") { ForEach(busy) { row($0) } }
             }
@@ -50,24 +68,34 @@ struct DownloadsView: View {
     }
 
     private func row(_ e: Downloads.Entry) -> some View {
-        Button { open(e) } label: {
-            HStack(spacing: 12) {
-                poster(e)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(e.item.title).font(.body.weight(.medium)).lineLimit(1)
-                    HStack(spacing: 4) {
-                        if e.smart != nil {
-                            Image(systemName: "sparkles").accessibilityLabel("Smart download")
+        HStack(spacing: 8) {
+            Button { open(e) } label: {
+                HStack(spacing: 12) {
+                    poster(e)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(e.item.title).font(.body.weight(.medium)).lineLimit(1)
+                        HStack(spacing: 4) {
+                            if e.smart != nil {
+                                Image(systemName: "sparkles").accessibilityLabel("Smart download")
+                            }
+                            Text(subtitle(e))
                         }
-                        Text(subtitle(e))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        status(e)
                     }
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    status(e)
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+            }
+            .buttonStyle(.plain)
+            if case .failed = e.state {
+                Button { ActionError.run { try await downloads.retry(e.id) } } label: {
+                    Label("Try Again", systemImage: "arrow.clockwise").labelStyle(.iconOnly).frame(minWidth: 36, minHeight: 36)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Try Again")
+                .accessibilityIdentifier("download.retry.\(e.id)")
             }
         }
-        .buttonStyle(.plain)
         .swipeActions {
             Button("Delete", role: .destructive) { downloads.remove(e.id) }
         }
@@ -97,7 +125,7 @@ struct DownloadsView: View {
         case .track:
             [e.item.artistCredit ?? e.item.grandparentTitle, e.item.parentTitle].compactMap { $0 }.joined(separator: " · ")
         default:
-            [e.item.year.map(String.init), e.quality == .original ? nil : e.quality.label].compactMap { $0 }.joined(separator: " · ")
+            e.item.year.map(String.init) ?? ""
         }
     }
 
@@ -108,7 +136,9 @@ struct DownloadsView: View {
         case let .downloading(p):
             ProgressView(value: p) { Text("Downloading… \(Int(p * 100))%").font(.caption2) }
         case .done:
-            Text(ByteCountFormatter.string(fromByteCount: e.size, countStyle: .file)).font(.caption2).foregroundStyle(.tertiary)
+            let quality = e.quality == .original ? nil : e.quality.label(e.item._type == .track ? .song : .video)
+            Text([ByteCountFormatter.string(fromByteCount: e.size, countStyle: .file), quality].compactMap { $0 }.joined(separator: " · "))
+                .font(.caption2).foregroundStyle(.tertiary)
         case let .failed(msg):
             Text(msg).font(.caption2).foregroundStyle(.red).lineLimit(2)
         }
@@ -126,7 +156,8 @@ struct DownloadsView: View {
     }
 }
 
-/// The download control on detail pages: pick a quality, then shows progress or "Downloaded".
+/// The download control on detail pages: one tap downloads at the quality chosen in Settings,
+/// then it shows progress or "Downloaded".
 struct DownloadButton: View {
     @Environment(Downloads.self) private var downloads
     @Environment(AppSession.self) private var app
@@ -153,6 +184,10 @@ struct DownloadButton: View {
                     // A smart download becomes the person's own: never removed automatically.
                     Button("Keep Download", systemImage: "pin") { downloads.markSmart(item.id, kind: nil, owner: nil) }
                 }
+                if case let .failed(message) = e.state {
+                    Text(message)
+                    Button("Try Again", systemImage: "arrow.clockwise") { retry() }
+                }
                 Button("Delete Download", systemImage: "trash", role: .destructive) { downloads.remove(item.id) }
             } label: {
                 switch e.state {
@@ -162,40 +197,78 @@ struct DownloadButton: View {
                 }
             }
             .buttonStyle(.bordered)
-        } else if item._type == .track {
-            Button { start(.original) } label: { Label("Download", systemImage: "arrow.down.circle") }.buttonStyle(.bordered)
         } else {
-            Menu {
-                ForEach(Downloads.Quality.allCases, id: \.self) { q in Button(q.label) { start(q) } }
-            } label: { Label("Download", systemImage: "arrow.down.circle") }
-            .buttonStyle(.bordered)
+            Button { start() } label: { Label("Download", systemImage: "arrow.down.circle") }.buttonStyle(.bordered)
         }
     }
 
     /// Seasons, shows, albums and artists download everything inside.
-    @ViewBuilder private var many: some View {
-        let music = item._type == .album || item._type == .artist
-        if music {
-            Button { startAll(.original) } label: { Label("Download", systemImage: "arrow.down.circle") }.buttonStyle(.bordered)
-        } else {
-            Menu {
-                ForEach(Downloads.Quality.allCases, id: \.self) { q in Button(q.label) { startAll(q) } }
-            } label: { Label(item._type == .season ? "Download Season" : "Download All", systemImage: "arrow.down.circle") }
-            .buttonStyle(.bordered)
-        }
+    private var many: some View {
+        let title = item._type == .season ? "Download Season" : item._type == .show ? "Download All" : "Download"
+        return Button { startAll() } label: { Label(title, systemImage: "arrow.down.circle") }.buttonStyle(.bordered)
     }
 
-    private func start(_ q: Downloads.Quality) {
+    private func start() {
         Task {
-            do { try await downloads.download(item, quality: q) } catch { self.error = error.localizedDescription }
+            do { try await downloads.download(item) } catch { self.error = error.localizedDescription }
         }
     }
 
-    private func startAll(_ q: Downloads.Quality) {
+    private func retry() {
+        Task {
+            do { try await downloads.retry(item.id) } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    private func startAll() {
         Task {
             guard let items = try? await app.leaves(item.id) else { error = "Couldn't list what's inside."; return }
-            await downloads.download(children: items, quality: q)
+            await downloads.download(children: items)
         }
+    }
+}
+
+/// Settings → Downloads: the quality for songs or for videos, with a rough idea of the size of
+/// each and the one recommended for this device marked. What's already downloaded stays as it is.
+struct DownloadQualityView: View {
+    @Environment(Downloads.self) private var downloads
+    let kind: Downloads.Kind
+
+    private var name: String { kind == .song ? "song" : "video" }
+
+    var body: some View {
+        let current = downloads.quality(kind), recommended = downloads.recommendedQuality(kind)
+        Form {
+            Section {
+                ForEach(Downloads.Quality.allCases, id: \.self) { q in
+                    Button { downloads.setQuality(q, for: kind) } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 8) {
+                                    Text(q.label(kind)).foregroundStyle(.primary)
+                                    if q == recommended {
+                                        Text("Recommended").font(.caption2.weight(.semibold))
+                                            .padding(.horizontal, 6).padding(.vertical, 2)
+                                            .background(Color.marqueeGold.opacity(0.25), in: Capsule())
+                                            .foregroundStyle(Color.marqueeGold)
+                                    }
+                                }
+                                Text(q.sizeGuide(kind)).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if q == current { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(q == current ? .isSelected : [])
+                    .accessibilityIdentifier("downloadQuality.\(name).\(q.rawValue)")
+                }
+            } footer: {
+                Text("New \(name) downloads use this. Anything but Original is converted on the server first. What's already downloaded stays as it is.")
+            }
+        }
+        .navigationTitle(kind == .song ? "Song Quality" : "Video Quality")
     }
 }
 #endif
