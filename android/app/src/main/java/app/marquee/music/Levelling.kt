@@ -171,7 +171,7 @@ private class LevellingAudioRenderer(
     private fun trackOf(id: MediaSource.MediaPeriodId): Long? = runCatching {
         val tl = timeline
         val window = tl.getPeriodByUid(id.periodUid, Timeline.Period()).windowIndex
-        tl.getWindow(window, Timeline.Window()).mediaItem.mediaId.toLongOrNull()
+        QueueIds.trackId(tl.getWindow(window, Timeline.Window()).mediaItem.mediaId)
     }.getOrNull()
 }
 

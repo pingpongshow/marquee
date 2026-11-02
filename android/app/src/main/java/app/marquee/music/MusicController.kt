@@ -117,7 +117,12 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private var djCount = 0
     private var djBusy = false
     private var lastId: Long? = null
+    /** The entry playing: the same track again (a radio coming round) is a new entry. */
+    private var lastEntry: String? = null
     private var ratingJob: Job? = null
+    /** A top-up that failed with nothing left to play tries again by itself. */
+    private var topUpRetry: Job? = null
+    private var topUpWaitMs = TOP_UP_RETRY_MS
 
     init {
         // After changes made offline were sent: show the server's rating for the current track.
@@ -175,7 +180,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
 
     private fun meta(item: MediaItem): Now {
         val m = item.mediaMetadata
-        return Now(item.mediaId.toLongOrNull() ?: 0, m.title?.toString() ?: "", m.artist?.toString() ?: "", m.albumTitle?.toString() ?: "", m.artworkUri,
+        return Now(QueueIds.trackId(item.mediaId) ?: 0, m.title?.toString() ?: "", m.artist?.toString() ?: "", m.albumTitle?.toString() ?: "", m.artworkUri,
             m.extras?.getString("dj"), m.extras?.getLong("album", 0L)?.takeIf { it > 0 }, AudioQuality.from(m.extras),
             m.extras?.takeIf { it.containsKey("favorite") }?.getBoolean("favorite"), m.extras?.getString("context"), m.extras?.getBoolean("radio") == true)
     }
@@ -194,7 +199,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
         if (queueChanged) _queue.value = (0 until p.mediaItemCount).map { meta(p.getMediaItemAt(it)) }
         _shuffle.value = p.shuffleModeEnabled
         _repeat.value = p.repeatMode
-        if (cur?.id != lastId) {
+        if (p.currentMediaItem?.mediaId != lastEntry) {
+            lastEntry = p.currentMediaItem?.mediaId
             lastId = cur?.id
             left(p, prevIndex)
             playingNow = cur
@@ -205,6 +211,16 @@ class MusicController(private val context: Context, private val marquee: Marquee
         }
         // While casting, the receiver's position comes in through tick.
         if (!casting) heard(p.currentPosition, p.duration.coerceAtLeast(0))
+        // Played to the end of what's queued: a radio goes on when more comes.
+        if (p.playbackState == Player.STATE_ENDED) {
+            if (_sleep.value == Sleep.EndOfTrack) {
+                // The sleep timer was waiting for this: no top-up may start the music again.
+                _sleep.value = null
+                radio = null
+                topUpRetry?.cancel()
+                queueGen++
+            } else topUpRadio(p)
+        }
     }
 
     /** Keeps how far the playing track got, and counts a radio's track as played through at 80% (MUSIC-17). */
@@ -259,8 +275,22 @@ class MusicController(private val context: Context, private val marquee: Marquee
         }
     }
 
-    private fun mediaItem(t: ItemSummary, dj: String? = null, context: String? = null, radio: Boolean = false): MediaItem =
-        trackItem(marquee, t, dj, context, radio)
+    private fun mediaItem(t: ItemSummary, dj: String? = null, context: String? = null, radio: Boolean = false): MediaItem {
+        val item = trackItem(marquee, t, dj, context, radio)
+        if (item.mediaMetadata.artworkUri != null) return item
+        // Offline: the artwork saved with its download.
+        val poster = (this.context.applicationContext as app.marquee.MarqueeApplication).downloads.posterFile(t.id) ?: return item
+        return item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setArtworkUri(Uri.fromFile(poster)).build()).build()
+    }
+
+    /** Entries for [tracks], each with a media id of its own among those [taken] (a track can come round again). */
+    private fun mediaItems(tracks: List<ItemSummary>, taken: Collection<String> = emptyList(), dj: String? = null, context: String? = null, radio: Boolean = false): List<MediaItem> {
+        val ids = QueueIds.assign(tracks.map { it.id }, taken)
+        return tracks.mapIndexed { i, t -> mediaItem(t, dj, context, radio).buildUpon().setMediaId(ids[i]).build() }
+    }
+
+    /** The media ids in the queue. */
+    private fun entryIds(p: Player) = (0 until p.mediaItemCount).map { p.getMediaItemAt(it).mediaId }
 
     /**
      * Plays tracks from start (at startMs into it); source names what's playing (an album or
@@ -279,7 +309,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
         scope.launch(Dispatchers.Main) {
             val c = connect()
             val index = start.coerceIn(0, tracks.size - 1)
-            c.setMediaItems(tracks.map { mediaItem(it, context = context, radio = radio != null) }, index, startMs.coerceAtLeast(0))
+            c.setMediaItems(mediaItems(tracks, context = context, radio = radio != null), index, startMs.coerceAtLeast(0))
             // While casting (or with a device connected and idle) the new queue plays there.
             if (casting || beginCasting()) castTrack(index, startMs.coerceAtLeast(0))
             else { c.prepare(); c.play() }
@@ -312,22 +342,72 @@ class MusicController(private val context: Context, private val marquee: Marquee
         steering = RadioSteering()
         queueGen++
         djCount = 0
+        topUpRetry?.cancel()
+        topUpWaitMs = TOP_UP_RETRY_MS
     }
 
-    /** Continues a station when fewer than five tracks are left, steered by what was skipped and played through. */
+    /**
+     * Continues a station when five or fewer tracks are left, steered by what was skipped and
+     * played through. A station never ends: the server comes round again once everything has
+     * played, and a top-up that fails or brings nothing tries again on the next track, or by
+     * itself when there isn't one.
+     */
     private fun topUpRadio(p: Player) {
         val r = radio ?: return
-        if (refilling || steeringNow || p.mediaItemCount - p.currentMediaItemIndex > 5) return
+        if (refilling || steeringNow || tracksLeft(p) > 5) return
         refilling = true
-        val exclude = _queue.value.map { it.id }
+        val exclude = steering.exclude(_queue.value.map { it.id })
         val gens = queueGen to steerGen
         scope.launch {
             val st = withContext(Dispatchers.IO) { runCatching { marquee.music.musicRadio(steering.request(r, exclude)) }.getOrNull() }
             refilling = false
-            if (st == null || gens != queueGen to steerGen) return@launch
-            val fresh = st.items.filter { it.id !in exclude }
-            if (fresh.isNotEmpty()) controller?.addMediaItems(fresh.map { mediaItem(it, context = stationContext ?: st.context, radio = true) })
+            val c = controller
+            if (c == null || gens != queueGen to steerGen) return@launch
+            val upcoming = (c.currentMediaItemIndex until c.mediaItemCount).map { meta(c.getMediaItemAt(it)).id }.toSet()
+            val fresh = RadioSteering.toAdd(st?.items.orEmpty(), upcoming) { it.id }
+            if (fresh.isEmpty()) { retryTopUp(c); return@launch }
+            topUpWaitMs = TOP_UP_RETRY_MS
+            addToStation(c, fresh, st?.context)
         }
+    }
+
+    /** With nothing left to play there may be no next track to try again on. */
+    private fun retryTopUp(c: Player) {
+        if (tracksLeft(c) > 1 || topUpRetry?.isActive == true) return
+        val wait = topUpWaitMs
+        topUpWaitMs = (wait * 2).coerceAtMost(TOP_UP_RETRY_MAX_MS)
+        topUpRetry = scope.launch {
+            delay(wait)
+            topUpRadio(c)
+        }
+    }
+
+    /** How many tracks are left to play, this one included, in the order they'll play. */
+    private fun tracksLeft(p: Player): Int {
+        if (!p.shuffleModeEnabled) return p.mediaItemCount - p.currentMediaItemIndex
+        val timeline = p.currentTimeline
+        if (timeline.isEmpty) return 0
+        var left = 1
+        var i = p.currentMediaItemIndex
+        while (true) {
+            i = timeline.getNextWindowIndex(i, Player.REPEAT_MODE_OFF, true)
+            if (i == C.INDEX_UNSET) return left
+            left++
+        }
+    }
+
+    /** Adds to the end of a station's queue; if it had already played to its end, on with the first of them. */
+    private fun addToStation(c: Player, tracks: List<ItemSummary>, context: String?) {
+        val ended = c.playbackState == Player.STATE_ENDED
+        val first = c.mediaItemCount
+        c.addMediaItems(mediaItems(tracks, entryIds(c), context = stationContext ?: context, radio = true))
+        if (ended) {
+            c.seekTo(first, 0)
+            c.prepare()
+            c.play()
+        }
+        // A radio can play for days: what played long ago leaves the queue (top-ups still leave it out).
+        if (!c.shuffleModeEnabled) RadioSteering.toTrim(c.currentMediaItemIndex).takeIf { it > 0 }?.let { c.removeMediaItems(0, it) }
     }
 
     /**
@@ -341,15 +421,15 @@ class MusicController(private val context: Context, private val marquee: Marquee
         steeringNow = true
         steerGen++
         steering.toppedUp()
-        val exclude = _queue.value.map { it.id }
+        val exclude = steering.exclude(_queue.value.map { it.id })
         val gen = queueGen
         scope.launch {
             val st = withContext(Dispatchers.IO) { runCatching { marquee.music.musicRadio(steering.request(r, exclude)) }.getOrNull() }
             steeringNow = false
             val c = controller ?: return@launch
             if (st == null || gen != queueGen) return@launch
-            val fresh = st.items.filter { it.id !in exclude }
-            if (fresh.isEmpty()) return@launch
+            // Nothing new (or no answer): the tracks already queued play on.
+            if (st.items.isEmpty()) return@launch
             // From the end back, removing each run of the station's entries in one go.
             val at = c.currentMediaItemIndex
             var i = c.mediaItemCount - 1
@@ -360,7 +440,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
                 c.removeMediaItems(from, i + 1)
                 i = from - 1
             }
-            c.addMediaItems(fresh.map { mediaItem(it, context = stationContext ?: st.context, radio = true) })
+            val upcoming = (c.currentMediaItemIndex until c.mediaItemCount).map { meta(c.getMediaItemAt(it)).id }.toSet()
+            addToStation(c, RadioSteering.toAdd(st.items, upcoming) { it.id }, st.context)
         }
     }
 
@@ -380,7 +461,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
             djBusy = false
             val c = controller ?: return@launch
             if (pick == null || lastId != cur.id) return@launch
-            c.addMediaItem(c.currentMediaItemIndex + 1, mediaItem(pick, dj.label))
+            c.addMediaItems(c.currentMediaItemIndex + 1, mediaItems(listOf(pick), entryIds(c), dj = dj.label))
             djCount = 0
         }
     }
@@ -428,11 +509,13 @@ class MusicController(private val context: Context, private val marquee: Marquee
     /** A rating set elsewhere (a track row or an item page): Now Playing follows it when that track is playing. */
     fun ratingChanged(id: Long, rating: Double?) { if (lastId == id) _rating.value = rating }
 
-    /** Rates the current track 0–10, or clears it with null (MUSIC-11). */
-    fun rate(rating: Double?) {
-        val id = lastId ?: return
-        val before = _rating.value
-        _rating.value = rating
+    /**
+     * Rates a track 0–10, or clears it with null (MUSIC-11). It takes the track rather than going
+     * by what's playing: the song may have changed by the time the person picks.
+     */
+    fun rate(id: Long, rating: Double?) {
+        val before = _rating.value.takeIf { lastId == id }
+        if (lastId == id) _rating.value = rating
         scope.launch {
             // Kept on the device and sent later when the server can't be reached (USER-18).
             val ok = marquee.sync.saveShowing(marquee.sync.rating(id, rating))
@@ -442,7 +525,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
 
     /** Adds tracks after the current one (Play Next) or at the end. */
     fun enqueue(tracks: List<ItemSummary>, next: Boolean) = with { c ->
-        val items = tracks.map { mediaItem(it) }
+        val items = mediaItems(tracks, entryIds(c))
         if (c.mediaItemCount == 0) {
             c.setMediaItems(items)
             if (casting || beginCasting()) castTrack(0, 0) else { c.prepare(); c.play() }
@@ -548,5 +631,10 @@ class MusicController(private val context: Context, private val marquee: Marquee
         _sleep.value = null
         it.stop()
         it.clearMediaItems()
+    }
+
+    private companion object {
+        const val TOP_UP_RETRY_MS = 10_000L
+        const val TOP_UP_RETRY_MAX_MS = 60_000L
     }
 }

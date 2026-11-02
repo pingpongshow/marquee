@@ -80,9 +80,18 @@ object SmartSelection {
         return ms * kbps / 8
     }
 
-    /** Roughly how big a track is: its length at its bit rate (lossless about 1000 kbps, else 320). */
-    fun estimateTrackBytes(durationMs: Long?, bitrateKbps: Int?, lossless: Boolean): Long {
-        val kbps = bitrateKbps?.takeIf { it > 0 } ?: if (lossless) 1000 else 320
+    /**
+     * Roughly how big a track is: its length at its bit rate (lossless about 1000 kbps, else 320),
+     * or at the quality's when converted (never above the original's).
+     */
+    fun estimateTrackBytes(durationMs: Long?, bitrateKbps: Int?, lossless: Boolean, quality: Downloads.Quality = Downloads.Quality.Original): Long {
+        val original = bitrateKbps?.takeIf { it > 0 } ?: if (lossless) 1000 else 320
+        val kbps = when (quality) {
+            Downloads.Quality.Original -> original
+            Downloads.Quality.High -> minOf(original, 256)
+            Downloads.Quality.Medium -> minOf(original, 160)
+            Downloads.Quality.Low -> minOf(original, 96)
+        }
         val ms = durationMs?.takeIf { it > 0 } ?: (4 * 60_000L)
         return ms * kbps / 8
     }

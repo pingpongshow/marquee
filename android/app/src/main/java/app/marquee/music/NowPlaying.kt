@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -55,6 +56,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -76,29 +78,44 @@ import app.marquee.ui.focusCard
 import app.marquee.ui.formatTime
 import coil3.compose.AsyncImage
 
-/** The bar above the tabs while music plays. */
+/**
+ * The bar above the tabs while music plays: opens Now Playing, with the track's own buttons (which
+ * don't) for adding it to a playlist, its heart and rating, and play and next. Narrow phones
+ * shorten the title rather than the buttons.
+ */
 @Composable
 fun MiniPlayer(onOpen: () -> Unit) {
     val music = LocalMusic.current
+    val marquee = LocalMarquee.current
     val now by music.now.collectAsState()
     val playing by music.playing.collectAsState()
+    val offline by marquee.offline.collectAsState()
+    val rating by music.rating.collectAsState()
+    val favorite by music.favorite.collectAsState()
     val (pos, dur) = music.position.collectAsState().value
+    var adding by remember { mutableStateOf(false) }
     val n = now ?: return
     Surface(color = MaterialTheme.colorScheme.surface) {
         Column {
             LinearProgressIndicator(progress = { if (dur > 0) pos.toFloat() / dur else 0f }, modifier = Modifier.fillMaxWidth().height(2.dp), color = Gold, trackColor = Surface2)
-            Row(Modifier.fillMaxWidth().clickable(onClick = onOpen).semantics { contentDescription = "Open Now Playing" }.padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth().clickable(onClick = onOpen).semantics { contentDescription = "Open Now Playing" }.padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(n.artwork, null, contentScale = ContentScale.Crop, modifier = Modifier.size(44.dp).clip(RoundedCornerShape(6.dp)).background(Surface2))
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                     Text(n.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                     Text(n.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = music::toggle) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pause" else "Play") }
-                IconButton(onClick = music::next) { Icon(Icons.Filled.SkipNext, "Next track") }
+                // Adding needs the server; the heart and rating are queued while offline.
+                if (!offline) IconButton({ adding = true }, Modifier.size(36.dp)) { Icon(Icons.Filled.Add, "Add to playlist", Modifier.size(22.dp)) }
+                app.marquee.ui.FavoriteButton(n.id, n.title, favorite ?: n.favorite, small = true)
+                // Its own for each track: a popover left open closes when the song changes, and what it picks is for this song.
+                key(n.id) { RatingPopover(rating, n.title, { music.rate(n.id, it) }, compact = true) }
+                IconButton(onClick = music::toggle, Modifier.size(40.dp)) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pause" else "Play") }
+                IconButton(onClick = music::next, Modifier.size(40.dp)) { Icon(Icons.Filled.SkipNext, "Next track") }
             }
         }
     }
+    if (adding) app.marquee.ui.AddToPlaylistDialog(n.id, music = true) { adding = false }
 }
 
 /** Full-screen Now Playing: artwork or lyrics or the queue, rating, radio, sleep timer and DJ. */
@@ -110,7 +127,9 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
     val now by music.now.collectAsState()
     val source by music.source.collectAsState()
     val castDevice by marquee.cast.device.collectAsState()
+    val offline by marquee.offline.collectAsState()
     var panel by remember { mutableStateOf(Panel.Art) }
+    var adding by remember { mutableStateOf(false) }
     var radioError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val n = now
@@ -131,8 +150,9 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
         Row(Modifier.fillMaxWidth().semantics { contentDescription = "Now Playing header" }, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose, modifier = Modifier.focusRing()) { Icon(Icons.Filled.KeyboardArrowDown, "Close Now Playing") }
             Spacer(Modifier.weight(1f))
-            CastButton(MaterialTheme.colorScheme.onSurface)
-            PanelButton(Icons.Filled.Lyrics, "Lyrics", panel == Panel.Lyrics) { panel = if (panel == Panel.Lyrics) Panel.Art else Panel.Lyrics }
+            // Casting and lyrics need the server.
+            if (!offline) CastButton(MaterialTheme.colorScheme.onSurface)
+            if (!offline) PanelButton(Icons.Filled.Lyrics, "Lyrics", panel == Panel.Lyrics) { panel = if (panel == Panel.Lyrics) Panel.Art else Panel.Lyrics }
             PanelButton(Icons.AutoMirrored.Filled.QueueMusic, "Up Next", panel == Panel.Queue) { panel = if (panel == Panel.Queue) Panel.Art else Panel.Queue }
         }
         Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp).semantics(mergeDescendants = true) {}, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -144,7 +164,7 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
     val panelContent: @Composable (Modifier) -> Unit = { m ->
         when {
             n == null -> Box(m, contentAlignment = Alignment.Center) { Text("Nothing playing", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            panel == Panel.Lyrics -> LyricsPanel(n.id, music.position.collectAsState().value.first, music::seek, m)
+            panel == Panel.Lyrics && !offline -> LyricsPanel(n.id, music.position.collectAsState().value.first, music::seek, m)
             panel == Panel.Queue -> QueueList(m, ::saveQueue)
             else -> Box(m, contentAlignment = Alignment.Center) {
                 AsyncImage(n.artwork, null, contentScale = ContentScale.Crop,
@@ -162,17 +182,21 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
             // Wraps onto a second line on narrow phones.
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
                 Box(Modifier.height(48.dp), contentAlignment = Alignment.Center) {
-                    RatingStars(music.rating.collectAsState().value, music::rate, size = if (marquee.isTv) 22 else 24)
+                    RatingStars(music.rating.collectAsState().value, { music.rate(n.id, it) }, size = if (marquee.isTv) 22 else 24)
                 }
                 // The heart (USER-12), from the track's current state.
                 app.marquee.ui.FavoriteButton(n.id, n.title, music.favorite.collectAsState().value ?: n.favorite,
                     Modifier.testTag("now-playing-favorite"))
-                IconButton(::startRadio, Modifier.focusRing()) { Icon(Icons.Filled.Radio, "Start Radio", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                IconButton(::saveQueue, Modifier.focusRing()) {
-                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Save as playlist", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                // What needs the server goes while offline; the rating and heart above are queued.
+                if (!offline) {
+                    IconButton({ adding = true }, Modifier.focusRing()) { Icon(Icons.Filled.Add, "Add to playlist", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    IconButton(::startRadio, Modifier.focusRing()) { Icon(Icons.Filled.Radio, "Start Radio", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    IconButton(::saveQueue, Modifier.focusRing()) {
+                        Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Save as playlist", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 SleepButton()
-                DJButton()
+                if (!offline) DJButton()
                 CrossfadeButton()
             }
             radioError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
@@ -198,6 +222,7 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
         }
         androidx.compose.material3.SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp))
     }
+    if (adding && n != null) app.marquee.ui.AddToPlaylistDialog(n.id, music = true) { adding = false }
     if (saving) SaveAsPlaylistDialog(defaultPlaylistTitle(source), music.queue.value.map { it.id }) { pl ->
         saving = false
         if (pl != null) scope.launch {
@@ -248,12 +273,15 @@ private fun Transport() {
     }
 }
 
-/** Up Next: tap to jump, with the DJ's picks marked and each track's heart. */
+/** Up Next: tap to jump, with the DJ's picks marked and each track's heart. While offline, only what's downloaded. */
 @Composable
 private fun QueueList(modifier: Modifier, onSave: () -> Unit) {
     val music = LocalMusic.current
     val queue by music.queue.collectAsState()
     val index by music.index.collectAsState()
+    val offline by LocalMarquee.current.offline.collectAsState()
+    val downloads = app.marquee.ui.LocalDownloads.current
+    val entries by downloads.entries.collectAsState()
     val state = rememberLazyListState()
     LaunchedEffect(Unit) { state.scrollToItem(index.coerceAtLeast(0) + 1) } // past the header
     LazyColumn(modifier, state = state) {
@@ -261,13 +289,14 @@ private fun QueueList(modifier: Modifier, onSave: () -> Unit) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (queue.size == 1) "1 track" else "${queue.size} tracks", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                androidx.compose.material3.TextButton(onSave, Modifier.focusRing()) {
+                if (!offline) androidx.compose.material3.TextButton(onSave, Modifier.focusRing()) {
                     Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null)
                     Text("Save as playlist", Modifier.padding(start = 6.dp))
                 }
             }
         }
         itemsIndexed(queue) { i, q ->
+            if (offline && i != index && entries[q.id]?.state != app.marquee.core.Downloads.State.Done) return@itemsIndexed
             Row(Modifier.fillMaxWidth().focusCard({ music.jump(i) }).padding(vertical = 10.dp, horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AsyncImage(q.artwork, null, contentScale = ContentScale.Crop, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)).background(Surface2))

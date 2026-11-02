@@ -131,7 +131,7 @@ fun setVodWatched(marquee: Marquee, context: Context, kind: HubsApi.KindRemoveVo
 
 /** Mark as watched and/or unwatched for a film or episode on demand, as [choices] say; [onDone] once saved. */
 fun vodWatchActions(marquee: Marquee, context: Context, kind: HubsApi.KindRemoveVodFromContinueWatching, id: Long, choices: WatchChoices, title: String,
-    onDone: () -> Unit = {}): List<TileAction> = if (marquee.isOffline) emptyList() else buildList {
+    onDone: () -> Unit = {}): List<TileAction> = if (marquee.offline.value) emptyList() else buildList {
     if (choices.markWatched) add(TileAction("Mark as watched") { setVodWatched(marquee, context, kind, id, true, title, onDone) })
     if (choices.markUnwatched) add(TileAction("Mark as unwatched") { setVodWatched(marquee, context, kind, id, false, title, onDone) })
 }
@@ -189,7 +189,7 @@ private fun VodContinueTile(nav: NavHostController, e: ContinueEntry, width: Dp,
     val actions = buildList {
         // Watched or unwatched: either way it leaves Continue Watching.
         vodRemoval(e)?.let { (kind, id) -> addAll(vodWatchActions(marquee, context, kind, id, vodWatchChoices(e), title) { onRemoved(e.key) }) }
-        if (!marquee.isOffline) add(TileAction("Remove from Continue Watching") {
+        if (!marquee.offline.value) add(TileAction("Remove from Continue Watching") {
             val (kind, id) = vodRemoval(e) ?: return@TileAction
             removeVodContinue(marquee, context, kind, id, title, onRemoved = { onRemoved(e.key) })
         })

@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -88,7 +89,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private data class Page(val detail: ItemDetail, val children: List<ItemSummary>, val related: List<ItemSummary>, val similar: List<ItemSummary>,
-    val popular: List<ItemSummary> = emptyList())
+    val topSongs: List<ItemSummary> = emptyList(), val topSongsTotal: Int = 0)
 
 /** Detail page for any item: header, play buttons, contents, cast and related titles. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
@@ -116,9 +117,9 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 val related = if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.ALBUM, ItemType.ARTIST)) runCatching { marquee.items.relatedItems(itemId) }.getOrDefault(emptyList()) else emptyList()
                 // Music: what sounds like it, from Soundprint analysis (MUSIC-2).
                 val similar = if (d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK)) runCatching { marquee.music.soundsLike(itemId, 20) }.getOrDefault(emptyList()) else emptyList()
-                // An artist's most-listened tracks in the library (MUSIC-15).
-                val popular = if (d.type == ItemType.ARTIST) runCatching { marquee.items.listPopularTracks(itemId).items }.getOrDefault(emptyList()) else emptyList()
-                Page(d, children, related, similar, popular)
+                // An artist's top songs for this person (MUSIC-24).
+                val top = if (d.type == ItemType.ARTIST) runCatching { marquee.items.listTopSongs(itemId, limit = TOP_SONGS_SHOWN) }.getOrNull() else null
+                Page(d, children, related, similar, top?.items.orEmpty(), top?.total ?: 0)
             }
         }
         // Gone since it was shown (an album emptied by moving its tracks, an artist merged by a match): back.
@@ -131,7 +132,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     val vodOn by marquee.vod.collectAsState()
     val itemType = page?.getOrNull()?.detail?.type
     val alsoOnVod by cachedLoad<List<app.marquee.api.models.VodSuggestion>>("item-$itemId:vod-similar", vodOn, itemType) {
-        if (!vodOn || marquee.isOffline || itemType !in listOf(ItemType.MOVIE, ItemType.SHOW)) null
+        if (!vodOn || marquee.offline.value || itemType !in listOf(ItemType.MOVIE, ItemType.SHOW)) null
         else withContext(Dispatchers.IO) { runCatching { marquee.items.itemVodSimilar(itemId, 20) }.getOrNull() }
     }
     val p = page
@@ -150,6 +151,13 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 .onFailure { toast(context, serverMessage(it, "Couldn't start a radio"), long = true) }
         }
     }) { Icon(Icons.Filled.Radio, null); Text("Radio") }
+    /** An artist's station, next to Play and Shuffle and as easy to find (MUSIC-3). */
+    @Composable fun ArtistRadioButton() = Button(modifier = Modifier.focusRing(), colors = ButtonDefaults.buttonColors(containerColor = Gold.copy(alpha = 0.2f), contentColor = Gold), onClick = {
+        scope.launch {
+            runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = d.id)) }
+                .onFailure { toast(context, serverMessage(it, "Couldn't start a radio"), long = true) }
+        }
+    }) { Icon(Icons.Filled.Radio, null); Text("Artist Radio") }
     /** The heart (USER-12), watchlist (USER-8) and watched state. */
     @Composable fun StateButtons() {
         if (d.type in app.marquee.core.FavoriteState.types) FavoriteButton(d.id, d.title, d.favorite)
@@ -262,7 +270,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 ItemType.ALBUM, ItemType.ARTIST -> {
                     Button(onClick = { leaves { music.play(it, 0, source = d.title) } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) { Icon(Icons.Filled.PlayArrow, null); Text("Play") }
                     OutlinedButton(modifier = Modifier.focusRing(), onClick = { leaves(shuffle = true) { music.play(it, 0, source = d.title) } }) { Icon(Icons.Filled.Shuffle, null); Text("Shuffle") }
-                    RadioButton()
+                    if (d.type == ItemType.ARTIST) ArtistRadioButton() else RadioButton()
                 }
                 ItemType.TRACK -> {
                     Button(onClick = { leaves { music.play(it, 0) } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) { Icon(Icons.Filled.PlayArrow, null); Text("Play") }
@@ -306,6 +314,10 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 FlowRow(Modifier.padding(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)) { Actions() }
             }
+        }
+        // An artist's page starts with their songs, above the biography.
+        if (pg.topSongs.isNotEmpty()) item { TopSongsSection(nav, d.id, d.title, pg.topSongs, pg.topSongsTotal) }
+        if (!marquee.isTv) {
             d.summary?.takeIf { it.isNotBlank() }?.let { s -> item { Text(s, Modifier.padding(horizontal = sidePadding), maxLines = 8, overflow = TextOverflow.Ellipsis) } }
         }
         TrackSummary.forPage(d.versions)?.let { t -> item { TrackList(t, Modifier.padding(horizontal = sidePadding)) } }
@@ -341,7 +353,8 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     FavoriteButton(t, Modifier.inRowFirst(inRow), small = true)
-                                    app.marquee.music.TrackRating(t, Modifier.padding(end = 8.dp))
+                                    app.marquee.music.TrackRating(t)
+                                    app.marquee.music.TrackRadioButton(t, Modifier.padding(end = 8.dp))
                                     Text(t.durationMs?.let { formatTime(it) } ?: "", maxLines = 1, softWrap = false)
                                     if (!marquee.isTv) TrackMenu(t, onMoved = { reload++ })
                                 }
@@ -352,7 +365,6 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                     }
                 }
                 ItemType.ARTIST -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    if (pg.popular.isNotEmpty()) PopularTracks(d.title, pg.popular)
                     // Sections by release type (MusicBrainz, META-3).
                     releaseSections(pg.children).forEach { (title, list) ->
                         Shelf(title, list, sidePadding) { _, it ->
@@ -525,34 +537,6 @@ fun releaseSections(items: List<ItemSummary>): List<Pair<String, List<ItemSummar
     "Compilations" to setOf("compilation"), "Soundtracks" to setOf("soundtrack"), "Remixes" to setOf("remix"),
     "Demos" to setOf("demo"), "Other" to setOf("other"),
 ).map { (title, types) -> title to items.filter { (it.releaseType?.value ?: "") in types } }.filter { it.second.isNotEmpty() }
-
-/** An artist's most-listened tracks: five, or all of them. */
-@Composable
-private fun PopularTracks(artist: String, tracks: List<ItemSummary>) {
-    val music = LocalMusic.current
-    var all by remember { mutableStateOf(false) }
-    Column {
-        Text("Popular", Modifier.padding(horizontal = sidePadding, vertical = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        (if (all) tracks else tracks.take(5)).forEachIndexed { i, t ->
-            val inRow = rememberInRowFocus()
-            ListItem(
-                headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                supportingContent = { t.parentTitle?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
-                leadingContent = { Text("${i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                trailingContent = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FavoriteButton(t, Modifier.inRowFirst(inRow), small = true)
-                        app.marquee.music.TrackRating(t, Modifier.padding(end = 8.dp))
-                        Text(t.durationMs?.let { formatTime(it) } ?: "", maxLines = 1, softWrap = false)
-                    }
-                },
-                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                modifier = Modifier.rowFocus(inRow).focusCard({ music.play(tracks, i, source = "$artist – Popular") }),
-            )
-        }
-        if (tracks.size > 5) TextButton({ all = !all }, Modifier.padding(horizontal = sidePadding).focusRing()) { Text(if (all) "Show fewer" else "Show all ${tracks.size}") }
-    }
-}
 
 /** Problems Library Health found with the title's files, each with the way to its check. */
 @Composable

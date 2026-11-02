@@ -51,6 +51,9 @@ import java.util.concurrent.TimeUnit
 import okhttp3.MediaType.Companion.toMediaType
 import org.junit.After
 import app.marquee.api.infrastructure.Serializer
+import app.marquee.api.models.ItemSummary
+import app.marquee.api.models.RadioRequest
+import app.marquee.core.Downloads
 import app.marquee.api.models.AuthResult
 import app.marquee.api.models.User
 import app.marquee.music.MusicService
@@ -144,9 +147,11 @@ class MarqueeUiTest {
     /** From the music home: the Artists page, scrolled to an artist. */
     private fun openArtist(name: String) {
         rule.waitUntilAtLeastOneExists(hasContentDescription("Music home"), 20_000)
-        rule.waitUntil(20_000) { scrollTo(hasText("Artists") and hasClickAction()) }
-        rule.onNode(hasText("Artists") and hasClickAction()).performClick()
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Sort"), 10_000)
+        // The page's rows are still arriving and moving it, so a tap can land beside the entry: again until it opens.
+        rule.waitUntil(20_000) {
+            if (scrollTo(hasText("Artists") and hasClickAction())) runCatching { rule.onNode(hasText("Artists") and hasClickAction()).performClick() }
+            runCatching { rule.waitUntilAtLeastOneExists(hasContentDescription("Sort"), 3_000) }.isSuccess
+        }
         rule.waitUntil(20_000) { scrollTo(hasText(name, substring = true)) }
     }
 
@@ -325,8 +330,20 @@ class MarqueeUiTest {
         val heart = (hasContentDescription("Add Floating 1 to favourites") or hasContentDescription("Remove Floating 1 from favourites")) and isFocused()
         rule.waitUntilAtLeastOneExists(heart, 5_000)
         shot("tv-heart-focused")
+        // On along the row to its Track Radio, and back.
+        key(KeyEvent.KEYCODE_DPAD_RIGHT)
+        key(KeyEvent.KEYCODE_DPAD_RIGHT)
+        val radio = hasContentDescription("Track Radio") and isFocused()
+        rule.waitUntilAtLeastOneExists(radio, 5_000)
+        shot("tv-track-radio-focused")
+        key(KeyEvent.KEYCODE_DPAD_LEFT)
+        key(KeyEvent.KEYCODE_DPAD_LEFT)
+        rule.waitUntilAtLeastOneExists(heart, 5_000)
         key(KeyEvent.KEYCODE_DPAD_LEFT)
         rule.waitUntilAtLeastOneExists(row and isFocused(), 5_000)
+        // Down to the next row still works from the row itself.
+        key(KeyEvent.KEYCODE_DPAD_DOWN)
+        rule.waitUntilAtLeastOneExists(hasText("Floating 2") and hasClickAction() and isFocused(), 5_000)
     }
 
     /** One of Home's first rows (seasonal, new and suggestion rows can come before Recently Added). */
@@ -407,7 +424,6 @@ class MarqueeUiTest {
             tap("Delete Download")
         }
         tap("Download")
-        tap("Low (480p)")
         rule.waitText("Downloaded", 240_000) // converted on the server, then fetched
         shot("d1-downloaded")
 
@@ -426,6 +442,8 @@ class MarqueeUiTest {
         tap("Downloads")
         rule.waitText("Movies and TV")
         rule.waitText("Floating 4", 60_000)
+        // Songs are converted first now, so wait for them to land.
+        rule.waitUntil(120_000) { rule.onAllNodesWithText("In progress").fetchSemanticsNodes().isEmpty() }
         shot("d2-downloads")
         tap("00 Preview Test")
         val playing = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
@@ -460,17 +478,16 @@ class MarqueeUiTest {
         tap("Libraries")
         tap("Downloads")
         rule.waitText("Floating 4", 60_000)
-        rule.waitUntil(60_000) { rule.onAllNodesWithText("In progress").fetchSemanticsNodes().isEmpty() }
+        rule.waitUntil(120_000) { rule.onAllNodesWithText("In progress").fetchSemanticsNodes().isEmpty() }
 
         // Offline: the app comes back up without the server.
         shell("svc wifi disable"); shell("svc data disable")
         try {
             scenario.close()
             scenario = ActivityScenario.launch(Intent(context, MainActivity::class.java))
-            rule.waitText("Open Downloads", 40_000)
+            rule.waitText("Offline Library", 40_000)
             shot("o1-offline-home")
-            tap("Open Downloads")
-            rule.waitText("You're offline", substring = true)
+            rule.waitUntil(20_000) { scrollTo(hasText("Floating 3")) }
             tap("Floating 3")
             rule.waitUntilAtLeastOneExists(hasContentDescription("Pause"), 15_000)
             Thread.sleep(2000)
@@ -479,6 +496,12 @@ class MarqueeUiTest {
         } finally {
             shell("svc wifi enable"); shell("svc data enable")
         }
+        // Back online by itself; then clean up.
+        rule.waitUntilAtLeastOneExists(homeLoaded, 60_000)
+        tap("Libraries")
+        rule.waitText("Downloads")
+        tap("Downloads")
+        rule.waitText("Floating 1")
         listOf("Floating 1", "Floating 2", "Floating 3", "Floating 4").forEach { t ->
             if (rule.onAllNodes(hasContentDescription("Delete $t")).fetchSemanticsNodes().isNotEmpty()) rule.onNode(hasContentDescription("Delete $t")).performClick()
         }
@@ -651,7 +674,7 @@ class MarqueeUiTest {
     private fun adminApi(method: String, path: String, body: String? = null, asToken: String? = null): String {
         val token = asToken ?: adminToken ?: throw org.junit.AssumptionViolatedException("no admin token")
         val req = okhttp3.Request.Builder().url("http://$server/api/v1$path").header("Authorization", "Bearer $token")
-            .method(method, body?.let { okhttp3.RequestBody.create("application/json".toMediaType(), it) } ?: if (method == "POST") okhttp3.RequestBody.create(null, ByteArray(0)) else null)
+            .method(method, body?.let { okhttp3.RequestBody.create("application/json".toMediaType(), it) } ?: if (method == "POST" || method == "PUT") okhttp3.RequestBody.create(null, ByteArray(0)) else null)
             .build()
         return okhttp3.OkHttpClient().newCall(req).execute().use { it.body!!.string() }
     }
@@ -2028,7 +2051,7 @@ class MarqueeUiTest {
         openLibrary("Music")
         openArtist("Calm Pads")
         tap("Calm Pads", substring = true)
-        check("artist", listOf("Play", "Shuffle", "Radio"))
+        check("artist", listOf("Play", "Shuffle", "Artist Radio"))
         shot("hb2-artist")
         rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
         rule.waitText("Radio")
@@ -2366,7 +2389,7 @@ class MarqueeUiTest {
             rule.waitText("On Watchlist")
             rule.onNode(hasContentDescription("Open Now Playing")).performClick()
             rule.waitUntilAtLeastOneExists(hasContentDescription("Close Now Playing"), 10_000)
-            rule.onNode(hasContentDescription("4 stars") and hasAnyAncestor(hasContentDescription("Rating request"))).performClick()
+            rule.onNode(hasContentDescription("4 stars")).performClick()
             rule.waitUntilAtLeastOneExists(hasContentDescription("Rating") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "4 of 5 stars"), 5_000)
             Thread.sleep(3000)
             assertEquals(8.0, app.music.rating.value)
@@ -3326,5 +3349,488 @@ class MarqueeUiTest {
         } finally {
             adminApi("PATCH", "/playlists/$id", """{"title":"Road Trip"}""", asToken = appToken)
         }
+    }
+
+    // MUSIC-24
+
+    private fun tracksOf(artist: Long): List<org.json.JSONObject> {
+        val a = org.json.JSONArray(adminApi("GET", "/items/$artist/leaves", asToken = appToken))
+        return (0 until a.length()).map { a.getJSONObject(it) }
+    }
+
+    /** An artist's page opens with Top Songs, Artist Radio beside Play and Shuffle, and Track Radio on each row; More opens them all. */
+    @Test fun artistTopSongs() {
+        connectAndSignIn()
+        val song = tracksOf(308).first()
+        val id = song.getLong("id")
+        adminApi("PUT", "/items/$id/favorite", asToken = appToken)
+        try {
+            openLibrary("Music")
+            openArtist("Test Artist 1")
+            tap("Test Artist 1")
+            rule.waitText("Top Songs", 15_000)
+            rule.waitText("Artist Radio")
+            rule.onAllNodes(hasContentDescription("Track Radio")).onFirst().assertExists()
+            rule.waitText(song.getString("title"))
+            // Above the albums.
+            // (A row composed ahead but not placed yet, off the bottom of a TV's page, reports the list's top.)
+            rule.waitUntil(5_000) {
+                val top = rule.onAllNodesWithText("Top Songs").onFirst().fetchSemanticsNode().boundsInRoot
+                val albums = rule.onAllNodesWithText("Albums").fetchSemanticsNodes().firstOrNull()?.boundsInRoot
+                albums == null || albums.top == 0f || top.bottom <= albums.top
+            }
+            shot("ts1-artist")
+            val total = org.json.JSONObject(adminApi("GET", "/items/308/top-songs?limit=15", asToken = appToken)).getInt("total")
+            if (total > 15) {
+                rule.waitUntil(5_000) { scrollTo(hasText("More") and hasClickAction()) }
+                rule.onNode(hasText("More") and hasClickAction()).performClick()
+                rule.waitUntil(10_000) { scrollTo(hasText("Test Artist 1")) }
+                rule.waitUntil(20_000) { scrollTo(hasText("$total")) } // the last row's number
+                shot("ts2-all")
+            } else assertTrue("No More under 16", rule.onAllNodes(hasText("More") and hasClickAction()).fetchSemanticsNodes().isEmpty())
+        } finally {
+            adminApi("DELETE", "/items/$id/favorite", asToken = appToken)
+        }
+    }
+
+    /** TV: on an artist's page the D-pad goes from a Top Songs row to its Track Radio, which starts a station; More and back aside. */
+    @Test fun tvTopSongsTrackRadio() {
+        assumeTrue("TV only", isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        val song = tracksOf(308).first()
+        val id = song.getLong("id")
+        val title = song.getString("title")
+        adminApi("PUT", "/items/$id/favorite", asToken = appToken)
+        try {
+            openLibrary("Music")
+            openArtist("Test Artist 1")
+            tap("Test Artist 1")
+            rule.waitText("Top Songs", 15_000)
+            rule.waitText("Artist Radio")
+            val row = hasText(title) and hasClickAction()
+            rule.waitUntilAtLeastOneExists(row, 10_000)
+            rule.onAllNodes(row).onFirst().performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+            rule.waitUntilAtLeastOneExists(row and isFocused(), 5_000)
+            key(KeyEvent.KEYCODE_DPAD_RIGHT)
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Remove $title from favourites") and isFocused(), 5_000)
+            key(KeyEvent.KEYCODE_DPAD_RIGHT)
+            key(KeyEvent.KEYCODE_DPAD_RIGHT)
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Track Radio") and isFocused(), 5_000)
+            shot("tvts1-track-radio")
+            key(KeyEvent.KEYCODE_DPAD_CENTER)
+            rule.waitUntil(20_000) { app.music.now.value != null }
+            assertTrue("a station", app.music.queue.value.isNotEmpty() && app.music.queue.value.all { it.radio })
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            adminApi("DELETE", "/items/$id/favorite", asToken = appToken)
+        }
+    }
+
+    /** TV: no downloads anywhere, and losing the network doesn't bring the phones' Offline Library. */
+    @Test fun tvHasNoDownloadsOrOfflineLibrary() {
+        assumeTrue("TV only", isTv)
+        connectAndSignIn()
+        tap("Libraries")
+        rule.waitText("Movies")
+        assertTrue(rule.onAllNodesWithText("Downloads").fetchSemanticsNodes().isEmpty())
+        tap("Movies")
+        rule.waitText("00 Preview Test")
+        tap("00 Preview Test")
+        rule.waitText("Add to playlist", 15_000)
+        assertTrue(rule.onAllNodesWithText("Download", substring = true).fetchSemanticsNodes().isEmpty())
+        shot("tvn1-movie")
+        tap("Settings")
+        rule.waitText("Sign out", 15_000)
+        listOf("Song quality", "Video quality", "Downloaded", "Smart downloads").forEach { d ->
+            assertTrue("$d hidden on TV", rule.onAllNodes(hasContentDescription(d) or hasText(d)).fetchSemanticsNodes().isEmpty())
+        }
+        shot("tvn2-settings")
+        shell("svc wifi disable"); shell("svc data disable")
+        try {
+            Thread.sleep(6000)
+            rule.waitForIdle()
+            assertTrue(rule.onAllNodesWithText("Offline Library").fetchSemanticsNodes().isEmpty())
+            assertTrue(rule.onAllNodesWithText("Offline: showing downloads").fetchSemanticsNodes().isEmpty())
+            rule.waitText("Libraries")
+            shot("tvn3-no-network")
+        } finally {
+            shell("svc wifi enable"); shell("svc data enable")
+        }
+    }
+
+    /** A track's radio plays on when the station has run out: tracks repeat, and the queue keeps growing. */
+    @Test fun radioNeverEnds() {
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        val first = tracksOf(308).first().getLong("id")
+        try {
+            kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.Main) {
+                app.music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = first))
+            }
+            rule.waitUntil(20_000) { app.music.now.value != null }
+            val distinct = app.music.queue.value.map { it.id }.toSet().size
+            var skips = 0
+            // Well past everything the station has: 2.5 times round.
+            while (skips < distinct * 5 / 2 + 6) {
+                InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.next() }
+                skips++
+                val at = skips
+                rule.waitUntil(20_000) { app.music.index.value >= 0 && app.music.queue.value.size - app.music.index.value > 0 && app.music.now.value != null }
+                Thread.sleep(1200)
+                assertTrue("still has something to play after $at skips", app.music.now.value != null && app.music.queue.value.size > app.music.index.value)
+            }
+            val ids = app.music.queue.value.map { it.id }
+            assertTrue("tracks came round again: ${ids.size} entries of ${ids.toSet().size} tracks", ids.size > ids.toSet().size)
+            assertTrue("it's still going", app.music.queue.value.size - app.music.index.value >= 1)
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+        }
+    }
+
+    /** Sharing a playlist: accept, decline and remove (phones, tablets and TV); read-only for the person it's shared with. */
+    @Test fun sharedPlaylist() {
+        connectAndSignIn()
+        val songs = tracksOf(308).take(2).map { it.getLong("id") }
+        fun create(title: String): Long {
+            val p = org.json.JSONObject(adminApi("POST", "/playlists", """{"title":"$title","kind":"audio","itemIds":$songs}"""))
+            val id = p.getLong("id")
+            adminApi("PUT", "/playlists/$id/shares", """{"userIds":[2]}""")
+            return id
+        }
+        val tag = (1000..9999).random()
+        val a = create("Share A $tag")
+        val b = create("Share B $tag")
+        try {
+            tap("Playlists")
+            rule.waitText("Share A $tag", 15_000)
+            rule.waitText("Share B $tag")
+            rule.waitText("Accept")
+            // TV: the page starts on the first invitation, for the D-pad.
+            if (isTv) rule.waitUntilAtLeastOneExists(hasText("Accept") and isFocused(), 5_000)
+            shot("sp1-invites")
+            // Decline the second.
+            rule.onNode(hasText("Decline") and hasClickAction() and hasAnyAncestor(hasTestTag("invite-$b"))).performClick()
+            rule.waitUntil(10_000) { rule.onAllNodesWithText("Share B $tag").fetchSemanticsNodes().isEmpty() }
+            // Accept the first: it joins the list, marked with its owner.
+            rule.onNode(hasText("Accept") and hasClickAction() and hasAnyAncestor(hasTestTag("invite-$a"))).performClick()
+            rule.waitText("Shared by", 10_000, substring = true)
+            rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("invite-$a")).fetchSemanticsNodes().isEmpty() }
+            rule.waitUntil(10_000) { scrollTo(hasText("Share A $tag")) }
+            tap("Share A $tag")
+            rule.waitText("Shuffle")
+            rule.waitText("Shared by", 10_000, substring = true)
+            // Read-only: no menu, no removing rows; playing works.
+            assertTrue(rule.onAllNodes(hasContentDescription("Playlist actions")).fetchSemanticsNodes().isEmpty())
+            assertTrue(rule.onAllNodes(hasContentDescription("More for ", substring = true)).fetchSemanticsNodes().isEmpty())
+            shot("sp2-shared")
+            tap("Play")
+            val app = context.applicationContext as MarqueeApplication
+            rule.waitUntil(20_000) { app.music.now.value != null }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            // Removing asks first and says what it means (TV: with the D-pad).
+            if (isTv) {
+                rule.onNode(hasText("Remove") and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+                rule.waitUntilAtLeastOneExists(hasText("Remove") and isFocused(), 5_000)
+                key(KeyEvent.KEYCODE_DPAD_CENTER)
+            } else rule.onNode(hasText("Remove") and hasClickAction()).performClick()
+            rule.waitText("share it with you again", substring = true)
+            shot("sp3-remove")
+            rule.onAllNodes(hasText("Remove") and hasClickAction()).onLast().performClick()
+            rule.waitUntil(15_000) { rule.onAllNodesWithText("Share A $tag").fetchSemanticsNodes().isEmpty() }
+            val mine = adminApi("GET", "/playlists", asToken = appToken)
+            assertTrue("gone from the list", !mine.contains("Share A $tag"))
+        } finally {
+            adminApi("DELETE", "/playlists/$a")
+            adminApi("DELETE", "/playlists/$b")
+        }
+    }
+
+    /** The Share dialog on your own playlist: people with their status, no Everyone unless you're an admin. And a shared one can't be picked to add to. */
+    @Test fun shareDialog() {
+        assumeTrue("phones and tablets", !isTv)
+        connectAndSignIn()
+        val lists = org.json.JSONArray(adminApi("GET", "/playlists", asToken = appToken))
+        val id = (0 until lists.length()).map { lists.getJSONObject(it) }.first { it.getString("title") == "Road Trip" }.getLong("id")
+        val shared = org.json.JSONObject(adminApi("POST", "/playlists", """{"title":"Not Yours","kind":"audio","itemIds":[]}"""))
+        val sharedId = shared.getLong("id")
+        adminApi("PUT", "/playlists/$sharedId/shares", """{"userIds":[2]}""")
+        adminApi("PUT", "/me/playlist-shares/$sharedId", asToken = appToken)
+        try {
+            tap("Playlists")
+            rule.waitText("Road Trip")
+            tap("Road Trip")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Playlist actions"), 10_000)
+            rule.onNode(hasContentDescription("Playlist actions")).performClick()
+            tap("Share…")
+            rule.waitText("Share “Road Trip”")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("e2eadmin", substring = true, ignoreCase = true) or hasText("Save"), 10_000)
+            assertTrue("no Everyone for a non-admin", rule.onAllNodesWithText("Everyone").fetchSemanticsNodes().isEmpty())
+            val targets = org.json.JSONArray(adminApi("GET", "/me/playlist-share-targets", asToken = appToken))
+            val person = targets.getJSONObject(0).getString("name")
+            rule.onAllNodes(hasContentDescription(person)).onFirst().performClick()
+            shot("sd1-dialog")
+            tap("Save")
+            rule.waitUntil(10_000) { rule.onAllNodesWithText("Share “Road Trip”").fetchSemanticsNodes().isEmpty() }
+            rule.waitText("Shared with 1", 10_000)
+            rule.onNode(hasContentDescription("Playlist actions")).performClick()
+            tap("Share…")
+            rule.waitText("Pending", 10_000)
+            shot("sd2-pending")
+            tap("Cancel")
+
+            // The picker leaves out what's shared with you.
+            back()
+            openLibrary("Movies")
+            rule.waitText("00 Preview Test")
+            tap("00 Preview Test")
+            rule.waitText("Add to playlist", 10_000)
+            tap("Add to playlist")
+            rule.waitUntilAtLeastOneExists(hasText("New playlist"), 10_000)
+            assertTrue(rule.onAllNodesWithText("Not Yours").fetchSemanticsNodes().isEmpty())
+            tap("Cancel")
+        } finally {
+            adminApi("PUT", "/playlists/$id/shares", """{"userIds":[]}""", asToken = appToken)
+            adminApi("DELETE", "/playlists/$sharedId")
+        }
+    }
+
+    /** The now-playing bar's own buttons don't open Now Playing, fit a phone, and stay in step with Now Playing. */
+    @Test fun nowPlayingBarButtons() {
+        assumeTrue("phones and tablets", !isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        val track = tracksOf(308).first()
+        val id = track.getLong("id")
+        try {
+            openLibrary("Music")
+            openArtist("Test Artist 1")
+            tap("Test Artist 1")
+            rule.waitText("Play")
+            tap("Play")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 20_000)
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.pause() }
+            val now = app.music.now.value!!
+            val bar = hasAnyAncestor(hasContentDescription("Open Now Playing"))
+            val width = rule.onRoot().fetchSemanticsNode().boundsInRoot.width
+            listOf(hasContentDescription("Add to playlist"), hasContentDescription("Next track"), hasContentDescription("Play") or hasContentDescription("Pause")).forEach { m ->
+                val b = rule.onNode(m and hasClickAction() and bar).fetchSemanticsNode().boundsInRoot
+                assertTrue("on screen ($b, width $width)", b.right <= width + 1 && b.left >= 0)
+            }
+            shot("np1-bar")
+            // The heart: stays on this page and takes effect.
+            rule.onNode(hasContentDescription("Add ${now.title} to favourites") and bar).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Remove ${now.title} from favourites") and bar, 5_000)
+            assertTrue(rule.onAllNodes(hasContentDescription("Close Now Playing")).fetchSemanticsNodes().isEmpty())
+            // The rating, in its popover.
+            rule.onNode((hasContentDescription("Rate ${now.title}") or hasContentDescription("Rated ", substring = true)) and bar).performClick()
+            val popover = hasAnyAncestor(hasContentDescription("Rate ${now.title}"))
+            rule.waitUntilAtLeastOneExists(hasContentDescription("4 stars") and popover, 5_000)
+            rule.onNode(hasContentDescription("4 stars") and popover).performClick()
+            rule.waitUntil(5_000) { app.music.rating.value == 8.0 }
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rated 4 stars") and bar, 5_000)
+            assertTrue(rule.onAllNodes(hasContentDescription("Close Now Playing")).fetchSemanticsNodes().isEmpty())
+            shot("np2-rated")
+            // Add to playlist: its dialog, here.
+            rule.onNode(hasContentDescription("Add to playlist") and bar).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("New playlist"), 10_000)
+            tap("Cancel")
+            // Now Playing shows the same, with its own "+".
+            rule.onNode(hasContentDescription("Open Now Playing")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Close Now Playing"), 10_000)
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rating") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "4 of 5 stars"), 5_000)
+            rule.onNode(hasContentDescription("Remove ${now.title} from favourites")).assertExists()
+            rule.onNode(hasContentDescription("Add to playlist") and hasClickAction()).assertExists()
+            shot("np3-now-playing")
+            assertEquals(8.0, org.json.JSONObject(adminApi("GET", "/items/${now.id}", asToken = appToken)).optDouble("userRating", 0.0), 0.0)
+        } finally {
+            val n = app.music.now.value?.id ?: id
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            adminApi("PUT", "/items/$n/rating", """{"rating":null}""", asToken = appToken)
+            adminApi("DELETE", "/items/$n/favorite", asToken = appToken)
+        }
+    }
+
+    /** The bar's rating belongs to the song it opened for: its popover closes when the song changes, and a pick never lands on the next one. */
+    @Test fun ratingStaysWithItsTrack() {
+        assumeTrue("phones and tablets", !isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        openLibrary("Music")
+        openArtist("Test Artist 1")
+        tap("Test Artist 1")
+        rule.waitText("Play")
+        tap("Play")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 20_000)
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.pause() }
+        val first = app.music.now.value!!
+        val popover = hasContentDescription("4 stars") and hasAnyAncestor(hasContentDescription("Rate ${first.title}"))
+        fun rating(id: Long) = org.json.JSONObject(adminApi("GET", "/items/$id", asToken = appToken)).optDouble("userRating", 0.0)
+        var second = first
+        try {
+            rule.onNode(hasContentDescription("Rate ${first.title}") and hasClickAction() and hasAnyAncestor(hasContentDescription("Open Now Playing"))).performClick()
+            rule.waitUntilAtLeastOneExists(popover, 5_000)
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.next() }
+            rule.waitUntil(10_000) { app.music.now.value?.id != first.id }
+            second = app.music.now.value!!
+            rule.waitUntil(5_000) { rule.onAllNodes(popover).fetchSemanticsNodes().isEmpty() }
+            // A pick made for the first song, arriving now: it goes to that song, and the second's stays.
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.rate(first.id, 8.0) }
+            rule.waitUntil(10_000) { rating(first.id) == 8.0 }
+            assertEquals(0.0, rating(second.id), 0.0)
+            assertTrue("the bar shows the second song's rating", app.music.rating.value != 8.0)
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            adminApi("PUT", "/items/${first.id}/rating", """{"rating":null}""", asToken = appToken)
+            adminApi("PUT", "/items/${second.id}/rating", """{"rating":null}""", asToken = appToken)
+        }
+    }
+
+    /** Song and video quality in Settings: Recommended until chosen; a song converts and lands as .m4a and plays from the device; a lost conversion shows and can be tried again. */
+    @Test fun downloadQualities() {
+        assumeTrue("phones and tablets", !isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        val downloads = app.downloads
+        val track = tracksOf(308).first()
+        val id = track.getLong("id")
+        val title = track.getString("title")
+        tap("Settings")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Song quality"), 10_000)
+        rule.onNode(hasContentDescription("Downloaded")).assertExists()
+        rule.onNode(hasContentDescription("Song quality")).performScrollTo().performClick()
+        rule.waitText("Recommended", substring = true)
+        rule.waitText("About 8 MB a song")
+        shot("dq1-songs")
+        // Chosen: stays chosen.
+        rule.onAllNodesWithText("Medium (160 kbps)", substring = true).onLast().performClick()
+        rule.waitUntil(5_000) { downloads.songQuality.value == Downloads.Quality.Medium }
+        rule.onNode(hasContentDescription("Video quality")).performScrollTo().performClick()
+        rule.waitText("Low (480p)", substring = true)
+        rule.waitText("About 1 GB an hour")
+        rule.onAllNodesWithText("Low (480p)", substring = true).onLast().performClick()
+        rule.waitUntil(5_000) { downloads.videoQuality.value == Downloads.Quality.Low }
+        shot("dq2-chosen")
+        try {
+            // A song, one tap: converted, fetched as M4A, played from the file.
+            kotlinx.coroutines.runBlocking { downloads.download(org.json.JSONObject(adminApi("GET", "/items/$id", asToken = appToken)).let { Serializer.kotlinxSerializationJson.decodeFromString(ItemSummary.serializer(), it.toString()) }) }
+            rule.waitUntil(120_000) { downloads.entries.value[id]?.state == Downloads.State.Done }
+            val file = downloads.localFile(id)!!
+            assertTrue("a converted song is .m4a: ${file.name}", file.name.endsWith(".m4a"))
+            assertEquals(Downloads.Quality.Medium, downloads.entries.value[id]!!.quality)
+
+            // A conversion the server has lost: failed, shown, and it can be tried again.
+            val movie = org.json.JSONObject(adminApi("GET", "/items/322", asToken = appToken))
+            kotlinx.coroutines.runBlocking { downloads.download(Serializer.kotlinxSerializationJson.decodeFromString(ItemSummary.serializer(), movie.toString())) }
+            val job = downloads.entries.value[322]?.jobId!!
+            adminApi("DELETE", "/downloads/$job", asToken = appToken)
+            rule.waitUntil(20_000) { downloads.entries.value[322]?.state == Downloads.State.Failed }
+            rule.onNode(hasContentDescription("Downloaded")).performScrollTo().performClick()
+            rule.waitText("Couldn't download", 10_000)
+            rule.waitText("no longer has", 10_000, substring = true)
+            shot("dq3-failed")
+            rule.onNode(hasContentDescription("Try ${movie.getString("title")} again")).performClick()
+            rule.waitUntil(15_000) { downloads.entries.value[322]?.state != Downloads.State.Failed }
+            assertTrue(downloads.entries.value[322]?.jobId != job)
+            // The song plays from the device.
+            rule.waitUntil(10_000) { scrollTo(hasText(title)) }
+            tap(title)
+            rule.waitUntil(15_000) { app.music.playing.value }
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            downloads.remove(id)
+            downloads.remove(322)
+        }
+    }
+
+    /**
+     * Offline mode: losing the network swaps the app for the Offline Library with a banner; what's
+     * downloaded plays; server-only controls go; a rating is queued. Back online it all returns by
+     * itself, the online page as it was, and the rating reaches the server.
+     */
+    @Test fun offlineLibrary() {
+        assumeTrue("phones and tablets", !isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        val downloads = app.downloads
+        val tracks = tracksOf(308).take(2)
+        val summary = { t: org.json.JSONObject -> Serializer.kotlinxSerializationJson.decodeFromString(ItemSummary.serializer(), t.toString()) }
+        tracks.forEach { t -> kotlinx.coroutines.runBlocking { downloads.download(summary(t)) } }
+        val ids = tracks.map { it.getLong("id") }
+        rule.waitUntil(120_000) { ids.all { downloads.entries.value[it]?.state == Downloads.State.Done } }
+        val title = tracks[0].getString("title")
+        val album = tracks[0].getString("parentTitle")
+        // An online page to come back to.
+        openLibrary("Movies")
+        rule.waitText("00 Preview Test")
+        tap("00 Preview Test")
+        rule.waitText("Mark watched", 15_000)
+        val banner = hasText("Offline: showing downloads")
+        shell("svc wifi disable"); shell("svc data disable")
+        try {
+            rule.waitUntilAtLeastOneExists(banner, 30_000)
+            rule.waitText("Offline Library", 10_000)
+            shot("ol1-library")
+            // Only what's downloaded, and no online tabs.
+            assertTrue(rule.onAllNodesWithText("Home").fetchSemanticsNodes().isEmpty())
+            assertTrue(rule.onAllNodesWithText("Search").fetchSemanticsNodes().isEmpty())
+            rule.waitUntil(5_000) { scrollTo(hasText(album)) }
+            tap(album)
+            rule.waitText("Shuffle")
+            tap("Play")
+            rule.waitUntil(15_000) { app.music.playing.value }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.pause() }
+            shot("ol2-album")
+            // Server-only controls are gone, on the bar and in Now Playing.
+            assertTrue(rule.onAllNodes(hasContentDescription("Add to playlist")).fetchSemanticsNodes().isEmpty())
+            rule.onNode(hasContentDescription("Open Now Playing")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Close Now Playing"), 10_000)
+            listOf("Start Radio", "Add to playlist", "Save as playlist", "Lyrics").forEach { d ->
+                assertTrue("$d hidden offline", rule.onAllNodes(hasContentDescription(d)).fetchSemanticsNodes().isEmpty())
+            }
+            // A rating and a heart made offline are queued.
+            rule.onNode(hasContentDescription("3 stars")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rating") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "3 of 5 stars"), 5_000)
+            shot("ol3-now-playing")
+            val playing = app.music.now.value!!
+            rule.onNode(hasContentDescription("Close Now Playing")).performClick()
+            // Settings still opens, with only what works; the downloads from there.
+            tap("Settings")
+            rule.waitText("Changes waiting to sync", 10_000, substring = true)
+            assertTrue(rule.onAllNodesWithText("Your Stats").fetchSemanticsNodes().isEmpty())
+            rule.onNode(hasContentDescription("Downloaded")).performScrollTo()
+            shot("ol4-settings")
+            rule.onNode(hasContentDescription("Downloaded")).performClick()
+            rule.waitText("You're offline", substring = true)
+
+            shell("svc wifi enable"); shell("svc data enable")
+            // Back by itself: no banner, the page left, and the rating sent.
+            rule.waitUntil(60_000) { rule.onAllNodes(banner).fetchSemanticsNodes().isEmpty() }
+            rule.waitText("Mark watched", 20_000)
+            rule.waitText("Home", 5_000)
+            shot("ol5-back-online")
+            rule.waitUntil(30_000) { org.json.JSONObject(adminApi("GET", "/items/${playing.id}", asToken = appToken)).optDouble("userRating", 0.0) == 6.0 }
+            adminApi("PUT", "/items/${playing.id}/rating", """{"rating":null}""", asToken = appToken)
+        } finally {
+            shell("svc wifi enable"); shell("svc data enable")
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            ids.forEach(downloads::remove)
+        }
+    }
+
+    /** Nothing downloaded: the Offline Library says so. */
+    @Test fun offlineLibraryEmpty() {
+        assumeTrue("phones and tablets", !isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        app.downloads.entries.value.keys.toList().forEach(app.downloads::remove)
+        shell("svc wifi disable"); shell("svc data disable")
+        try {
+            rule.waitUntilAtLeastOneExists(hasText("Nothing downloaded"), 30_000)
+            shot("ol6-empty")
+        } finally {
+            shell("svc wifi enable"); shell("svc data enable")
+        }
+        rule.waitUntilAtLeastOneExists(homeLoaded, 60_000)
     }
 }

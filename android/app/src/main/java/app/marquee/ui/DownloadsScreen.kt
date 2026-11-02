@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -50,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.ItemType
+import app.marquee.core.DownloadQuality
 import app.marquee.core.Downloads
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
@@ -61,8 +63,10 @@ fun DownloadsScreen(nav: NavHostController) {
     val music = LocalMusic.current
     val marquee = LocalMarquee.current
     val context = LocalContext.current
+    val offline by marquee.offline.collectAsState()
     val all = downloads.entries.collectAsState().value.values.sortedByDescending { it.addedMs }
-    val busy = all.filter { it.state != Downloads.State.Done }
+    val busy = all.filter { it.state == Downloads.State.Preparing || it.state == Downloads.State.Downloading }
+    val failed = all.filter { it.state == Downloads.State.Failed }
     val byAlbum = compareBy<Downloads.Entry>({ it.item.grandparentTitle }, { it.item.parentTitle }, { it.item.index ?: 0 })
     val allTracks = all.filter { it.state == Downloads.State.Done && it.item.type == ItemType.TRACK }.sortedWith(byAlbum)
     val videos = all.filter { it.state == Downloads.State.Done && it.item.type != ItemType.TRACK && it.smart == null }
@@ -83,7 +87,7 @@ fun DownloadsScreen(nav: NavHostController) {
 
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp)) {
         item { Text("Downloads", Modifier.padding(horizontal = sidePadding, vertical = 8.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
-        if (marquee.isOffline) item {
+        if (offline) item {
             Row(Modifier.padding(horizontal = sidePadding, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.CloudOff, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("You're offline. Downloads play without the server; what you watch syncs when you're back.",
@@ -101,6 +105,16 @@ fun DownloadsScreen(nav: NavHostController) {
         if (busy.isNotEmpty()) {
             item { Section("In progress") }
             items(busy, key = { "b${it.item.id}" }) { Row(it, downloads, ::open) }
+        }
+        if (failed.isNotEmpty()) {
+            item {
+                Row(Modifier.fillMaxWidth().padding(end = sidePadding), verticalAlignment = Alignment.CenterVertically) {
+                    Section("Couldn't download", Modifier.weight(1f))
+                    // The app's scope: leaving the page mustn't stop an album halfway.
+                    if (failed.size > 1 && !offline) TextButton({ downloads.scope.launch { failed.forEach { e -> retry(context, downloads, e) } } }) { Text("Try all again") }
+                }
+            }
+            items(failed, key = { "f${it.item.id}" }) { Row(it, downloads, ::open) }
         }
         if (videos.isNotEmpty()) {
             item { Section("Movies and TV") }
@@ -157,9 +171,15 @@ fun DownloadsScreen(nav: NavHostController) {
 private fun Section(title: String, modifier: Modifier = Modifier) =
     Text(title, modifier.padding(start = sidePadding, top = 16.dp, bottom = 6.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
+/** Tries a failed download again; says so if it can't even start. */
+private suspend fun retry(context: android.content.Context, downloads: Downloads, e: Downloads.Entry) {
+    runCatching { downloads.retry(e.item.id) }.onFailure { toast(context, serverMessage(it, "Couldn't download “${e.item.title}”"), long = true) }
+}
+
 @Composable
 private fun Row(e: Downloads.Entry, downloads: Downloads, open: (Downloads.Entry) -> Unit) {
     val context = LocalContext.current
+    val offline by LocalMarquee.current.offline.collectAsState()
     val square = e.item.type == ItemType.TRACK
     Row(Modifier.fillMaxWidth().focusCard({ open(e) }).padding(horizontal = sidePadding, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -180,6 +200,9 @@ private fun Row(e: Downloads.Entry, downloads: Downloads, open: (Downloads.Entry
                 Downloads.State.Failed -> Text(e.error ?: "Failed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, maxLines = 2)
             }
         }
+        if (e.state == Downloads.State.Failed && !offline) IconButton({ downloads.scope.launch { retry(context, downloads, e) } }, Modifier.focusRing()) {
+            Icon(Icons.Filled.Refresh, "Try ${e.item.title} again", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         IconButton({ downloads.remove(e.item.id) }) { Icon(Icons.Filled.Delete, "Delete ${e.item.title}", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
@@ -187,10 +210,10 @@ private fun Row(e: Downloads.Entry, downloads: Downloads, open: (Downloads.Entry
 private fun subtitle(e: Downloads.Entry): String = when (e.item.type) {
     ItemType.EPISODE -> listOfNotNull(e.item.grandparentTitle, e.item.parentTitle).joinToString(" · ")
     ItemType.TRACK -> listOfNotNull(e.item.artistCredit ?: e.item.grandparentTitle, e.item.parentTitle).joinToString(" · ")
-    else -> listOfNotNull(e.item.year?.toString(), e.quality.label.takeIf { e.quality != Downloads.Quality.Original }).joinToString(" · ")
+    else -> listOfNotNull(e.item.year?.toString(), DownloadQuality.label(DownloadQuality.Kind.Videos, e.quality).takeIf { e.quality != Downloads.Quality.Original }).joinToString(" · ")
 }
 
-/** The download control on item pages: pick a quality, then progress or "Downloaded". */
+/** The download control on item pages: one tap, at the quality set in Settings; then progress or "Downloaded". */
 @Composable
 fun DownloadButton(item: ItemSummary) {
     val downloads = LocalDownloads.current
@@ -198,19 +221,20 @@ fun DownloadButton(item: ItemSummary) {
     val entries by downloads.entries.collectAsState()
     var menu by remember { mutableStateOf(false) }
     val single = item.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO, ItemType.TRACK)
-    val musicContainer = item.type == ItemType.ALBUM || item.type == ItemType.ARTIST
-    fun start(q: Downloads.Quality) {
+    fun start() {
         menu = false
         // The app's scope: leaving the page mustn't stop a season or album halfway.
         downloads.scope.launch {
-            runCatching { if (single) downloads.download(item, q) else downloads.downloadAll(item, q) }
-                .onFailure { android.widget.Toast.makeText(context.applicationContext, serverMessage(it, "Couldn't download"), android.widget.Toast.LENGTH_LONG).show() }
+            runCatching {
+                if (single) downloads.download(item)
+                else downloads.downloadAll(item).let { n -> toast(context, if (n > 0) "Downloading $n ${if (n == 1) "item" else "items"}" else "Already in Downloads") }
+            }.onFailure { android.widget.Toast.makeText(context.applicationContext, serverMessage(it, "Couldn't download"), android.widget.Toast.LENGTH_LONG).show() }
         }
     }
     val e = entries[item.id]
     Box {
-        when {
-            single && e != null -> OutlinedButton({ menu = true }, Modifier.focusRing()) {
+        if (single && e != null) {
+            OutlinedButton({ menu = true }, Modifier.focusRing()) {
                 Icon(when (e.state) { Downloads.State.Done -> Icons.Filled.DownloadDone; Downloads.State.Failed -> Icons.Filled.ErrorOutline; else -> Icons.Filled.Download }, null)
                 Spacer(Modifier.width(6.dp))
                 Text(when (e.state) {
@@ -219,19 +243,18 @@ fun DownloadButton(item: ItemSummary) {
                     else -> "${(e.progress * 100).toInt()}%"
                 })
             }
-            item.type == ItemType.TRACK || musicContainer -> OutlinedButton({ start(Downloads.Quality.Original) }, Modifier.focusRing()) {
-                Icon(Icons.Filled.Download, null); Spacer(Modifier.width(6.dp)); Text("Download")
+            DropdownMenu(menu, { menu = false }) {
+                if (e.state == Downloads.State.Failed) DropdownMenuItem({ Text("Try Again") }, {
+                    menu = false
+                    downloads.scope.launch { retry(context, downloads, e) }
+                })
+                // A smart download can be kept, so smart downloads won't remove it.
+                if (e.smart != null) DropdownMenuItem({ Text("Keep Download") }, { menu = false; downloads.keep(item.id) })
+                DropdownMenuItem({ Text("Delete Download") }, { menu = false; downloads.remove(item.id) })
             }
-            else -> OutlinedButton({ menu = true }, Modifier.focusRing()) {
-                Icon(Icons.Filled.Download, null); Spacer(Modifier.width(6.dp))
-                Text(when (item.type) { ItemType.SEASON -> "Download Season"; ItemType.SHOW -> "Download All"; else -> "Download" })
-            }
-        }
-        DropdownMenu(menu, { menu = false }) {
-            // A smart download can be kept, so smart downloads won't remove it.
-            if (single && e?.smart != null) DropdownMenuItem({ Text("Keep Download") }, { menu = false; downloads.keep(item.id) })
-            if (single && e != null) DropdownMenuItem({ Text("Delete Download") }, { menu = false; downloads.remove(item.id) })
-            else Downloads.Quality.entries.forEach { q -> DropdownMenuItem({ Text(q.label) }, { start(q) }) }
+        } else OutlinedButton(::start, Modifier.focusRing()) {
+            Icon(Icons.Filled.Download, null); Spacer(Modifier.width(6.dp))
+            Text(when (item.type) { ItemType.SEASON -> "Download Season"; ItemType.SHOW -> "Download All"; else -> "Download" })
         }
     }
 }

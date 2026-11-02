@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -350,12 +351,10 @@ fun TrackRating(track: app.marquee.api.models.ItemSummary, modifier: Modifier = 
         val queued = marquee.sync.queued(track.id, app.marquee.core.PendingChange.Kind.Rating)
         mutableStateOf(if (queued != null) queued.rating else track.userRating?.takeIf { it > 0 })
     }
-    var open by remember { mutableStateOf(false) }
     val music = LocalMusic.current
     fun rate(r: Double?) {
         val before = rating
         rating = r
-        open = false
         music.ratingChanged(track.id, r)
         scope.launch {
             val ok = marquee.sync.saveShowing(marquee.sync.rating(track.id, r), context)
@@ -366,25 +365,57 @@ fun TrackRating(track: app.marquee.api.models.ItemSummary, modifier: Modifier = 
             }
         }
     }
+    RatingPopover(rating, track.title, ::rate, modifier)
+}
+
+/**
+ * A rating that takes little room: the stars (or an empty star to rate), opening a small popover
+ * of stars to choose from. [compact] shows one star and the number, for the now-playing bar.
+ */
+@Composable
+fun RatingPopover(rating: Double?, title: String, onRate: (Double?) -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
+    var open by remember { mutableStateOf(false) }
     Box(modifier) {
-        val r = rating
+        val r = rating?.takeIf { it > 0 }
         Box(
             Modifier.clip(RoundedCornerShape(6.dp)).focusRing(RoundedCornerShape(6.dp)).clickable { open = true }
                 .semantics(mergeDescendants = true) {
-                    contentDescription = if (r != null) "Rated ${app.marquee.ui.starsLabel(r)} stars" else "Rate ${track.title}"
+                    contentDescription = if (r != null) "Rated ${app.marquee.ui.starsLabel(r)} stars" else "Rate $title"
                     role = androidx.compose.ui.semantics.Role.Button
                 }
                 .padding(horizontal = 6.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center,
         ) {
-            if (r != null) app.marquee.ui.RatingBadge(r)
-            else Icon(Icons.Filled.StarBorder, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f))
-        }
-        DropdownMenu(open, { open = false }) {
-            Box(Modifier.padding(horizontal = 8.dp).semantics { contentDescription = "Rate ${track.title}" }) {
-                RatingStars(rating, ::rate, size = 24)
+            when {
+                r != null && compact -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Star, null, Modifier.size(16.dp), tint = Gold)
+                    Text(app.marquee.ui.starsLabel(r), Modifier.padding(start = 2.dp), style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false)
+                }
+                r != null -> app.marquee.ui.RatingBadge(r)
+                else -> Icon(Icons.Filled.StarBorder, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (compact) 1f else 0.45f))
             }
         }
+        DropdownMenu(open, { open = false }) {
+            Box(Modifier.padding(horizontal = 8.dp).semantics { contentDescription = "Rate $title" }) {
+                RatingStars(r, { open = false; onRate(it) }, size = 24)
+            }
+        }
+    }
+}
+
+/** The small note on a song's row: a radio seeded with that track (MUSIC-3). */
+@Composable
+fun TrackRadioButton(track: app.marquee.api.models.ItemSummary, modifier: Modifier = Modifier) {
+    val music = LocalMusic.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    IconButton({
+        scope.launch {
+            runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = track.id)) }
+                .onFailure { android.widget.Toast.makeText(context, serverMessage(it, "Couldn't start a radio"), android.widget.Toast.LENGTH_LONG).show() }
+        }
+    }, modifier.focusRing().size(36.dp)) {
+        Icon(Icons.Filled.MusicNote, "Track Radio", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
     }
 }
 

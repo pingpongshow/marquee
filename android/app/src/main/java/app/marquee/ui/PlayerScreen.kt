@@ -409,7 +409,10 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 d?.let { marquee.askedRating(it.id) }
                 if (local != null) {
                     recordLocal(ended = true)
-                    if (stillShowing()) { d?.let { marquee.requestRating(ratingRequestFor(marquee, it)) }; nav.popBackStack() }
+                    // In order from a playlist or the Offline Library: on to the next one if it's downloaded too.
+                    val next = queue.getOrNull(queue.indexOf(itemId) + 1)?.takeIf { downloads.localFile(it) != null }
+                    if (next != null) playNext(next)
+                    else if (stillShowing()) { d?.let { marquee.requestRating(ratingRequestFor(marquee, it)) }; nav.popBackStack() }
                     return
                 }
                 report(PlaybackProgress.State.PAUSED)

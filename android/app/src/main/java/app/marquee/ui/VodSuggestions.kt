@@ -142,7 +142,7 @@ fun VodSuggestionTile(nav: NavHostController, s: VodSuggestion, width: Dp?, auto
     val open = { onOpen(); vodRoute(s)?.let { nav.navigate(it) }; Unit }
     val actions = buildList {
         // In Your Watchlist (USER-8): [onHide] takes it off the watchlist instead.
-        if (!marquee.isOffline) add(TileAction(if (watchlist) "Remove from watchlist" else "Not interested", onHide))
+        if (!marquee.offline.value) add(TileAction(if (watchlist) "Remove from watchlist" else "Not interested", onHide))
         add(TileAction(if (m != null) "Go to film" else "Go to show") { vodRoute(s)?.let { nav.navigate(it) } })
     }
     Column(if (width != null) Modifier.width(width) else Modifier.fillMaxWidth()) {

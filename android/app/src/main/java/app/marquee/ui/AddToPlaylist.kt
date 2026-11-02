@@ -61,10 +61,11 @@ fun AddToPlaylistDialog(itemId: Long, music: Boolean, onDone: () -> Unit) {
     val marquee = LocalMarquee.current
     val scope = rememberCoroutineScope()
     val kind = if (music) PlaylistKind.AUDIO else PlaylistKind.VIDEO
-    val playlists by produceState<List<Playlist>?>(null) {
-        // Smart playlists fill themselves, so they aren't offered.
-        value = withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists(kind).filter { it.rules == null } }.getOrDefault(emptyList()) }
-    }
+    // Read here, not just inside the dialog: an answer arriving during the dialog's first composition could otherwise never show.
+    val playlists = produceState<List<Playlist>?>(null) {
+        // Smart playlists fill themselves, so they aren't offered; nor are ones shared by someone else, which only they can change (MUSIC-24).
+        value = withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists(kind).filter { it.rules == null && it.readOnly != true } }.getOrDefault(emptyList()) }
+    }.value
     var newTitle by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var done by remember { mutableStateOf<String?>(null) }
@@ -88,7 +89,7 @@ fun AddToPlaylistDialog(itemId: Long, music: Boolean, onDone: () -> Unit) {
                     playlists == null -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     else -> {
                         Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
-                            playlists!!.forEach { p ->
+                            playlists.forEach { p ->
                                 Row(Modifier.fillMaxWidth().clickable(enabled = !busy) {
                                     act(p.title) { marquee.playlists.addPlaylistItems(p.id, AddPlaylistItemsRequest(listOf(itemId))) }
                                 }.focusRing().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {

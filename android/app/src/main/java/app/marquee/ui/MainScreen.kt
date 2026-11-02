@@ -16,6 +16,17 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -70,7 +81,22 @@ private val tabs = listOf(
     Dest("settings", "Settings", Icons.Filled.Settings),
 )
 
-/** Phones: bottom navigation with the mini player above it. TV: a side rail (D-pad friendly). */
+// While offline (phones and tablets) only what works without the server: its screens and Settings.
+private val offlineTabs = listOf(
+    Dest(OFFLINE_ROUTE, "Library", Icons.Filled.DownloadDone),
+    Dest("settings", "Settings", Icons.Filled.Settings),
+)
+
+/** Screens that take over the whole display, without the tabs and mini player. */
+private fun isFullScreen(route: String) = route.startsWith("player") || route == "nowplaying" || route.startsWith("live/") ||
+    route.startsWith("vodplay/") || route.startsWith("vodepplay/") || route.startsWith("recap/")
+
+/**
+ * Phones: bottom navigation with the mini player above it. TV: a side rail (D-pad friendly). While
+ * offline, phones and tablets swap their screens for the Offline Library, with a banner across the
+ * top; the online screens stay where they were for when the server's back. A player that's open
+ * stays open through the change, until it's closed.
+ */
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun MainScreen() {
@@ -78,7 +104,7 @@ fun MainScreen() {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route ?: "home"
-    val fullScreen = route.startsWith("player") || route == "nowplaying" || route.startsWith("live/") || route.startsWith("vodplay/") || route.startsWith("vodepplay/") || route.startsWith("recap/")
+    val fullScreen = isFullScreen(route)
     // The tab whose section is showing; reselecting it goes back to its first screen.
     var tab by rememberSaveable { mutableStateOf("home") }
     LaunchedEffect(route) { if (tabs.any { it.route == route }) tab = route }
@@ -109,25 +135,65 @@ fun MainScreen() {
         TimeLimitHost()
         return
     }
-    Scaffold(
-        bottomBar = {
-            if (!fullScreen) Column {
-                MiniPlayer(onOpen = { nav.navigate("nowplaying") })
-                NavigationBar {
-                    tabs.forEach { t ->
-                        NavigationBarItem(selected = tab == t.route, onClick = { go(t.route) }, icon = { Icon(t.icon, t.label) }, label = { Text(t.label) })
+    val offline by marquee.offline.collectAsState()
+    val offlineNav = rememberNavController()
+    val offlineEntry by offlineNav.currentBackStackEntryAsState()
+    val offlineRoute = offlineEntry?.destination?.route ?: OFFLINE_ROUTE
+    var library by rememberSaveable { mutableStateOf(offline) }
+    LaunchedEffect(offline, library, route, offlineRoute) {
+        if (isFullScreen(if (library) offlineRoute else route)) return@LaunchedEffect
+        library = offline
+        // Next time it starts from the top, as there may be other downloads by then.
+        if (!offline) runCatching { offlineNav.popBackStack(OFFLINE_ROUTE, inclusive = false) }
+    }
+    val shownNav = if (library) offlineNav else nav
+    val shownRoute = if (library) offlineRoute else route
+    // Downloads and Smart downloads open from Settings.
+    val offlineTab = if (offlineRoute == "settings" || offlineRoute == "downloads" || offlineRoute == "smartdownloads") "settings" else OFFLINE_ROUTE
+    // What the screens remember (scroll positions and the like) waits for them while they're away.
+    val saved = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+    // Not over a video, which fills the screen.
+    val banner = offline && !shownRoute.startsWith("player")
+    Column(Modifier.fillMaxSize()) {
+        if (banner) OfflineBanner()
+        Scaffold(
+            if (banner) Modifier.weight(1f).consumeWindowInsets(WindowInsets.statusBars) else Modifier.weight(1f),
+            bottomBar = {
+                if (!isFullScreen(shownRoute)) Column {
+                    MiniPlayer(onOpen = { shownNav.navigate("nowplaying") })
+                    NavigationBar {
+                        if (library) offlineTabs.forEach { t ->
+                            NavigationBarItem(selected = offlineTab == t.route, onClick = {
+                                offlineNav.navigate(t.route) { popUpTo(OFFLINE_ROUTE); launchSingleTop = true }
+                            }, icon = { Icon(t.icon, t.label) }, label = { Text(t.label) })
+                        }
+                        else tabs.forEach { t ->
+                            NavigationBarItem(selected = tab == t.route, onClick = { go(t.route) }, icon = { Icon(t.icon, t.label) }, label = { Text(t.label) })
+                        }
                     }
                 }
+            },
+        ) { padding ->
+            Box(Modifier.padding(padding)) {
+                if (library) saved.SaveableStateProvider("offline") { OfflineRoutes(offlineNav) }
+                else saved.SaveableStateProvider("online") { Routes(nav) }
+                // Asks for a rating after the player closed at the end (USER-19).
+                RatingPromptHost(!isFullScreen(shownRoute), Modifier.align(Alignment.BottomCenter))
             }
-        },
-    ) { padding ->
-        Box(Modifier.padding(padding)) {
-            Routes(nav)
-            // Asks for a rating after the player closed at the end (USER-19).
-            RatingPromptHost(!fullScreen, Modifier.align(Alignment.BottomCenter))
         }
     }
     TimeLimitHost()
+}
+
+/** Across the top of the screen while offline, under the status bar. */
+@Composable
+private fun OfflineBanner() {
+    Row(Modifier.fillMaxWidth().background(Surface2).statusBarsPadding().padding(horizontal = sidePadding, vertical = 4.dp)
+        .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }.testTag("offlineBanner"),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+        Icon(Icons.Filled.CloudOff, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Offline: showing downloads", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable
@@ -145,6 +211,8 @@ private fun Routes(nav: NavHostController) {
             LibraryScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getString("sort"))
         }
         composable("item/{id}", listOf(navArgument("id") { type = NavType.LongType })) { ItemScreen(nav, it.arguments!!.getLong("id")) }
+        // All of an artist's Top Songs (their page's More).
+        composable("topsongs/{id}", listOf(navArgument("id") { type = NavType.LongType })) { TopSongsScreen(nav, it.arguments!!.getLong("id")) }
         composable("playlist/{id}", listOf(navArgument("id") { type = NavType.LongType })) { PlaylistScreen(nav, it.arguments!!.getLong("id")) }
         composable(
             "player/{id}?start={start}&group={group}",
@@ -202,6 +270,29 @@ private fun Routes(nav: NavHostController) {
         }
         composable("health") { LibraryHealthScreen(nav) }
         composable("health/{check}") { HealthIssuesScreen(nav, it.arguments!!.getString("check")!!) }
+    }
+}
+
+/** What works without the server: the Offline Library, the players and Settings. */
+@Composable
+private fun OfflineRoutes(nav: NavHostController) {
+    NavHost(nav, startDestination = OFFLINE_ROUTE) {
+        composable(OFFLINE_ROUTE) { OfflineLibraryScreen(nav) }
+        composable("offlineshow/{id}", listOf(navArgument("id") { type = NavType.LongType })) { OfflineShowScreen(nav, it.arguments!!.getLong("id")) }
+        composable("offlinealbum/{id}", listOf(navArgument("id") { type = NavType.LongType })) { OfflineAlbumScreen(it.arguments!!.getLong("id")) }
+        composable("offlineplaylist/{id}", listOf(navArgument("id") { type = NavType.LongType })) { OfflinePlaylistScreen(nav, it.arguments!!.getLong("id")) }
+        composable(
+            "player/{id}?start={start}&group={group}",
+            listOf(
+                navArgument("id") { type = NavType.LongType },
+                navArgument("start") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("group") { type = NavType.StringType; nullable = true; defaultValue = null },
+            ),
+        ) { PlayerScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getLong("start").takeIf { s -> s >= 0 }, it.arguments!!.getString("group")) }
+        composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }) }
+        composable("settings") { SettingsScreen(nav) }
+        composable("downloads") { DownloadsScreen(nav) }
+        composable("smartdownloads") { SmartDownloadsScreen(nav) }
     }
 }
 

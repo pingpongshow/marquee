@@ -134,7 +134,7 @@ class MusicLibrary(private val marquee: Marquee, private val ownPackage: String,
     ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
         val only = mediaItems.singleOrNull()
         val query = only?.requestMetadata?.searchQuery
-        if (only == null || (only.mediaId.toLongOrNull() != null && query == null)) {
+        if (only == null || (QueueIds.trackId(only.mediaId) != null && query == null)) {
             // The app's own queue: rebuild URIs only.
             return com.google.common.util.concurrent.Futures.immediateFuture(
                 MediaSession.MediaItemsWithStartPosition(mediaItems.map(::withUri), startIndex, startPositionMs),
@@ -150,13 +150,13 @@ class MusicLibrary(private val marquee: Marquee, private val ownPackage: String,
     override fun onAddMediaItems(mediaSession: MediaSession, controller: MediaSession.ControllerInfo, mediaItems: MutableList<MediaItem>): ListenableFuture<MutableList<MediaItem>> =
         io {
             mediaItems.flatMap {
-                if (it.mediaId.toLongOrNull() != null) listOf(withUri(it)) else runCatching { expand(it.mediaId).first }.getOrDefault(emptyList())
+                if (QueueIds.trackId(it.mediaId) != null) listOf(withUri(it)) else runCatching { expand(it.mediaId).first }.getOrDefault(emptyList())
             }.toMutableList()
         }
 
     // The play context travels in the metadata extras (URIs don't cross to the session) and back into the URI here.
     private fun withUri(item: MediaItem) = item.buildUpon()
-        .setUri(item.mediaId.toLongOrNull()?.let { trackUri(it, playContext(item)) } ?: "marquee://track/${item.mediaId}").build()
+        .setUri(QueueIds.trackId(item.mediaId)?.let { trackUri(it, playContext(item)) } ?: "marquee://track/${item.mediaId}").build()
 
     /** Turns a browse id into a queue and the index to start at. */
     private fun expand(mediaId: String): Pair<List<MediaItem>, Int> {

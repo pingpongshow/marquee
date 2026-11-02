@@ -364,7 +364,7 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
         removed.retainAll { it in keys }
     }
     fun continueActions(removal: Pair<HubsApi.KindRemoveVodFromContinueWatching, Long>?, key: String, title: String, more: List<TileAction>) = buildList {
-        if (removal != null && !marquee.isOffline) add(TileAction("Remove from Continue Watching") {
+        if (removal != null && !marquee.offline.value) add(TileAction("Remove from Continue Watching") {
             removed.add(key)
             removeVodContinue(marquee, context, removal.first, removal.second, title, onFailed = { removed.remove(key) })
         })

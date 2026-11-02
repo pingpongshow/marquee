@@ -38,7 +38,6 @@ class SmartDownloads(context: Context, private val marquee: Marquee, private val
         val musicOn: Boolean = false,
         val musicBudgetGb: Int = 5,
         val wifiOnly: Boolean = true,
-        val quality: Downloads.Quality = Downloads.Quality.Medium,
     ) {
         val on: Boolean get() = showsOn || musicOn
     }
@@ -63,7 +62,6 @@ class SmartDownloads(context: Context, private val marquee: Marquee, private val
         musicOn = prefs.getBoolean("musicOn", false),
         musicBudgetGb = prefs.getInt("musicBudgetGb", 5).takeIf { it in SmartSelection.budgets } ?: 5,
         wifiOnly = prefs.getBoolean("wifiOnly", true),
-        quality = runCatching { Downloads.Quality.valueOf(prefs.getString("quality", null) ?: "") }.getOrDefault(Downloads.Quality.Medium),
     )
 
     /**
@@ -75,8 +73,7 @@ class SmartDownloads(context: Context, private val marquee: Marquee, private val
         val new = f(old)
         _settings.value = new
         prefs.edit().putBoolean("showsOn", new.showsOn).putInt("showsBudgetGb", new.showsBudgetGb).putInt("episodes", new.episodes)
-            .putBoolean("musicOn", new.musicOn).putInt("musicBudgetGb", new.musicBudgetGb).putBoolean("wifiOnly", new.wifiOnly)
-            .putString("quality", new.quality.name).apply()
+            .putBoolean("musicOn", new.musicOn).putInt("musicBudgetGb", new.musicBudgetGb).putBoolean("wifiOnly", new.wifiOnly).apply()
         if (old.showsOn && !new.showsOn) downloads.removeSmart(Downloads.SmartKind.Shows)
         if (old.musicOn && !new.musicOn) downloads.removeSmart(Downloads.SmartKind.Music)
         schedule()
@@ -153,6 +150,7 @@ class SmartDownloads(context: Context, private val marquee: Marquee, private val
     private suspend fun shows(s: Settings) {
         // Shows being watched, from Continue Watching (in-progress episodes and next episodes).
         val page = withContext(Dispatchers.IO) { marquee.hubs.continueWatching(0, 50) }
+        val quality = downloads.quality(DownloadQuality.Kind.Videos)
         val lastWatched = LinkedHashMap<Long, Long>()
         for (c in page.propertyEntries) {
             val item = c.item ?: continue
@@ -167,7 +165,7 @@ class SmartDownloads(context: Context, private val marquee: Marquee, private val
                 { leaves ->
                     val next = leaves.filter { it.type == ItemType.EPISODE }.take(s.episodes)
                     next.forEach { items[it.id] = it }
-                    SmartSelection.ShowQueue(show, at, next.map { SmartSelection.Candidate(it.id, bytes(it) { SmartSelection.estimateVideoBytes(it.durationMs, s.quality) }) })
+                    SmartSelection.ShowQueue(show, at, next.map { SmartSelection.Candidate(it.id, bytes(it) { SmartSelection.estimateVideoBytes(it.durationMs, quality) }) })
                 },
                 { SmartSelection.ShowQueue(show, at, emptyList(), failed = true) },
             )
@@ -183,6 +181,7 @@ class SmartDownloads(context: Context, private val marquee: Marquee, private val
 
     private suspend fun music(s: Settings) {
         val budget = s.musicBudgetGb * SmartSelection.GB
+        val quality = downloads.quality(DownloadQuality.Kind.Songs)
         val libs = withContext(Dispatchers.IO) { marquee.libraries.listLibraries().filter { it.type == LibraryType.MUSIC } }
         val items = HashMap<Long, ItemSummary>()
         val candidates = mutableListOf<SmartSelection.Candidate>()
@@ -191,7 +190,7 @@ class SmartDownloads(context: Context, private val marquee: Marquee, private val
             for (t in tracks) {
                 if (t.type != ItemType.TRACK || items.containsKey(t.id)) continue
                 items[t.id] = t
-                val b = bytes(t) { SmartSelection.estimateTrackBytes(t.durationMs, t.audioFormat?.bitrateKbps, t.audioFormat?.lossless == true) }
+                val b = bytes(t) { SmartSelection.estimateTrackBytes(t.durationMs, t.audioFormat?.bitrateKbps, t.audioFormat?.lossless == true, quality) }
                 candidates += SmartSelection.Candidate(t.id, b)
                 total += b
             }
@@ -230,7 +229,7 @@ class SmartDownloads(context: Context, private val marquee: Marquee, private val
             // Settings may have changed meanwhile (turned off): stop adding.
             val now = _settings.value
             if (kind == Downloads.SmartKind.Shows && !now.showsOn || kind == Downloads.SmartKind.Music && !now.musicOn) break
-            runCatching { downloads.download(item, s.quality, smart = kind, wifiOnly = s.wifiOnly) }
+            runCatching { downloads.download(item, smart = kind, wifiOnly = s.wifiOnly) }
         }
     }
 

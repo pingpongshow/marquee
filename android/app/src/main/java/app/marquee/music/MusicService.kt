@@ -141,7 +141,7 @@ class MusicService : MediaLibraryService() {
                         if (lastDuration > 0 && end >= lastDuration / 2) app.downloads.recordProgress(prev, end, watched = true)
                     } else finish(prev, end)
                 }
-                current = item?.mediaId?.toLongOrNull()
+                current = QueueIds.trackId(item?.mediaId)
                 lastDuration = 0
                 if (current != retried) retried = null
                 report(player, PlaybackProgress.State.PLAYING)
@@ -164,7 +164,7 @@ class MusicService : MediaLibraryService() {
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
                 if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) return
                 updateAlbumOrder(player)
-                val queued = (0 until player.mediaItemCount).mapNotNull { player.getMediaItemAt(it).mediaId.toLongOrNull() }.toSet()
+                val queued = (0 until player.mediaItemCount).mapNotNull { QueueIds.trackId(player.getMediaItemAt(it).mediaId) }.toSet()
                 resolved.keys.filter { it !in queued && it != current && it != fadingFrom }.forEach { finish(it, 0) }
             }
 
@@ -172,13 +172,25 @@ class MusicService : MediaLibraryService() {
             // fresh session from the same position; then on to the next track rather than
             // stopping. Not when the server can't be reached at all, or after several in a row.
             override fun onPlayerError(error: PlaybackException) {
-                val id = player.currentMediaItem?.mediaId?.toLongOrNull() ?: return
+                val id = QueueIds.trackId(player.currentMediaItem?.mediaId) ?: return
                 val code = (error.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
                 android.util.Log.w("Marquee", "track $id failed (${error.errorCodeName}, http $code)", error)
                 // Its session may be dead or broken: the retry starts a new one.
                 if (code == 404 || code == 410) resolved.remove(id) else finish(id, player.currentPosition)
                 val offline = error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
                     error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+                // Offline, only downloads can play: on to the next one, if any.
+                if (marquee.offline.value) {
+                    val next = (player.currentMediaItemIndex + 1 until player.mediaItemCount).firstOrNull { i ->
+                        QueueIds.trackId(player.getMediaItemAt(i).mediaId)?.let(app.downloads::localFile) != null
+                    }
+                    if (next != null) {
+                        player.seekTo(next, 0)
+                        player.prepare()
+                        player.play()
+                    }
+                    return
+                }
                 when {
                     retried != id -> {
                         retried = id
@@ -268,7 +280,7 @@ class MusicService : MediaLibraryService() {
         val dur = p.duration
         if (dur <= secs * 3000L || dur - p.currentPosition > secs * 1000L || sameAlbumNext(p)) return
         val item = p.currentMediaItem ?: return
-        val id = item.mediaId.toLongOrNull() ?: return
+        val id = QueueIds.trackId(item.mediaId) ?: return
         val f = faderPlayer()
         val fromVolume = 1f
         fadingFrom = id
@@ -326,11 +338,11 @@ class MusicService : MediaLibraryService() {
     private fun updateAlbumOrder(p: Player) {
         val ids = (0 until p.mediaItemCount).map { p.getMediaItemAt(it) }
         val order = Levelling.albumOrder(ids.map { it.mediaMetadata.extras?.getLong("album", -1)?.takeIf { a -> a >= 0 } }, p.shuffleModeEnabled)
-        ids.forEachIndexed { i, item -> item.mediaId.toLongOrNull()?.let { TrackGains.albumMode[it] = order[i] } }
+        ids.forEachIndexed { i, item -> QueueIds.trackId(item.mediaId)?.let { TrackGains.albumMode[it] = order[i] } }
     }
 
     private fun report(player: Player, state: PlaybackProgress.State) {
-        val id = player.currentMediaItem?.mediaId?.toLongOrNull() ?: return
+        val id = QueueIds.trackId(player.currentMediaItem?.mediaId) ?: return
         val session = resolved[id]?.first ?: return
         val pos = player.currentPosition
         marquee.scope.launch { runCatching { marquee.playback.reportPlayback(session, PlaybackProgress(pos, state)) } }

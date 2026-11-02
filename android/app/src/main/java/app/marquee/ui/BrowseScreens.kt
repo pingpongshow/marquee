@@ -1,5 +1,6 @@
 package app.marquee.ui
 
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RemoveCircleOutline
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -111,6 +113,7 @@ fun HomeScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
     val connection by marquee.connection.collectAsState()
     val me by marquee.me.collectAsState()
+    val offline by marquee.offline.collectAsState()
     var groups by remember { mutableStateOf(emptyList<app.marquee.api.models.WatchGroup>()) }
     LaunchedEffect(connection) {
         while (true) {
@@ -150,9 +153,9 @@ fun HomeScreen(nav: NavHostController) {
                     Row(Modifier.padding(horizontal = sidePadding).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Home", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         // Muse: describe what to watch (USER-15).
-                        if (!marquee.isOffline) IconButton({ nav.navigate("muse") }, Modifier.focusRing()) { Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold) }
+                        if (!offline) IconButton({ nav.navigate("muse") }, Modifier.focusRing()) { Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold) }
                         // Rows: order, hide and pinned collections and playlists (USER-12).
-                        if (!marquee.isOffline) androidx.compose.material3.TextButton({ nav.navigate("edithome") }, Modifier.focusRing()) {
+                        if (!offline) androidx.compose.material3.TextButton({ nav.navigate("edithome") }, Modifier.focusRing()) {
                             Icon(Icons.Filled.Edit, null)
                             Text("Edit Home", Modifier.padding(start = 6.dp))
                         }
@@ -187,7 +190,7 @@ fun HomeScreen(nav: NavHostController) {
                     }
                 }
             }
-            if (!marquee.isOffline) h.exceptionOrNull()?.let { e -> item { Text("Couldn't load: ${serverMessage(e)}", Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.error) } }
+            if (!offline) h.exceptionOrNull()?.let { e -> item { Text("Couldn't load: ${serverMessage(e)}", Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.error) } }
             itemsIndexed(h.getOrDefault(emptyList()), key = { _, it -> it.id }) { hi, hub ->
                 val first = opened == null && openedKey == null && hi == 0
                 // Every row's See all (USER-12): its page; on TV the D-pad comes back to its tile.
@@ -499,12 +502,32 @@ internal fun <T> positionAmong(items: List<T>, i: Int, match: (T) -> Boolean): I
 @Composable
 fun PlaylistsScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Bumped after an invitation is answered, to load both lists again.
+    var version by remember { mutableIntStateOf(0) }
     // Kept while on the back stack, so coming back keeps the list's place.
-    val loaded by cachedLoad("playlists") { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists() } } }
+    val loaded by cachedLoad("playlists", version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists() } } }
     val lists = loaded?.getOrNull() ?: emptyList()
+    // Playlists people have shared with this person (MUSIC-24), to accept or decline.
+    val loadedInvites by cachedLoad("playlist-invites", version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistInvites() }.getOrNull() } }
+    // Answered here: gone at once, before the lists come back from the server.
+    val answered = remember { mutableStateListOf<Long>() }
+    val invites = (loadedInvites ?: emptyList()).filter { it.id !in answered }
+    fun answer(p: app.marquee.api.models.Playlist, accept: Boolean) {
+        answered.add(p.id)
+        marquee.scope.launch {
+            withContext(Dispatchers.IO) { runCatching { if (accept) marquee.playlists.acceptPlaylistShare(p.id) else marquee.playlists.removePlaylistShare(p.id) } }
+                .onSuccess { version++ }
+                .onFailure { answered.remove(p.id); toast(context, "Couldn't answer “${p.title}”: ${serverMessage(it)}") }
+        }
+    }
     var opened by rememberLastOpened("playlists")
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp)) {
         item { Text("Playlists", Modifier.padding(horizontal = sidePadding, vertical = 8.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        items(invites, key = { "invite${it.id}" }) { p ->
+            val first = marquee.isTv && opened == null && p == invites.first()
+            PlaylistInvite(p, first, { answer(p, accept = true) }, { answer(p, accept = false) })
+        }
         // Loading, couldn't load, or none yet (not "No playlists yet" while they're on their way).
         when {
             loaded == null -> item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
@@ -524,13 +547,41 @@ fun PlaylistsScreen(nav: NavHostController) {
             items(group, key = { it.id }) { p ->
                 ListItem(
                     headlineContent = { Text(p.title) },
-                    supportingContent = { Text("${p.itemCount} ${if (p.kind == PlaylistKind.AUDIO) "tracks" else "videos"}") },
+                    supportingContent = { Text(listOfNotNull("${p.itemCount} ${if (p.kind == PlaylistKind.AUDIO) "tracks" else "videos"}", playlistSharing(p)).joinToString(" · ")) },
                     leadingContent = { PlaylistMosaic(p.imageIds, p.title, Modifier.size(56.dp)) },
                     trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                    modifier = Modifier.initialFocus(marquee.isTv && (if (opened != null) opened == p.id else p == lists.first()))
+                    modifier = Modifier.initialFocus(marquee.isTv && invites.isEmpty() && (if (opened != null) opened == p.id else p == lists.first()))
                         .focusCard({ opened = p.id; nav.navigate("playlist/${p.id}") }),
                 )
+            }
+        }
+    }
+}
+
+/** "Shared by Sam" on a playlist someone shared, "Shared with 2" on your own that you did; else nothing. */
+internal fun playlistSharing(p: app.marquee.api.models.Playlist): String? = when {
+    p.readOnly == true -> p.ownerName?.let { "Shared by $it" } ?: "Shared with you"
+    p.sharedWithAll == true -> "Shared with everyone"
+    (p.shareCount ?: 0) > 0 -> "Shared with ${p.shareCount}"
+    else -> null
+}
+
+/** An invitation at the top of Playlists: whose it is, with Accept and Decline. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun PlaylistInvite(p: app.marquee.api.models.Playlist, focusFirst: Boolean, onAccept: () -> Unit, onDecline: () -> Unit) {
+    Row(Modifier.padding(horizontal = sidePadding, vertical = 6.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Gold.copy(alpha = 0.12f))
+        .testTag("invite-${p.id}").padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        PlaylistMosaic(p.imageIds, p.title, Modifier.size(56.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(p.title, fontWeight = FontWeight.SemiBold, maxLines = 2)
+            Text("${p.ownerName ?: "Someone"} shared this with you · ${p.itemCount} ${if (p.kind == PlaylistKind.AUDIO) "tracks" else "videos"}",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(onAccept, Modifier.focusRing().initialFocus(focusFirst)) { Text("Accept", maxLines = 1, softWrap = false) }
+                OutlinedButton(onDecline, Modifier.focusRing()) { Text("Decline", maxLines = 1, softWrap = false) }
             }
         }
     }
@@ -551,8 +602,8 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
     val playlist by cachedLoad("playlist-$playlistId", version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.getPlaylist(playlistId) }.getOrNull() } }
     val title = playlist?.title ?: ""
     val context = androidx.compose.ui.platform.LocalContext.current
-    // A smart playlist fills itself from its rules: nothing to remove by hand.
-    val editable = playlist != null && playlist?.rules == null
+    // A smart playlist fills itself from its rules: nothing to remove by hand. Nor from one shared with this person (MUSIC-24).
+    val editable = playlist != null && playlist?.rules == null && playlist?.readOnly != true
     fun removeEntry(entryId: Long, what: String) {
         removed.add(entryId)
         marquee.scope.launch {
@@ -576,7 +627,10 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
             Column(Modifier.padding(horizontal = sidePadding)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     playlist?.let { PlaylistMosaic(it.imageIds, it.title, Modifier.size(if (marquee.isTv) 120.dp else 88.dp)) }
-                    Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Column {
+                        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        playlist?.let(::playlistSharing)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
                 }
                 // Full width, wrapping onto another line rather than squeezing a button's label.
                 FlowRow(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -597,7 +651,10 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
                         }
                     }
                     PinToHomeButton("playlist-$playlistId")
-                    playlist?.let { p -> PlaylistMenu(p, nav, onRenamed = { version++ }) }
+                    playlist?.let { p ->
+                        if (p.readOnly == true) RemoveSharedPlaylistButton(p, nav)
+                        else PlaylistMenu(p, nav, onChanged = { version++ })
+                    }
                 }
             }
         }
@@ -616,7 +673,10 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
                 trailingContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (hearted) FavoriteButton(it, Modifier.inRowFirst(inRow), small = true)
-                        if (it.type == ItemType.TRACK) app.marquee.music.TrackRating(it)
+                        if (it.type == ItemType.TRACK) {
+                            app.marquee.music.TrackRating(it)
+                            app.marquee.music.TrackRadioButton(it)
+                        }
                         if (editable) {
                             Box {
                                 // TV: the D-pad can't reach it; holding OK (or Menu) on the row opens the same menu.
@@ -639,21 +699,50 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
     }
 }
 
-/** A playlist's "…": Rename and Delete (with a confirmation), for its owner's own playlists. */
+/** A playlist someone shared with this person: it can only leave their playlists (with a confirmation). */
 @Composable
-private fun PlaylistMenu(p: app.marquee.api.models.Playlist, nav: NavHostController, onRenamed: () -> Unit) {
+private fun RemoveSharedPlaylistButton(p: app.marquee.api.models.Playlist, nav: NavHostController) {
+    val marquee = LocalMarquee.current
+    val downloads = LocalDownloads.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var removing by remember { mutableStateOf(false) }
+    OutlinedButton({ removing = true }, Modifier.focusRing()) {
+        Icon(Icons.Filled.RemoveCircleOutline, null); Text("Remove", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
+    }
+    if (removing) AlertDialog(onDismissRequest = { removing = false },
+        title = { Text("Remove “${p.title}”?") },
+        text = { Text("It leaves your playlists. To get it back, ${p.ownerName ?: "its owner"} would have to share it with you again.") },
+        confirmButton = {
+            TextButton({
+                removing = false
+                marquee.scope.launch {
+                    withContext(Dispatchers.IO) { runCatching { marquee.playlists.removePlaylistShare(p.id) } }
+                        .onSuccess { downloads.unsyncPlaylist(p.id); withContext(Dispatchers.Main) { nav.popBackStack() } }
+                        .onFailure { toast(context, "Couldn't remove it: ${serverMessage(it)}") }
+                }
+            }, Modifier.focusRing()) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = { TextButton({ removing = false }, Modifier.focusRing()) { Text("Cancel") } })
+}
+
+/** A playlist's "…": Share (phones and tablets), Rename and Delete (with a confirmation), for its owner's own playlists. */
+@Composable
+private fun PlaylistMenu(p: app.marquee.api.models.Playlist, nav: NavHostController, onChanged: () -> Unit) {
     val marquee = LocalMarquee.current
     val context = androidx.compose.ui.platform.LocalContext.current
     var open by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    var sharing by remember { mutableStateOf(false) }
     Box {
         IconButton({ open = true }, Modifier.focusRing()) { Icon(Icons.Filled.MoreVert, "Playlist actions") }
         DropdownMenu(open, { open = false }) {
+            if (!marquee.isTv) DropdownMenuItem({ Text("Share…") }, { open = false; sharing = true }, leadingIcon = { Icon(Icons.Filled.Share, null) })
             DropdownMenuItem({ Text("Rename…") }, { open = false; renaming = true }, leadingIcon = { Icon(Icons.Filled.Edit, null) })
             DropdownMenuItem({ Text("Delete playlist…") }, { open = false; deleting = true }, leadingIcon = { Icon(Icons.Filled.Delete, null) })
         }
     }
+    if (sharing) PlaylistShareDialog(p) { changed -> sharing = false; if (changed) onChanged() }
     if (renaming) {
         var name by remember { mutableStateOf(p.title) }
         var busy by remember { mutableStateOf(false) }
@@ -665,7 +754,7 @@ private fun PlaylistMenu(p: app.marquee.api.models.Playlist, nav: NavHostControl
                     busy = true
                     marquee.scope.launch {
                         withContext(Dispatchers.IO) { runCatching { marquee.playlists.updatePlaylist(p.id, app.marquee.api.models.UpdatePlaylistRequest(title = name.trim())) } }
-                            .onSuccess { renaming = false; onRenamed() }
+                            .onSuccess { renaming = false; onChanged() }
                             .onFailure { toast(context, "Couldn't rename it: ${serverMessage(it)}") }
                         busy = false
                     }
@@ -681,7 +770,7 @@ private fun PlaylistMenu(p: app.marquee.api.models.Playlist, nav: NavHostControl
                 deleting = false
                 marquee.scope.launch {
                     withContext(Dispatchers.IO) { runCatching { marquee.playlists.deletePlaylist(p.id) } }
-                        .onSuccess { nav.popBackStack() }
+                        .onSuccess { withContext(Dispatchers.Main) { nav.popBackStack() } }
                         .onFailure { toast(context, "Couldn't delete it: ${serverMessage(it)}") }
                 }
             }, Modifier.focusRing()) { Text("Delete", color = MaterialTheme.colorScheme.error) }
@@ -742,6 +831,7 @@ fun SearchScreen(nav: NavHostController) {
 fun SettingsScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
     val me by marquee.me.collectAsState()
+    val offline by marquee.offline.collectAsState()
     val scope = rememberCoroutineScope()
     // The rating switch below shows only while the server asks for ratings (USER-19).
     LaunchedEffect(Unit) { marquee.refreshRatingPrompt() }
@@ -761,30 +851,35 @@ fun SettingsScreen(nav: NavHostController) {
                 Text("@${me?.username ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Text("Server: ${marquee.server?.name ?: ""} · ${if (marquee.isRemote) "Tailscale (away)" else "home network"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Server: ${marquee.server?.name ?: ""} · ${if (offline) "offline" else if (marquee.isRemote) "Tailscale (away)" else "home network"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Version ${marquee.info?.version ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         PendingSyncRow()
         // TV: the page starts on its first setting (not left on the side menu), and coming back from
         // one of its pages focuses that page's button again.
-        TrailersPreference(focusFirst = marquee.isTv && opened == null)
-        NightModePreference()
-        RatingPromptPreference()
+        // Offline, only what's kept on this device: these are saved on the server.
+        if (!offline) {
+            TrailersPreference(focusFirst = marquee.isTv && opened == null)
+            NightModePreference()
+            RatingPromptPreference()
+        }
         ShowAudioQualityPreference()
         EqualiserSetting()
-        // Smart downloads: phones and tablets (a TV doesn't download).
-        if (!marquee.isTv) SmartDownloadsRow(nav)
+        // Downloads: phones and tablets (a TV doesn't download).
+        if (!marquee.isTv) DownloadsSettings(nav)
         // Approve a TV's Quick Connect code (the TV's sign-in sends people here); TVs show the code, not this.
-        if (!marquee.isTv) LinkTvSetting()
+        if (!marquee.isTv && !offline) LinkTvSetting()
         // Buttons wrap onto more lines rather than running off a phone's edge.
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { open("stats") }, page("stats")) { Text("Your Stats") }
-            OutlinedButton(onClick = { open("subtitles") }, page("subtitles")) { Text("Subtitle appearance") }
-            if (me?.isAdmin == true && !marquee.isTv) OutlinedButton(onClick = { open("health") }, page("health")) { Text("Library Health") }
-            if (me?.isAdmin == true) OutlinedButton(onClick = { open("approvals") }, page("approvals")) { Text("Requests") }
-            if (me?.isAdmin == true) OutlinedButton(onClick = { open("users") }, page("users")) { Text("Users & sharing") }
-            if (me?.isAdmin == true) OutlinedButton(onClick = { open("serversettings") }, page("serversettings")) { Text("Server settings") }
-            // Friends have no household profiles to switch to (USER-13).
-            if (me?.restrictions?.friend != true) OutlinedButton(onClick = { switching = true }, Modifier.focusRing()) { Text("Switch profile") }
+            if (!offline) {
+                OutlinedButton(onClick = { open("stats") }, page("stats")) { Text("Your Stats") }
+                OutlinedButton(onClick = { open("subtitles") }, page("subtitles")) { Text("Subtitle appearance") }
+                if (me?.isAdmin == true && !marquee.isTv) OutlinedButton(onClick = { open("health") }, page("health")) { Text("Library Health") }
+                if (me?.isAdmin == true) OutlinedButton(onClick = { open("approvals") }, page("approvals")) { Text("Requests") }
+                if (me?.isAdmin == true) OutlinedButton(onClick = { open("users") }, page("users")) { Text("Users & sharing") }
+                if (me?.isAdmin == true) OutlinedButton(onClick = { open("serversettings") }, page("serversettings")) { Text("Server settings") }
+                // Friends have no household profiles to switch to (USER-13).
+                if (me?.restrictions?.friend != true) OutlinedButton(onClick = { switching = true }, Modifier.focusRing()) { Text("Switch profile") }
+            }
             OutlinedButton(onClick = { signingOut = true }, Modifier.focusRing()) { Text("Sign out") }
             OutlinedButton(onClick = { marquee.forgetServer() }, Modifier.focusRing()) { Text("Use a different server") }
         }

@@ -70,7 +70,7 @@ internal object VodFollowAvailability {
 
     /** Whether this person may follow at all: online, following not known to be off, and allowed to record (admins always are). */
     fun canFollow(marquee: Marquee): Boolean {
-        if (marquee.isOffline || isOff(marquee)) return false
+        if (marquee.offline.value || isOff(marquee)) return false
         val me = marquee.me.value ?: return true
         if (me.isAdmin) return true
         return (me.restrictions.canRecordDVR ?: me.restrictions.canRecord) != false
@@ -237,7 +237,8 @@ private fun FollowDialog(s: VodSeriesDetail, following: Boolean, defaultGb: Doub
 fun VodFollowingButton(nav: NavHostController) {
     val marquee = LocalMarquee.current
     LaunchedEffect(Unit) { VodFollowAvailability.check(marquee) }
-    if (marquee.isOffline || VodFollowAvailability.isOff(marquee)) return
+    val offline by marquee.offline.collectAsState()
+    if (offline || VodFollowAvailability.isOff(marquee)) return
     OutlinedButton({ nav.navigate("vodfollows") }, Modifier.focusRing()) {
         Icon(Icons.Filled.Bookmarks, null)
         Text("Following", Modifier.padding(start = 6.dp))

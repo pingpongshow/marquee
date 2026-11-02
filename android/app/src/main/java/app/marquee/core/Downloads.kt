@@ -24,18 +24,19 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Offline downloads on phones and tablets (M7, MUSIC-14), as on the iPhone (D64): videos as
- * the original file or converted on the server, music tracks as they are. The system's
- * DownloadManager fetches them into app storage (background, resumable, with a notification).
+ * Offline downloads on phones and tablets (M7, MUSIC-14), as on the iPhone (D64): as the
+ * original file or converted on the server, at the song and video quality chosen in Settings
+ * (the recommended ones until then). The system's DownloadManager fetches them into app storage
+ * (background, resumable, with a notification).
  * Plays made offline are kept and sent when the server is reachable again (with everything
  * else changed offline, in [OfflineSync]).
  */
 class Downloads(private val context: Context, private val marquee: Marquee) {
-    enum class Quality(val label: String, val api: CreateDownloadRequest.Quality) {
-        Original("Original", CreateDownloadRequest.Quality.ORIGINAL),
-        High("High (1080p)", CreateDownloadRequest.Quality.HIGH),
-        Medium("Medium (720p)", CreateDownloadRequest.Quality.MEDIUM),
-        Low("Low (480p)", CreateDownloadRequest.Quality.LOW),
+    enum class Quality(val api: CreateDownloadRequest.Quality) {
+        Original(CreateDownloadRequest.Quality.ORIGINAL),
+        High(CreateDownloadRequest.Quality.HIGH),
+        Medium(CreateDownloadRequest.Quality.MEDIUM),
+        Low(CreateDownloadRequest.Quality.LOW),
     }
 
     enum class State { Preparing, Downloading, Done, Failed }
@@ -54,7 +55,9 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         val poster: String? = null,
         val size: Long = 0,
         val jobId: String? = null,
+        val ownerId: Long? = null, // who asked for it: the server lists only the signed-in person's jobs
         val url: String? = null,
+        val fileName: String? = null, // the server's, which gives the extension
         val transfer: Long? = null, // DownloadManager id
         val addedMs: Long = System.currentTimeMillis(),
         val resumeMs: Long? = null,
@@ -69,6 +72,8 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     private val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "downloads").apply { mkdirs() }
     private val indexFile = File(context.filesDir, "downloads.json")
     private val playlistsFile = File(context.filesDir, "downloads-playlists.json")
+    private val playlistInfoFile = File(context.filesDir, "downloads-playlist-info.json")
+    private val prefs = context.getSharedPreferences("marquee.downloads", Context.MODE_PRIVATE)
     private val json = Serializer.kotlinxSerializationJson
     private val dm = context.getSystemService(DownloadManager::class.java)
     /** For starting downloads from screens that may go away; Main, for Toasts. */
@@ -87,6 +92,48 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         runCatching { json.decodeFromString(playlistsSerializer, readFile(playlistsFile)) }.getOrDefault(emptyMap()),
     )
     val playlists: StateFlow<Map<Long, Set<Long>>> = _playlists
+
+    /** A kept playlist as the Offline Library shows it, without the server: its name and order. */
+    @Serializable
+    data class PlaylistInfo(val title: String, val items: List<Long>, val ownerName: String? = null)
+
+    private val playlistInfoSerializer = kotlinx.serialization.builtins.MapSerializer(Long.serializer(), PlaylistInfo.serializer())
+    private val _playlistInfo = MutableStateFlow<Map<Long, PlaylistInfo>>(
+        runCatching { json.decodeFromString(playlistInfoSerializer, readFile(playlistInfoFile)) }.getOrDefault(emptyMap()),
+    )
+    val playlistInfo: StateFlow<Map<Long, PlaylistInfo>> = _playlistInfo
+
+    // Quality
+
+    private val _songQuality = MutableStateFlow(savedQuality(DownloadQuality.Kind.Songs))
+    private val _videoQuality = MutableStateFlow(savedQuality(DownloadQuality.Kind.Videos))
+    /** The song quality chosen in Settings; null until one is, when the recommended one applies. */
+    val songQuality: StateFlow<Quality?> = _songQuality
+    val videoQuality: StateFlow<Quality?> = _videoQuality
+
+    private fun savedQuality(kind: DownloadQuality.Kind): Quality? {
+        val saved = prefs.getString(kind.name, null)?.let { name -> Quality.entries.firstOrNull { it.name == name } }
+        if (saved != null || kind != DownloadQuality.Kind.Videos) return saved
+        // 1.6.0 kept a video quality in Smart Downloads' settings: it carries over, once.
+        val old = context.getSharedPreferences("smart-downloads", Context.MODE_PRIVATE).getString("quality", null)
+            ?.let { name -> Quality.entries.firstOrNull { it.name == name } } ?: return null
+        prefs.edit().putString(kind.name, old.name).apply()
+        return old
+    }
+
+    /** Chooses the quality for new downloads; those already made stay as they are. */
+    fun setQuality(kind: DownloadQuality.Kind, q: Quality) {
+        (if (kind == DownloadQuality.Kind.Songs) _songQuality else _videoQuality).value = q
+        prefs.edit().putString(kind.name, q.name).apply()
+    }
+
+    /** What's recommended here and now: it follows the kind of device and the free storage. */
+    fun recommendedQuality(kind: DownloadQuality.Kind): Quality = DownloadQuality.recommended(kind,
+        tablet = context.resources.configuration.smallestScreenWidthDp >= 600, freeBytes = dir.usableSpace)
+
+    /** The quality new downloads of this kind use. */
+    fun quality(kind: DownloadQuality.Kind): Quality =
+        (if (kind == DownloadQuality.Kind.Songs) _songQuality else _videoQuality).value ?: recommendedQuality(kind)
 
     private fun load(): Map<Long, Entry> = runCatching {
         json.decodeFromString(ListSerializer(Entry.serializer()), readFile(indexFile)).associateBy { it.item.id }
@@ -124,6 +171,13 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         save(soon = progressOnly)
     }
 
+    /** Many entries in one change (an album's songs moving along together), so screens update once. */
+    private fun setAll(changes: Map<Long, (Entry) -> Entry>, progressOnly: Boolean) {
+        if (changes.isEmpty()) return
+        _entries.update { m -> m + changes.mapNotNull { (id, f) -> m[id]?.let { id to f(it) } } }
+        save(soon = progressOnly)
+    }
+
     /** After signing in: resumes conversions and transfers, and sends what was changed offline. */
     fun attach() {
         watch()
@@ -141,12 +195,14 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         if (marquee.baseUrl == null) return
         val items = kotlinx.coroutines.withContext(Dispatchers.IO) { marquee.playlists.listPlaylistItems(id, limit = 2000).items.map { it.item } }
             .filter { it.type in listOf(ItemType.TRACK, ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO) }
+        val info = kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { marquee.playlists.getPlaylist(id) }.getOrNull() }
         val now = items.map { it.id }.toSet()
         val before = _playlists.value[id].orEmpty()
         _playlists.update { it + (id to now) }
+        _playlistInfo.update { m -> m + (id to PlaylistInfo(info?.title ?: m[id]?.title.orEmpty(), items.map { it.id }, info?.ownerName ?: m[id]?.ownerName)) }
         savePlaylists()
         for (it in items) if (_entries.value[it.id] == null) {
-            runCatching { download(it, if (it.type == ItemType.TRACK) Quality.Original else Quality.Medium) }
+            runCatching { download(it) }
             set(it.id) { e -> e.copy(viaPlaylist = true) }
         } else if (_entries.value[it.id]?.smart != null) {
             // A smart download the playlist now keeps: smart downloads no longer remove it.
@@ -158,6 +214,7 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     fun unsyncPlaylist(id: Long) {
         val ids = _playlists.value[id] ?: return
         _playlists.update { it - id }
+        _playlistInfo.update { it - id }
         savePlaylists()
         dropOrphans(ids)
     }
@@ -169,19 +226,21 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
 
     private fun savePlaylists() {
         runCatching { writeFile(playlistsFile, json.encodeToString(playlistsSerializer, _playlists.value)) }
+        runCatching { writeFile(playlistInfoFile, json.encodeToString(playlistInfoSerializer, _playlistInfo.value)) }
     }
 
     // Starting and removing
 
     /**
-     * Downloads a movie, episode, video or track. Tracks are always the original file. [smart]
-     * marks a smart download; [wifiOnly] fetches it only over an unmetered network.
+     * Downloads a movie, episode, video or track at the quality set for its kind. [smart] marks a
+     * smart download; [wifiOnly] fetches it only over an unmetered network.
      */
-    suspend fun download(item: ItemSummary, quality: Quality, smart: SmartKind? = null, wifiOnly: Boolean = false) {
-        val q = if (item.type == ItemType.TRACK) Quality.Original else quality
+    suspend fun download(item: ItemSummary, smart: SmartKind? = null, wifiOnly: Boolean = false) {
+        val q = quality(DownloadQuality.kind(item.type))
         val info = kotlinx.coroutines.withContext(Dispatchers.IO) { marquee.downloads.createDownload(CreateDownloadRequest(item.id, q.api)) }
         val entry = Entry(item, q, State.Preparing, info.progress, size = info.propertySize ?: 0,
-            jobId = info.id.takeUnless { it.startsWith("original-") }, url = info.url, smart = smart, wifiOnly = wifiOnly)
+            jobId = info.id.takeUnless { it.startsWith("original-") }, url = info.url, fileName = info.fileName, smart = smart, wifiOnly = wifiOnly,
+            ownerId = marquee.me.value?.id)
         _entries.update { it + (item.id to entry) }
         save()
         if (info.status == Download.Status.READY && info.url != null) fetch(item.id, info.url!!, info.fileName)
@@ -191,13 +250,26 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         if (item.type == ItemType.TRACK) marquee.scope.launch(Dispatchers.IO) { app.marquee.music.MusicService.fetchGains(marquee, item.id) }
     }
 
-    /** Everything playable under a season, show, album or artist. */
-    suspend fun downloadAll(container: ItemSummary, quality: Quality) {
+    /** Everything playable under a season, show, album or artist. Returns how many it started. */
+    suspend fun downloadAll(container: ItemSummary): Int {
         val leaves = kotlinx.coroutines.withContext(Dispatchers.IO) { marquee.items.itemLeaves(container.id) }
+        var started = 0
         for (it in leaves) {
             val e = _entries.value[it.id]
-            if (e == null) runCatching { download(it, quality) } else if (e.smart != null) keep(it.id)
+            if (e?.state == State.Failed) { if (runCatching { retry(it.id) }.isSuccess) started++ }
+            else if (e == null) { if (runCatching { download(it) }.isSuccess) started++ }
+            else if (e.smart != null) keep(it.id)
         }
+        return started
+    }
+
+    /** Tries a failed download again, at the quality set now. Throws, leaving it as it was, when the server refuses or can't be reached. */
+    suspend fun retry(id: Long) {
+        val e = _entries.value[id] ?: return
+        download(e.item, e.smart, e.wifiOnly)
+        set(id) { it.copy(viaPlaylist = e.viaPlaylist) }
+        // The failed job on the server has been replaced (a job that converted fine is reused).
+        e.jobId?.takeIf { it != _entries.value[id]?.jobId }?.let { job -> marquee.scope.launch(Dispatchers.IO) { runCatching { marquee.downloads.deleteDownload(job) } } }
     }
 
     /** Keeps a smart download as one made by hand: smart downloads won't remove it. */
@@ -251,10 +323,7 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     private fun fetch(id: Long, path: String, fileName: String? = null) {
         val e = _entries.value[id] ?: return
         val url = marquee.absolute(path) ?: return
-        // The server's file name gives the extension; players sniff the format anyway.
-        val ext = fileName?.substringAfterLast('.', "")?.takeIf { it.isNotEmpty() && it.length <= 5 }
-            ?: if (e.quality == Quality.Original) (if (e.item.type == ItemType.TRACK) "audio" else "mkv") else "mp4"
-        val name = "$id.$ext"
+        val name = "$id.${DownloadQuality.extension(fileName, e.item.type, e.quality)}"
         File(dir, name).delete()
         val req = DownloadManager.Request(Uri.parse(url))
             .addRequestHeader("Authorization", "Bearer ${marquee.token}")
@@ -267,54 +336,107 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         set(id) { it.copy(state = State.Downloading, progress = 0.0, file = name, transfer = transfer, url = path) }
     }
 
-    /** Follows conversions on the server and transfers on the device while any are running. */
+    /**
+     * Follows conversions on the server and transfers on the device while any are running. An
+     * album or artist can queue hundreds, so it's one request for all the conversions, every few
+     * seconds, and one query for all the transfers.
+     */
     private fun watch() {
         if (watcher?.isActive == true) return
         watcher = marquee.scope.launch {
+            var tick = 0
             while (true) {
                 val busy = _entries.value.values.filter { it.state == State.Preparing || it.state == State.Downloading }
                 if (busy.isEmpty()) break
-                for (e in busy) {
-                    if (e.state == State.Preparing) checkConversion(e) else checkTransfer(e)
-                }
+                checkTransfers(busy.filter { it.state == State.Downloading })
+                if (tick++ % CONVERSION_POLL_TICKS == 0) checkConversions(busy.filter { it.state == State.Preparing })
                 delay(1000)
             }
         }
     }
 
-    private suspend fun checkConversion(e: Entry) {
-        val job = e.jobId
-        if (job == null) { e.url?.let { fetch(e.item.id, it) }; return }
-        if (marquee.baseUrl == null) return
-        val info = kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { marquee.downloads.getDownload(job) }.getOrNull() } ?: return
-        when (info.status) {
-            Download.Status.READY -> { set(e.item.id) { it.copy(size = info.propertySize ?: it.size) }; info.url?.let { fetch(e.item.id, it, info.fileName) } }
-            Download.Status.FAILED -> set(e.item.id) { it.copy(state = State.Failed, error = info.error ?: "Conversion failed") }
-            else -> set(e.item.id, progressOnly = true) { it.copy(progress = info.progress) }
-        }
-    }
-
-    private fun checkTransfer(e: Entry) {
-        val t = e.transfer ?: return
-        dm.query(DownloadManager.Query().setFilterById(t)).use { c ->
-            if (!c.moveToFirst()) { set(e.item.id) { it.copy(state = State.Failed, error = "The download was cancelled.") }; return }
-            val status = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-            val done = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
-            val total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
-            when (status) {
-                DownloadManager.STATUS_SUCCESSFUL -> {
-                    val size = e.file?.let { File(dir, it).length() } ?: total
-                    set(e.item.id) { it.copy(state = State.Done, progress = 1.0, size = size, transfer = null) }
-                    // The converted copy on the server is no longer needed.
-                    e.jobId?.let { job -> marquee.scope.launch(Dispatchers.IO) { runCatching { marquee.downloads.deleteDownload(job) } } }
+    private suspend fun checkConversions(preparing: List<Entry>) {
+        // Originals have no job: they only wait to be fetched.
+        preparing.filter { it.jobId == null }.forEach { e -> e.url?.let { fetch(e.item.id, it, e.fileName) } }
+        val converting = preparing.filter { it.jobId != null }
+        if (converting.isEmpty() || marquee.baseUrl == null) return
+        val jobs = kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { marquee.downloads.listDownloads() }.getOrNull() } ?: return
+        val byId = jobs.associateBy { it.id }
+        val changes = HashMap<Long, (Entry) -> Entry>()
+        var askedAlone = 0
+        var failed = false
+        for (e in converting) {
+            val info = byId[e.jobId] ?: when {
+                // Not in the list, which would hold it: the server has lost it (it can be tried again).
+                jobs.size < MAX_LISTED_JOBS -> null
+                // The list is full, so it may be further down: a few at a time.
+                askedAlone++ < 10 -> kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { marquee.downloads.getDownload(e.jobId!!) }.getOrNull() } ?: continue
+                else -> continue
+            }
+            if (info == null) {
+                if (e.ownerId != marquee.me.value?.id) continue // another profile's, which this list wouldn't hold
+                changes[e.item.id] = { it.copy(state = State.Failed, error = "The server no longer has this conversion.") }
+                failed = true
+                continue
+            }
+            when (info.status) {
+                Download.Status.READY -> {
+                    val url = info.url
+                    if (url != null) {
+                        set(e.item.id) { it.copy(size = info.propertySize ?: it.size) }
+                        fetch(e.item.id, url, info.fileName)
+                    } else {
+                        changes[e.item.id] = { it.copy(state = State.Failed, error = "The converted file isn't available.") }
+                        failed = true
+                    }
                 }
-                DownloadManager.STATUS_FAILED -> {
-                    val reason = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
-                    set(e.item.id) { it.copy(state = State.Failed, error = "Download failed ($reason)", transfer = null) }
+                Download.Status.FAILED -> {
+                    changes[e.item.id] = { it.copy(state = State.Failed, error = info.error ?: "Conversion failed") }
+                    failed = true
                 }
-                else -> if (total > 0) set(e.item.id, progressOnly = true) { it.copy(progress = done.toDouble() / total) }
+                else -> if (info.progress != e.progress) changes[e.item.id] = { it.copy(progress = info.progress) }
             }
         }
+        setAll(changes, progressOnly = !failed)
+    }
+
+    private fun checkTransfers(downloading: List<Entry>) {
+        val byTransfer = downloading.filter { it.transfer != null }.associateBy { it.transfer!! }
+        val seen = HashSet<Long>()
+        val changes = HashMap<Long, (Entry) -> Entry>()
+        var finished = false
+        // In batches: the query is one SQL statement with a parameter per transfer.
+        byTransfer.keys.chunked(200).forEach { ids ->
+            dm.query(DownloadManager.Query().setFilterById(*ids.toLongArray())).use { c ->
+                while (c.moveToNext()) {
+                    val e = byTransfer[c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_ID))] ?: continue
+                    seen += e.transfer!!
+                    val status = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                    val done = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                    val total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                    when (status) {
+                        DownloadManager.STATUS_SUCCESSFUL -> {
+                            val size = e.file?.let { File(dir, it).length() } ?: total
+                            changes[e.item.id] = { it.copy(state = State.Done, progress = 1.0, size = size, transfer = null) }
+                            finished = true
+                            // The converted copy on the server is no longer needed.
+                            e.jobId?.let { job -> marquee.scope.launch(Dispatchers.IO) { runCatching { marquee.downloads.deleteDownload(job) } } }
+                        }
+                        DownloadManager.STATUS_FAILED -> {
+                            val reason = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                            changes[e.item.id] = { it.copy(state = State.Failed, error = "Download failed ($reason)", transfer = null) }
+                            finished = true
+                        }
+                        else -> if (total > 0) changes[e.item.id] = { it.copy(progress = done.toDouble() / total) }
+                    }
+                }
+            }
+        }
+        byTransfer.filterKeys { it !in seen }.values.forEach { e ->
+            changes[e.item.id] = { it.copy(state = State.Failed, error = "The download was cancelled.") }
+            finished = true
+        }
+        setAll(changes, progressOnly = !finished)
     }
 
     private fun savePoster(item: ItemSummary) {
@@ -328,5 +450,12 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
             }
             set(item.id) { it.copy(poster = name) }
         }
+    }
+
+    private companion object {
+        /** Seconds between asks about conversions. */
+        const val CONVERSION_POLL_TICKS = 3
+        /** The most jobs the server's list holds (GET /downloads). */
+        const val MAX_LISTED_JOBS = 2000
     }
 }

@@ -25,8 +25,11 @@ import app.marquee.api.models.NetworkClass
 import app.marquee.api.models.PinLoginRequest
 import app.marquee.api.models.SystemInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
@@ -74,25 +77,55 @@ class Marquee(context: Context) {
     val state: StateFlow<State> = _state
     private val _me = MutableStateFlow<User?>(null)
     val me: StateFlow<User?> = _me
+    private val _offline = MutableStateFlow(false)
+    /**
+     * Signed in but the server can't be reached: the network went, every address failed when
+     * tried, or requests failing by network error were followed by checks that failed too. It
+     * comes back by itself. The phones' and tablets' Offline Library follows this; on a TV it
+     * changes only when reconnecting finds no address.
+     */
+    val offline: StateFlow<Boolean> = _offline
 
     var server: ServerRecord? = store.current; private set
-    var baseUrl: String? = null; private set
+    @Volatile var baseUrl: String? = null
+        private set(value) { field = value; offlineChanged() }
     var info: SystemInfo? = null; private set
     var lastError: String? = null; private set
-    @Volatile var token: String? = server?.let { store.token(it.id) }; private set
+    @Volatile var token: String? = server?.let { store.token(it.id) }
+        private set(value) { field = value; offlineChanged() }
+
+    private val signingIn = okhttp3.Interceptor { chain ->
+        if (simulateOffline) throw java.io.IOException("Offline (test)")
+        val t = token
+        // The sign-in token goes only to this server's own addresses: the same client loads
+        // images from elsewhere too (TMDB posters in Discover), which must never receive it.
+        val own = t != null && isOwn(chain.request().url)
+        val req = if (own) chain.request().newBuilder().header("Authorization", "Bearer $t").build() else chain.request()
+        chain.proceed(req)
+    }
+
+    private fun isOwn(url: okhttp3.HttpUrl) = isServerUrl(url, listOfNotNull(baseUrl) + server?.candidates.orEmpty())
 
     val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .addInterceptor { chain ->
-            if (simulateOffline) throw java.io.IOException("Offline (test)")
-            val t = token
-            // The sign-in token goes only to this server's own addresses: the same client loads
-            // images from elsewhere too (TMDB posters in Discover), which must never receive it.
-            val own = t != null && isServerUrl(chain.request().url, listOfNotNull(baseUrl) + server?.candidates.orEmpty())
-            val req = if (own) chain.request().newBuilder().header("Authorization", "Bearer $t").build() else chain.request()
-            chain.proceed(req)
+            try {
+                chain.proceed(chain.request())
+            } catch (e: java.io.IOException) {
+                // No answer from the server (not a request cancelled by leaving its screen): is it still there?
+                if (!chain.call().isCanceled() && !simulateOffline && isOwn(chain.request().url)) requestFailed()
+                throw e
+            }
         }
+        .addInterceptor(signingIn)
+        .build()
+
+    /** For asking whether an address answers: quicker to give up, and a failure here starts no further checks. */
+    private val probeHttp = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .addInterceptor(signingIn)
         .build()
 
     private val base get() = (baseUrl ?: "http://localhost") + "/api/v1"
@@ -114,8 +147,6 @@ class Marquee(context: Context) {
     val settings get() = app.marquee.api.apis.SettingsApi(base, http)
 
     val isRemote: Boolean get() = info?.networkClass == NetworkClass.REMOTE
-    /** Signed in but the server can't be reached. */
-    val isOffline: Boolean get() = token != null && baseUrl == null
 
     /** Who is signed in on the current server, even offline (remembered from the last sign-in). */
     val userId: Long? get() = me.value?.id ?: server?.let { store.userId(it.id) }
@@ -223,7 +254,90 @@ class Marquee(context: Context) {
     }
 
     private suspend fun probe(url: String): SystemInfo? = withContext(Dispatchers.IO) {
-        runCatching { SystemApi("$url/api/v1", http).getSystemInfo() }.getOrNull()
+        runCatching { SystemApi("$url/api/v1", probeHttp).getSystemInfo() }.getOrNull()
+    }
+
+    // Going offline and coming back (phones and tablets: a TV keeps to reconnecting)
+
+    private val offlineRules = OfflineRules()
+    private var networkGone: Job? = null
+    private var offlineRetry: Job? = null
+    @Volatile private var foreground = false
+    private val quietReconnect = Mutex()
+
+    /** Follows whether the server can be reached; when it can again, what was changed meanwhile is sent. */
+    private fun offlineChanged() {
+        val now = token != null && baseUrl == null
+        if (_offline.value == now) return
+        _offline.value = now
+        if (now) retryWhileOffline()
+        else if (token != null) scope.launch {
+            // Connections from before it went are dead, but a request would wait a minute to find out.
+            http.connectionPool.evictAll()
+            sync.syncNow()
+            refreshLiveTv()
+        }
+    }
+
+    /** The default network went. A moment's grace: on a hand-over from one network to another the next one comes straight away. */
+    fun networkLost() {
+        if (isTv || _state.value != State.SignedIn) return
+        networkGone?.cancel()
+        networkGone = scope.launch {
+            delay(NETWORK_GRACE_MS)
+            lastError = "No network connection."
+            baseUrl = null
+        }
+    }
+
+    /** A network came: on a different one the server may be at another address, or back. */
+    fun networkAvailable() {
+        networkGone?.cancel()
+        if (_state.value != State.SignedIn) return
+        scope.launch {
+            // Connections made on the last network are dead, but a request would wait a minute to find out.
+            http.connectionPool.evictAll()
+            if (baseUrl == null) reconnect(quiet = true) else if (!isTv) baseUrl?.let { url -> if (probe(url) == null) reconnect(quiet = true) }
+            sync.syncNow()
+            refreshLiveTv()
+        }
+    }
+
+    /** The app came to the foreground or left it: while offline it keeps trying only in the foreground. */
+    fun setForeground(on: Boolean) {
+        foreground = on
+        if (on) retryWhileOffline()
+    }
+
+    /** A request to the server failed by network error: a check, after a moment, says whether that means anything. */
+    private fun requestFailed() {
+        if (isTv || _state.value != State.SignedIn) return
+        if (!offlineRules.requestFailed(System.currentTimeMillis(), _offline.value)) return
+        scope.launch {
+            delay(CHECK_DELAY_MS)
+            while (true) {
+                val url = baseUrl ?: run { offlineRules.checkDropped(); return@launch }
+                when (offlineRules.checked(probe(url) != null, System.currentTimeMillis())) {
+                    OfflineRules.Next.Reachable -> break
+                    OfflineRules.Next.CheckAgain -> delay(CHECK_DELAY_MS)
+                    // Every address, in case another answers; offline when none does.
+                    OfflineRules.Next.Lost -> { reconnect(quiet = true); break }
+                }
+            }
+        }
+    }
+
+    /** While offline in the foreground: tries again, waiting longer each time (the network's return is told at once). */
+    private fun retryWhileOffline() {
+        if (isTv || !foreground || !_offline.value || offlineRetry?.isActive == true) return
+        offlineRetry = scope.launch {
+            var wait = RETRY_START_MS
+            while (foreground && _offline.value) {
+                delay(wait)
+                wait = (wait * 2).coerceAtMost(RETRY_MAX_MS)
+                if (foreground && _offline.value) reconnect(quiet = true)
+            }
+        }
     }
 
     /**
@@ -255,7 +369,11 @@ class Marquee(context: Context) {
 
     /** Picks the best address for the current network and checks the session. */
     /** Picks the best address; quiet keeps the current screens up (a background retry). */
-    suspend fun reconnect(quiet: Boolean = false): Unit = detached { reconnectNow(quiet) }
+    suspend fun reconnect(quiet: Boolean = false): Unit = detached {
+        if (!quiet) reconnectNow()
+        // Background retries from several places: one at a time is enough.
+        else if (quietReconnect.tryLock()) try { reconnectNow(quiet = true) } finally { quietReconnect.unlock() }
+    }
 
     private val _connection = MutableStateFlow(0)
     /** Bumped on every successful (re)connection, so screens can reload. */
@@ -264,10 +382,15 @@ class Marquee(context: Context) {
     private suspend fun reconnectNow(quiet: Boolean = false) {
         val record = server ?: run { _state.value = State.NoServer; return }
         if (!quiet) _state.value = State.Connecting
-        var chosen: Pair<String, SystemInfo>? = null
-        for (url in record.candidates) {
-            val i = probe(url)
-            if (i != null) { chosen = url to i; break }
+        suspend fun reachable(): Pair<String, SystemInfo>? {
+            for (url in record.candidates) probe(url)?.let { return url to it }
+            return null
+        }
+        var chosen = reachable()
+        // Just after a change of network a VPN may still be coming up: once more before calling it offline.
+        if (chosen == null && baseUrl != null) {
+            delay(CHECK_DELAY_MS)
+            chosen = reachable()
         }
         if (chosen == null) {
             lastError = "Can't reach ${record.name}. Check that you're on the home network or connected to Tailscale."
@@ -392,6 +515,11 @@ class Marquee(context: Context) {
         return baseUrl + path + keyParam
     }
 }
+
+private const val NETWORK_GRACE_MS = 1_500L
+private const val CHECK_DELAY_MS = 2_000L
+private const val RETRY_START_MS = 5_000L
+private const val RETRY_MAX_MS = 60_000L
 
 /** What a rating request shows (USER-19): the item, its title line and artwork. */
 data class RatingRequest(val itemId: Long, val title: String, val imageUrl: String?)

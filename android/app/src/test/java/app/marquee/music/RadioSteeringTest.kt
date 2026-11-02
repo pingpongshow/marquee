@@ -79,4 +79,67 @@ class RadioSteeringTest {
         assertEquals("calm", r.value)
         assertEquals(7L, r.libraryId)
     }
+
+    // A radio never ends (MUSIC-24)
+
+    @Test fun excludeIsOldestFirstWithEachTrackAtItsLatestPlace() {
+        val s = RadioSteering()
+        assertEquals(listOf(1L, 2L, 3L), s.exclude(listOf(1, 2, 3)))
+        // The station came round to 1 again: it's now among the latest.
+        assertEquals(listOf(2L, 3L, 1L), s.exclude(listOf(1, 2, 3, 1)))
+    }
+
+    @Test fun excludeKeepsTheMostRecent2000() {
+        val s = RadioSteering()
+        val r = s.exclude((1L..2500L).toList())
+        assertEquals(RadioSteering.MAX_EXCLUDE, r.size)
+        assertEquals(501L, r.first())
+        assertEquals(2500L, r.last())
+    }
+
+    @Test fun excludeRemembersWhatLeftTheQueue() {
+        val s = RadioSteering(historyLimit = 5)
+        s.exclude(listOf(1, 2, 3))
+        // The queue was trimmed: 1 and 2 have gone from it but not from what's left out.
+        assertEquals(listOf(1L, 2L, 3L, 4L, 5L), s.exclude(listOf(3, 4, 5)))
+        assertEquals(listOf(2L, 3L, 4L, 5L, 6L), s.exclude(listOf(5, 6)))
+    }
+
+    @Test fun aRepeatIsAddedRatherThanDropped() {
+        val played = setOf(1L, 2L, 3L)
+        // What comes back has all played before: repeats are fine, they keep the radio going.
+        assertEquals(listOf(1L, 2L), RadioSteering.toAdd(listOf(1L, 2L), emptySet()) { it })
+        assertEquals(played.toList(), RadioSteering.toAdd(played.toList(), setOf(9L)) { it })
+    }
+
+    @Test fun whatIsAlreadyComingUpIsNotQueuedAgain() {
+        assertEquals(listOf(3L), RadioSteering.toAdd(listOf(1L, 2L, 3L), setOf(1L, 2L)) { it })
+    }
+
+    @Test fun aSmallLibraryStillAddsSomething() {
+        // Everything the station has is already coming up: added anyway, or it would stop.
+        assertEquals(listOf(1L, 2L), RadioSteering.toAdd(listOf(1L, 2L), setOf(1L, 2L)) { it })
+        assertEquals(emptyList<Long>(), RadioSteering.toAdd(emptyList<Long>(), setOf(1L)) { it })
+    }
+
+    @Test fun onlyWhatPlayedLongAgoIsTrimmed() {
+        assertEquals(0, RadioSteering.toTrim(0))
+        assertEquals(0, RadioSteering.toTrim(199))
+        assertEquals(100, RadioSteering.toTrim(200))
+        assertEquals(150, RadioSteering.toTrim(250))
+    }
+
+    @Test fun aRepeatedTrackGetsItsOwnMediaId() {
+        assertEquals(listOf("1", "2", "1~2", "1~3"), QueueIds.assign(listOf(1, 2, 1, 1)))
+        // Against what's queued already, including earlier repeats.
+        assertEquals(listOf("1~3", "2", "1~4"), QueueIds.assign(listOf(1, 2, 1), listOf("1", "1~2", "3")))
+    }
+
+    @Test fun aMediaIdGivesItsTrack() {
+        assertEquals(12L, QueueIds.trackId("12"))
+        assertEquals(12L, QueueIds.trackId("12~3"))
+        assertNull(QueueIds.trackId("album:12"))
+        assertNull(QueueIds.trackId("search"))
+        assertNull(QueueIds.trackId(null))
+    }
 }

@@ -69,7 +69,7 @@ fun tileActions(item: ItemSummary, continueWatching: Boolean = false, nav: NavHo
         val show = item.grandparentId
         if (nav != null && item.type == ItemType.EPISODE && show != null) add(TileAction("Go to show") { nav.navigate("item/$show") })
         // On a Home suggestion row (USER-16): stop suggesting it; it leaves the row at once.
-        if (suggestion && !marquee.isOffline && (item.type == ItemType.MOVIE || item.type == ItemType.SHOW)) add(TileAction("Not interested") {
+        if (suggestion && !marquee.offline.value && (item.type == ItemType.MOVIE || item.type == ItemType.SHOW)) add(TileAction("Not interested") {
             onRemoved(item.id)
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { marquee.items.markNotInterested(item.id) } }
@@ -77,7 +77,7 @@ fun tileActions(item: ItemSummary, continueWatching: Boolean = false, nav: NavHo
                     .onFailure { toast(context, "Couldn't change “${item.title}”: ${serverMessage(it, "")}") }
             }
         })
-        if (continueWatching && !marquee.isOffline) add(TileAction("Remove from Continue Watching") {
+        if (continueWatching && !marquee.offline.value) add(TileAction("Remove from Continue Watching") {
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { marquee.hubs.removeFromContinueWatching(item.id) } }
                     .onSuccess { withContext(Dispatchers.Main) { onRemoved(item.id) }; marquee.watch.changed() }
