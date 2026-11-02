@@ -64,7 +64,7 @@ fun StatsScreen(nav: androidx.navigation.NavHostController? = null) {
                     }
                     top("Top artists", st.artists)
                     top("Top albums", st.albums)
-                    top("Top tracks", st.tracks)
+                    top("Top tracks", st.tracks, radio = true)
                     top("Top movies", st.movies)
                     top("Top shows", st.shows)
                 }
@@ -83,13 +83,14 @@ private fun Figure(label: String, value: String) {
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.top(title: String, list: List<StatsCount>) {
+private fun androidx.compose.foundation.lazy.LazyListScope.top(title: String, list: List<StatsCount>, radio: Boolean = false) {
     if (list.isEmpty()) return
     item { Text(title, Modifier.padding(top = 12.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
     items(list.withIndex().toList()) { (i, c) ->
-        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Text("${i + 1}", Modifier.width(28.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(c.title, Modifier.weight(1f), maxLines = 1)
+            Text(c.title, Modifier.weight(1f), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            if (radio) c.id?.let { app.marquee.music.TrackRadioButton(it) }
             Text(if (c.plays == 1) "1 play" else "${c.plays} plays", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

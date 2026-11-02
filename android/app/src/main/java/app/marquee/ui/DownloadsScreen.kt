@@ -203,6 +203,7 @@ private fun Row(e: Downloads.Entry, downloads: Downloads, open: (Downloads.Entry
         if (e.state == Downloads.State.Failed && !offline) IconButton({ downloads.scope.launch { retry(context, downloads, e) } }, Modifier.focusRing()) {
             Icon(Icons.Filled.Refresh, "Try ${e.item.title} again", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        if (square && e.state == Downloads.State.Done) app.marquee.music.TrackRadioButton(e.item)
         IconButton({ downloads.remove(e.item.id) }) { Icon(Icons.Filled.Delete, "Delete ${e.item.title}", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }

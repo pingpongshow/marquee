@@ -46,6 +46,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -288,7 +290,14 @@ private fun StoryPage(page: Int, r: ListeningRecap, onPlay: (Int) -> Unit, onSav
             r.topTracks.take(5).forEachIndexed { i, t ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Ranked(i, t, RoundedCornerShape(6.dp), Modifier.weight(1f))
-                    IconButton({ onPlay(i) }, Modifier.focusRing()) { Icon(Icons.Filled.PlayArrow, "Play ${t.item.title}", tint = Color.White) }
+                    // The story takes Left and Right to turn its pages, so on TV Down reaches the note from the song's Play.
+                    val play = remember { FocusRequester() }
+                    val note = remember { FocusRequester() }
+                    val offline by marquee.offline.collectAsState()
+                    TrackRadioButton(t.item, if (offline) Modifier else Modifier.focusRequester(note).focusProperties { up = play }, tint = Color.White)
+                    IconButton({ onPlay(i) }, Modifier.focusRequester(play).then(if (offline) Modifier else Modifier.focusProperties { down = note }).focusRing()) {
+                        Icon(Icons.Filled.PlayArrow, "Play ${t.item.title}", tint = Color.White)
+                    }
                 }
             }
             PlayTop(onPlay)

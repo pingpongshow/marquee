@@ -54,7 +54,7 @@ fun TopSongsSection(nav: NavHostController, artistId: Long, artist: String, song
 private fun TopSongRow(t: ItemSummary, i: Int, modifier: Modifier = Modifier, onPlay: () -> Unit) {
     val inRow = rememberInRowFocus()
     ListItem(
-        headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { Text(t.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = { t.parentTitle?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
         leadingContent = { Text("${i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
         trailingContent = {

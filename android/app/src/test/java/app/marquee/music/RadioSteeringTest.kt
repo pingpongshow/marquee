@@ -143,3 +143,56 @@ class RadioSteeringTest {
         assertNull(QueueIds.trackId(null))
     }
 }
+
+/** What a thumbs down does to a radio's queue (MUSIC-25). */
+class DislikeQueueTest {
+    @Test fun aStationSkipsThePlayingSongAndDropsItsUpcomingCopies() {
+        val move = RadioSteering.afterDislike(7, generated = true, queue = listOf(1, 7, 2, 7, 3, 7), current = 1, shuffled = false)
+        assertTrue(move.skip)
+        // Last first, so each index stays right as they go; the entry playing stays until it's left.
+        assertEquals(listOf(5, 3), move.remove)
+    }
+
+    @Test fun anAlbumOrOwnPlaylistPlaysAsItIs() {
+        val move = RadioSteering.afterDislike(7, generated = false, queue = listOf(7, 2, 7), current = 0, shuffled = false)
+        assertFalse(move.skip)
+        assertTrue(move.remove.isEmpty())
+    }
+
+    @Test fun copiesAlreadyPlayedStayUnlessShuffled() {
+        assertEquals(listOf(3), RadioSteering.afterDislike(7, true, listOf(7, 1, 7, 7), 2, shuffled = false).remove)
+        // Shuffled, any other entry may be next.
+        assertEquals(listOf(3, 0), RadioSteering.afterDislike(7, true, listOf(7, 1, 7, 7), 2, shuffled = true).remove)
+    }
+
+    @Test fun aSongNotPlayingOnlyLeavesTheQueue() {
+        val move = RadioSteering.afterDislike(7, true, listOf(1, 2, 7), 0, shuffled = false)
+        assertFalse(move.skip)
+        assertEquals(listOf(2), move.remove)
+    }
+
+    @Test fun aThumbsDownSteersAwayHoweverMuchWasHeard() {
+        val s = RadioSteering()
+        s.finished(7)
+        s.disliked(7)
+        assertEquals(listOf(7L), s.skipped)
+        assertTrue(s.finished.isEmpty())
+        // Reaching the end (the last of the queue) doesn't count it as played through.
+        s.finished(7)
+        assertFalse(s.left(7, 200_000, 200_000, natural = true))
+        assertEquals(listOf(7L), s.skipped)
+        assertTrue(s.finished.isEmpty())
+        // Two in a row asks for an early top-up, as two quick skips do.
+        s.disliked(8)
+        assertTrue(s.left(8, 150_000, 200_000, natural = false))
+    }
+
+    @Test fun takingItBackStopsSteeringAway() {
+        val s = RadioSteering()
+        s.disliked(7)
+        s.notDisliked(7)
+        assertTrue(s.skipped.isEmpty())
+        s.finished(7)
+        assertEquals(listOf(7L), s.finished)
+    }
+}

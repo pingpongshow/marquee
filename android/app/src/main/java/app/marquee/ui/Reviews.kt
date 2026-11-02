@@ -81,13 +81,18 @@ fun ItemRatings(d: ItemDetail, community: CommunityRating?, onRated: () -> Unit,
     var rating by remember(d.id, d.userRating) {
         mutableStateOf(marquee.sync.queued(d.id, app.marquee.core.PendingChange.Kind.Rating)?.let { it.rating } ?: d.userRating?.takeIf { it > 0 })
     }
+    val marks by marquee.dislikes.marks.collectAsState()
+    val offline by marquee.offline.collectAsState()
+    val track = d.type == ItemType.TRACK
     fun rate(r: Double?) {
         val before = rating
         rating = r
         music.ratingChanged(d.id, r)
+        val undo = marquee.dislikes.rated(d.id, r)
         scope.launch {
             val ok = marquee.sync.saveShowing(marquee.sync.rating(d.id, r), context)
             if (!ok) {
+                undo()
                 rating = before
                 music.ratingChanged(d.id, before)
                 Toast.makeText(context, "Couldn't save the rating", Toast.LENGTH_SHORT).show()
@@ -98,7 +103,14 @@ fun ItemRatings(d: ItemDetail, community: CommunityRating?, onRated: () -> Unit,
     FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("YOUR RATING", style = label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            RatingStars(rating, ::rate, size = if (marquee.isTv) 20 else 22)
+            val shown = marks.rating(d.id, rating)
+            // A song's thumbs down (MUSIC-25): where the stars would be once given, which still open to rate it.
+            if (track && marks.disliked(d.id, d.disliked)) app.marquee.music.RatingPopover(shown, d.title, ::rate, disliked = true,
+                onDislike = if (offline) null else { on -> scope.launch { music.setDisliked(d.id, d.title, on).join(); onRated() } })
+            else {
+                RatingStars(shown, ::rate, size = if (marquee.isTv) 20 else 22)
+                if (track) DislikeButton(d.id, d.title, d.disliked, small = true, onDone = onRated)
+            }
         }
         if (reviewable(d.type)) Row(
             Modifier.clip(RoundedCornerShape(8.dp)).focusRing(RoundedCornerShape(8.dp)).clickable(onClick = onOpen)

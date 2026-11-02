@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -92,6 +93,8 @@ fun MiniPlayer(onOpen: () -> Unit) {
     val offline by marquee.offline.collectAsState()
     val rating by music.rating.collectAsState()
     val favorite by music.favorite.collectAsState()
+    val disliked by music.disliked.collectAsState()
+    val marks by marquee.dislikes.marks.collectAsState()
     val (pos, dur) = music.position.collectAsState().value
     var adding by remember { mutableStateOf(false) }
     val n = now ?: return
@@ -109,7 +112,10 @@ fun MiniPlayer(onOpen: () -> Unit) {
                 if (!offline) IconButton({ adding = true }, Modifier.size(36.dp)) { Icon(Icons.Filled.Add, "Add to playlist", Modifier.size(22.dp)) }
                 app.marquee.ui.FavoriteButton(n.id, n.title, favorite ?: n.favorite, small = true)
                 // Its own for each track: a popover left open closes when the song changes, and what it picks is for this song.
-                key(n.id) { RatingPopover(rating, n.title, { music.rate(n.id, it) }, compact = true) }
+                key(n.id) {
+                    RatingPopover(marks.rating(n.id, rating), n.title, { music.rate(n.id, it) }, compact = true, disliked = marks.disliked(n.id, disliked ?: n.disliked),
+                        onDislike = if (offline) null else { on -> music.setDisliked(n.id, n.title, on) })
+                }
                 IconButton(onClick = music::toggle, Modifier.size(40.dp)) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pause" else "Play") }
                 IconButton(onClick = music::next, Modifier.size(40.dp)) { Icon(Icons.Filled.SkipNext, "Next track") }
             }
@@ -181,12 +187,22 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
             Transport()
             // Wraps onto a second line on narrow phones.
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
-                Box(Modifier.height(48.dp), contentAlignment = Alignment.Center) {
-                    RatingStars(music.rating.collectAsState().value, { music.rate(n.id, it) }, size = if (marquee.isTv) 22 else 24)
+                val marks by marquee.dislikes.marks.collectAsState()
+                val shownRating = marks.rating(n.id, music.rating.collectAsState().value)
+                val dislikedOnServer = music.disliked.collectAsState().value ?: n.disliked
+                val disliked = marks.disliked(n.id, dislikedOnServer)
+                val starSize = if (marquee.isTv) 22 else 24
+                // A thumbs down where the stars would be, taking their room so the buttons beside them stay put.
+                Box(Modifier.height(48.dp).then(if (disliked) Modifier.width(((starSize + 14) * 5).dp) else Modifier), contentAlignment = Alignment.Center) {
+                    if (disliked) key(n.id) {
+                        RatingPopover(shownRating, n.title, { music.rate(n.id, it) }, disliked = true,
+                            onDislike = if (offline) null else { on -> music.setDisliked(n.id, n.title, on) })
+                    } else RatingStars(shownRating, { music.rate(n.id, it) }, size = starSize)
                 }
                 // The heart (USER-12), from the track's current state.
                 app.marquee.ui.FavoriteButton(n.id, n.title, music.favorite.collectAsState().value ?: n.favorite,
                     Modifier.testTag("now-playing-favorite"))
+                app.marquee.ui.DislikeButton(n.id, n.title, dislikedOnServer, Modifier.testTag("now-playing-dislike"))
                 // What needs the server goes while offline; the rating and heart above are queued.
                 if (!offline) {
                     IconButton({ adding = true }, Modifier.focusRing()) { Icon(Icons.Filled.Add, "Add to playlist", tint = MaterialTheme.colorScheme.onSurfaceVariant) }

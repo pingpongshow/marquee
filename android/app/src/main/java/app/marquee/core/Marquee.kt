@@ -51,6 +51,8 @@ class Marquee(context: Context) {
     /** Watched marks shown at once, and a signal for rows and pages to reload (USER-6). */
     val watch = WatchState()
     val favorites = FavoriteState()
+    /** Thumbs downs on songs and the ratings they and it clear, shown at once (MUSIC-25). */
+    val dislikes = DislikeState()
     /** Kids' time limits: why video stopped, and the last status for playing downloads offline. */
     val timeLimits: TimeLimits by lazy { TimeLimits(appContext, this) }
     /**
@@ -441,6 +443,7 @@ class Marquee(context: Context) {
 
     suspend fun finish(result: AuthResult) {
         token = result.token
+        dislikes.clear()
         server?.let { store.setToken(it.id, result.token); store.setUserId(it.id, result.user.id) }
         _me.value = withContext(Dispatchers.IO) { runCatching { auth.getMe() }.getOrNull() }
         _state.value = State.SignedIn
@@ -455,6 +458,7 @@ class Marquee(context: Context) {
 
     private fun signOutLocally() {
         token = null
+        dislikes.clear()
         server?.let { store.setToken(it.id, null); store.setUserId(it.id, null) }
         _me.value = null
         _liveTv.value = false

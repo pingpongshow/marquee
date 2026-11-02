@@ -72,6 +72,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -459,13 +460,14 @@ private fun PagedMusic(nav: NavHostController, libraryId: Long, kind: MusicBrows
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
                 val inRow = rememberInRowFocus()
                 ListItem(
-                    headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    headlineContent = { Text(t.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(subtitleFor(t), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingContent = { Artwork(marquee.imageUrl(t.images?.poster, 120), t.title, Shape.Square, Modifier.width(44.dp)) },
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             app.marquee.ui.FavoriteButton(t, Modifier.inRowFirst(inRow), small = true)
                             TrackRating(t)
+                            TrackRadioButton(t)
                         }
                     },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
@@ -563,14 +565,16 @@ private fun FavoritesList(nav: NavHostController, libraryId: Long, type: ItemTyp
             itemsIndexed(items, key = { _, it -> it.id }) { i, t ->
                 val inRow = rememberInRowFocus()
                 ListItem(
-                    headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    headlineContent = { Text(t.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(subtitleFor(t), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingContent = { Artwork(marquee.imageUrl(t.images?.poster, 120), t.title, Shape.Square, Modifier.width(44.dp)) },
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            app.marquee.ui.CommunityScore(t.communityRating, Modifier.padding(end = 4.dp))
+                            // A narrow phone keeps its room for the title.
+                            if (marquee.isTv || LocalConfiguration.current.screenWidthDp >= 400) app.marquee.ui.CommunityScore(t.communityRating, Modifier.padding(end = 4.dp))
                             app.marquee.ui.FavoriteButton(t, Modifier.inRowFirst(inRow), small = true)
                             TrackRating(t)
+                            TrackRadioButton(t)
                         }
                     },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),

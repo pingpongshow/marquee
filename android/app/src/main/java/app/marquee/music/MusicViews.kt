@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbDownOffAlt
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.automirrored.filled.StarHalf
@@ -352,41 +354,59 @@ fun TrackRating(track: app.marquee.api.models.ItemSummary, modifier: Modifier = 
         mutableStateOf(if (queued != null) queued.rating else track.userRating?.takeIf { it > 0 })
     }
     val music = LocalMusic.current
+    val marks by marquee.dislikes.marks.collectAsState()
+    val offline by marquee.offline.collectAsState()
     fun rate(r: Double?) {
         val before = rating
         rating = r
         music.ratingChanged(track.id, r)
+        val undo = marquee.dislikes.rated(track.id, r)
         scope.launch {
             val ok = marquee.sync.saveShowing(marquee.sync.rating(track.id, r), context)
             if (!ok) {
+                undo()
                 rating = before
                 music.ratingChanged(track.id, before)
                 android.widget.Toast.makeText(context, "Couldn't save the rating", android.widget.Toast.LENGTH_SHORT).show()
             }
         }
     }
-    RatingPopover(rating, track.title, ::rate, modifier)
+    // A narrow phone's row gives the title the room the five small stars would take.
+    val narrow = !marquee.isTv && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 400
+    RatingPopover(marks.rating(track.id, rating), track.title, ::rate, modifier, compact = narrow, disliked = marks.disliked(track.id, track.disliked),
+        onDislike = if (offline) null else { on -> music.setDisliked(track.id, track.title, on) })
 }
+
+/** The menu line for a song's thumbs down. */
+fun dislikeLabel(disliked: Boolean) = if (disliked) "Take back thumbs down" else "Thumbs down"
 
 /**
  * A rating that takes little room: the stars (or an empty star to rate), opening a small popover
  * of stars to choose from. [compact] shows one star and the number, for the now-playing bar.
+ * A song with a thumbs down ([disliked]) shows that instead; [onDislike] offers giving it or
+ * taking it back in the popover (null while offline, as it needs the server).
  */
 @Composable
-fun RatingPopover(rating: Double?, title: String, onRate: (Double?) -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
+fun RatingPopover(rating: Double?, title: String, onRate: (Double?) -> Unit, modifier: Modifier = Modifier, compact: Boolean = false,
+    disliked: Boolean = false, onDislike: ((Boolean) -> Unit)? = null) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
         val r = rating?.takeIf { it > 0 }
         Box(
             Modifier.clip(RoundedCornerShape(6.dp)).focusRing(RoundedCornerShape(6.dp)).clickable { open = true }
                 .semantics(mergeDescendants = true) {
-                    contentDescription = if (r != null) "Rated ${app.marquee.ui.starsLabel(r)} stars" else "Rate $title"
+                    contentDescription = when {
+                        disliked -> "Thumbs down on $title"
+                        r != null -> "Rated ${app.marquee.ui.starsLabel(r)} stars"
+                        else -> "Rate $title"
+                    }
                     role = androidx.compose.ui.semantics.Role.Button
                 }
                 .padding(horizontal = 6.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center,
         ) {
             when {
+                disliked -> Icon(Icons.Filled.ThumbDown, null, Modifier.size(16.dp), tint = Gold)
                 r != null && compact -> Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Star, null, Modifier.size(16.dp), tint = Gold)
                     Text(app.marquee.ui.starsLabel(r), Modifier.padding(start = 2.dp), style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false)
@@ -399,23 +419,32 @@ fun RatingPopover(rating: Double?, title: String, onRate: (Double?) -> Unit, mod
             Box(Modifier.padding(horizontal = 8.dp).semantics { contentDescription = "Rate $title" }) {
                 RatingStars(r, { open = false; onRate(it) }, size = 24)
             }
+            if (onDislike != null) DropdownMenuItem({ Text(dislikeLabel(disliked)) }, { open = false; onDislike(!disliked) },
+                leadingIcon = { Icon(if (disliked) Icons.Filled.ThumbDown else Icons.Filled.ThumbDownOffAlt, null) })
         }
     }
 }
 
 /** The small note on a song's row: a radio seeded with that track (MUSIC-3). */
 @Composable
-fun TrackRadioButton(track: app.marquee.api.models.ItemSummary, modifier: Modifier = Modifier) {
+fun TrackRadioButton(track: app.marquee.api.models.ItemSummary, modifier: Modifier = Modifier, tint: Color? = null) = TrackRadioButton(track.id, modifier, tint)
+
+/** A radio needs the server, so the note goes while offline: a row using it for [app.marquee.ui.inRowFirst] must not then ask for its focus. */
+@Composable
+fun TrackRadioButton(trackId: Long, modifier: Modifier = Modifier, tint: Color? = null) {
+    val marquee = LocalMarquee.current
     val music = LocalMusic.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val offline by marquee.offline.collectAsState()
+    if (offline) return
     IconButton({
         scope.launch {
-            runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = track.id)) }
+            runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = trackId)) }
                 .onFailure { android.widget.Toast.makeText(context, serverMessage(it, "Couldn't start a radio"), android.widget.Toast.LENGTH_LONG).show() }
         }
     }, modifier.focusRing().size(36.dp)) {
-        Icon(Icons.Filled.MusicNote, "Track Radio", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+        Icon(Icons.Filled.MusicNote, "Track Radio", Modifier.size(18.dp), tint = tint ?: MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
     }
 }
 

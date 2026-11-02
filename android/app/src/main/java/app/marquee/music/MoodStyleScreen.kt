@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -41,6 +42,9 @@ import app.marquee.ui.PosterCard
 import app.marquee.ui.Shelf
 import app.marquee.ui.focusCard
 import app.marquee.ui.focusRing
+import app.marquee.ui.inRowFirst
+import app.marquee.ui.rememberInRowFocus
+import app.marquee.ui.rowFocus
 import app.marquee.ui.initialFocus
 import app.marquee.ui.openItem
 import app.marquee.ui.sidePadding
@@ -54,6 +58,7 @@ fun MoodStyleScreen(nav: NavHostController, libraryId: Long, kind: String, name:
     val marquee = LocalMarquee.current
     val music = LocalMusic.current
     val scope = rememberCoroutineScope()
+    val offline by marquee.offline.collectAsState()
     val isMood = kind == "mood"
     val req = if (isMood) RadioRequest(RadioRequest.Seed.MOOD, value = name.lowercase(), libraryId = libraryId, limit = 30)
     else RadioRequest(RadioRequest.Seed.GENRE, value = name, libraryId = libraryId, limit = 30)
@@ -94,7 +99,9 @@ fun MoodStyleScreen(nav: NavHostController, libraryId: Long, kind: String, name:
         else {
             item { Text("Tracks", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             itemsIndexed(list, key = { _, t -> t.id }) { i, t ->
-                Row(Modifier.fillMaxWidth().focusCard({ music.play(list, i, source = name, context = context) }).padding(horizontal = sidePadding, vertical = 8.dp),
+                // TV: Right from the row reaches its note (gone while offline, so there's nothing to reach).
+                val inRow = rememberInRowFocus()
+                Row(Modifier.fillMaxWidth().then(if (offline) Modifier else Modifier.rowFocus(inRow)).focusCard({ music.play(list, i, source = name, context = context) }).padding(horizontal = sidePadding, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     Text("${i + 1}", Modifier.width(28.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     Column(Modifier.weight(1f)) {
@@ -102,6 +109,7 @@ fun MoodStyleScreen(nav: NavHostController, libraryId: Long, kind: String, name:
                         Text(listOfNotNull(t.artistCredit ?: t.grandparentTitle, t.parentTitle).joinToString(" · "), maxLines = 1,
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    TrackRadioButton(t, Modifier.inRowFirst(inRow))
                 }
             }
         }

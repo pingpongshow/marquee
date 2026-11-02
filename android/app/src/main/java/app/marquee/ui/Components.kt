@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -242,8 +243,21 @@ fun PosterCard(item: ItemSummary, imageUrl: String?, width: Dp, onClick: () -> U
         item.reason?.takeIf { it.isNotBlank() }?.let {
             Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = Gold)
         }
-        if (showRating) RatingBadge(item.userRating, Modifier.padding(top = 2.dp))
+        val track = item.type == ItemType.TRACK
+        // Under the card, so on TV Down reaches it and Left and Right still move along the row.
+        if (showRating || track) Row(verticalAlignment = Alignment.CenterVertically) {
+            if (showRating) CardRating(item, Modifier.padding(top = 2.dp))
+            if (track) app.marquee.music.TrackRadioButton(item)
+        }
     }
+}
+
+/** A card's rating, with this device's changes; a thumbs down where the stars would be. */
+@Composable
+private fun CardRating(item: ItemSummary, modifier: Modifier = Modifier) {
+    val marks by LocalMarquee.current.dislikes.marks.collectAsState()
+    if (marks.disliked(item.id, item.disliked)) Icon(Icons.Filled.ThumbDown, "Thumbs down", modifier.size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    else RatingBadge(marks.rating(item.id, item.userRating), modifier)
 }
 
 /**
@@ -303,7 +317,7 @@ fun app.marquee.api.models.ItemDetail.summary() = ItemSummary(
     parentId = parentId, grandparentId = grandparentId, parentTitle = parentTitle, grandparentTitle = grandparentTitle,
     artistCredit = artistCredit, durationMs = durationMs, originallyAvailableAt = originallyAvailableAt, images = images,
     viewOffsetMs = viewOffsetMs, viewCount = viewCount, lastViewedAt = lastViewedAt, watchedLeafCount = watchedLeafCount,
-    userRating = userRating, watchlisted = watchlisted, communityRating = communityRating, favorite = favorite,
+    userRating = userRating, watchlisted = watchlisted, communityRating = communityRating, favorite = favorite, disliked = disliked,
 )
 
 /** A playlist's poster mosaic: up to four of its items' posters, or its one poster. */

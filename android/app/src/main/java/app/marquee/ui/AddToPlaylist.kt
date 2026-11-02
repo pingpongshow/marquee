@@ -13,6 +13,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbDownOffAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -114,7 +116,7 @@ fun AddToPlaylistDialog(itemId: Long, music: Boolean, onDone: () -> Unit) {
     )
 }
 
-/** The "…" menu on a track: play next, add to the queue, add to a playlist, add to or remove from favourites, a Sound Journey. */
+/** The "…" menu on a track: play next, add to the queue, add to a playlist, add to or remove from favourites, a thumbs down, a Sound Journey. */
 @Composable
 fun TrackMenu(track: ItemSummary, onMoved: (() -> Unit)? = null) {
     val music = LocalMusic.current
@@ -126,6 +128,9 @@ fun TrackMenu(track: ItemSummary, onMoved: (() -> Unit)? = null) {
     var playlist by remember { mutableStateOf(false) }
     var journey by remember { mutableStateOf(false) }
     val favorite = favoriteAction(track)
+    val offline by marquee.offline.collectAsState()
+    val marks by marquee.dislikes.marks.collectAsState()
+    val disliked = marks.disliked(track.id, track.disliked)
     Box {
         IconButton({ open = true }, Modifier.focusRing()) { Icon(Icons.Filled.MoreVert, "More actions for ${track.title}") }
         DropdownMenu(open, { open = false }) {
@@ -133,6 +138,10 @@ fun TrackMenu(track: ItemSummary, onMoved: (() -> Unit)? = null) {
             DropdownMenuItem({ Text("Add to queue") }, { music.enqueue(listOf(track), next = false); open = false })
             DropdownMenuItem({ Text("Add to playlist…") }, { playlist = true; open = false })
             favorite?.let { f -> DropdownMenuItem({ Text(f.label) }, { f.run(); open = false }) }
+            // Needs the server: a thumbs down isn't queued while offline.
+            if (track.type == app.marquee.api.models.ItemType.TRACK && !offline) DropdownMenuItem({ Text(app.marquee.music.dislikeLabel(disliked)) },
+                { music.setDisliked(track.id, track.title, !disliked); open = false },
+                leadingIcon = { Icon(if (disliked) Icons.Filled.ThumbDown else Icons.Filled.ThumbDownOffAlt, null) })
             DropdownMenuItem({ Text("Sound Journey…") }, { journey = true; open = false })
             // Admins (META-3): put the track on another album without editing its file.
             if (onMoved != null && me?.isAdmin == true) DropdownMenuItem({ Text("Move to album…") }, { move = true; open = false })

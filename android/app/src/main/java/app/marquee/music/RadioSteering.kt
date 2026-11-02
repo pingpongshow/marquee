@@ -11,6 +11,7 @@ class RadioSteering(private val keep: Int = 100, private val historyLimit: Int =
     private val skips = LinkedHashSet<Long>()
     private val finishes = LinkedHashSet<Long>()
     private val history = LinkedHashSet<Long>()
+    private val dislikes = HashSet<Long>()
     /** Quick skips since the last track played through or the last top-up. */
     var inARow = 0
         private set
@@ -21,6 +22,7 @@ class RadioSteering(private val keep: Int = 100, private val historyLimit: Int =
 
     /** A track played through: steers towards it and ends a run of skips. */
     fun finished(id: Long) {
+        if (id in dislikes) return
         note(finishes, skips, id)
         inARow = 0
     }
@@ -31,11 +33,23 @@ class RadioSteering(private val keep: Int = 100, private val historyLimit: Int =
         return ++inARow >= 2
     }
 
+    /** A thumbs down (MUSIC-25): steers away from it, however much of it was heard. */
+    fun disliked(id: Long) {
+        dislikes.add(id)
+        note(skips, finishes, id)
+    }
+
+    /** A thumbs down taken back. */
+    fun notDisliked(id: Long) {
+        if (dislikes.remove(id)) skips.remove(id)
+    }
+
     /**
      * A track left the player at positionMs of durationMs; natural when it ended by itself.
      * True when the station should top up early.
      */
     fun left(id: Long, positionMs: Long, durationMs: Long, natural: Boolean): Boolean = when {
+        id in dislikes -> skipped(id)
         natural || playedThrough(positionMs, durationMs) -> { finished(id); false }
         quickSkip(positionMs, durationMs) -> skipped(id)
         else -> false
@@ -90,8 +104,22 @@ class RadioSteering(private val keep: Int = 100, private val historyLimit: Int =
 
         /** Played to 80% or more, as the server counts a finished play. */
         fun playedThrough(positionMs: Long, durationMs: Long) = durationMs > 0 && positionMs >= durationMs * 4 / 5
+
+        /**
+         * What a thumbs down on [id] does to the queue: only a radio or generated station changes
+         * (an album or the listener's own playlist plays as it is). Upcoming copies leave it, and
+         * if the song is playing the station moves on. Shuffled, any other entry may be upcoming.
+         */
+        fun afterDislike(id: Long, generated: Boolean, queue: List<Long>, current: Int, shuffled: Boolean): DislikeMove {
+            if (!generated) return DislikeMove(false, emptyList())
+            val copies = queue.indices.filter { queue[it] == id && if (shuffled) it != current else it > current }
+            return DislikeMove(queue.getOrNull(current) == id, copies.reversed())
+        }
     }
 }
+
+/** What to do to the queue after a thumbs down: [remove] holds entries' indexes, last first, so each stays right as they go. */
+data class DislikeMove(val skip: Boolean, val remove: List<Int>)
 
 /**
  * Media ids of queue entries. A track's id is its entry's, as the player's items must each have

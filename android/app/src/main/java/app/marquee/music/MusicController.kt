@@ -35,7 +35,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
      * the playlist statistics (MUSIC-17); radio marks a track the playing radio added itself.
      */
     data class Now(val id: Long, val title: String, val artist: String, val album: String, val artwork: Uri?, val dj: String? = null, val albumId: Long? = null,
-        val audio: app.marquee.api.models.AudioFormat? = null, val favorite: Boolean? = null, val context: String? = null, val radio: Boolean = false)
+        val audio: app.marquee.api.models.AudioFormat? = null, val favorite: Boolean? = null, val context: String? = null, val radio: Boolean = false,
+        val disliked: Boolean? = null)
 
     /** DJ modes (MUSIC-6): a pick every few of your own tracks. */
     enum class DJ(val label: String, val mode: MusicDJRequest.Mode, val blurb: String) {
@@ -88,6 +89,9 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private val _favorite = MutableStateFlow<Boolean?>(null)
     /** Whether the current track is a favourite on the server (the heart shows this device's changes over it). */
     val favorite: StateFlow<Boolean?> = _favorite
+    private val _disliked = MutableStateFlow<Boolean?>(null)
+    /** Whether the current track has a thumbs down on the server (the views show this device's changes over it). */
+    val disliked: StateFlow<Boolean?> = _disliked
     private val _sleep = MutableStateFlow<Sleep?>(null)
     val sleep: StateFlow<Sleep?> = _sleep
     private val _dj = MutableStateFlow(DJ.saved(prefs.getString("dj", null)))
@@ -98,6 +102,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private var refilling = false
     /** The playing station's context, which its top-ups keep (MUSIC-17). */
     private var stationContext: String? = null
+    /** The queue is a radio or a generated station (a mix, Muse, a journey), not something the listener chose song by song. */
+    private var generated = false
     /** What the listener skipped and played through on the playing radio (MUSIC-17). */
     private var steering = RadioSteering()
     /** Set while an early top-up (after quick skips) is on its way. */
@@ -182,7 +188,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
         val m = item.mediaMetadata
         return Now(QueueIds.trackId(item.mediaId) ?: 0, m.title?.toString() ?: "", m.artist?.toString() ?: "", m.albumTitle?.toString() ?: "", m.artworkUri,
             m.extras?.getString("dj"), m.extras?.getLong("album", 0L)?.takeIf { it > 0 }, AudioQuality.from(m.extras),
-            m.extras?.takeIf { it.containsKey("favorite") }?.getBoolean("favorite"), m.extras?.getString("context"), m.extras?.getBoolean("radio") == true)
+            m.extras?.takeIf { it.containsKey("favorite") }?.getBoolean("favorite"), m.extras?.getString("context"), m.extras?.getBoolean("radio") == true,
+            m.extras?.takeIf { it.containsKey("disliked") }?.getBoolean("disliked"))
     }
 
     private fun sync(p: Player, queueChanged: Boolean) {
@@ -260,7 +267,12 @@ class MusicController(private val context: Context, private val marquee: Marquee
     }
 
     private fun loadRating(id: Long, reset: Boolean = true) {
-        if (reset) { _rating.value = null; _favorite.value = _now.value?.takeIf { it.id == id }?.favorite }
+        if (reset) {
+            val n = _now.value?.takeIf { it.id == id }
+            _rating.value = null
+            _favorite.value = n?.favorite
+            _disliked.value = n?.disliked
+        }
         ratingJob?.cancel()
         // A rating made offline and not yet sent wins over the server's older one (USER-18).
         marquee.sync.queued(id, app.marquee.core.PendingChange.Kind.Rating)?.let { _rating.value = it.rating }
@@ -270,7 +282,10 @@ class MusicController(private val context: Context, private val marquee: Marquee
             val queued = marquee.sync.queued(id, app.marquee.core.PendingChange.Kind.Rating)
             if (lastId == id) {
                 _rating.value = if (queued != null) queued.rating else r.getOrElse { _rating.value }
-                item.getOrNull()?.let { _favorite.value = it.favorite == true }
+                item.getOrNull()?.let {
+                    _favorite.value = it.favorite == true
+                    _disliked.value = it.disliked == true
+                }
             }
         }
     }
@@ -300,12 +315,13 @@ class MusicController(private val context: Context, private val marquee: Marquee
         start(tracks, start, source, null, startMs, context)
 
     /** Plays a generated station; with a radio request it keeps topping itself up. */
-    fun playStation(station: Station, radio: RadioRequest? = null) = start(station.items, 0, station.title, radio, context = station.context)
+    fun playStation(station: Station, radio: RadioRequest? = null) = start(station.items, 0, station.title, radio, context = station.context, generated = true)
 
-    private fun start(tracks: List<ItemSummary>, start: Int, source: String?, radio: RadioRequest?, startMs: Long = 0, context: String? = null) {
+    private fun start(tracks: List<ItemSummary>, start: Int, source: String?, radio: RadioRequest?, startMs: Long = 0, context: String? = null,
+        generated: Boolean = radio != null || context != null) {
         if (tracks.isEmpty()) return
         _source.value = source
-        newQueue(radio, context)
+        newQueue(radio, context, generated)
         scope.launch(Dispatchers.Main) {
             val c = connect()
             val index = start.coerceIn(0, tracks.size - 1)
@@ -336,9 +352,10 @@ class MusicController(private val context: Context, private val marquee: Marquee
     }
 
     /** A new queue: its station (if any) and context, with nothing skipped or played on it yet. */
-    private fun newQueue(radio: RadioRequest?, context: String?) {
+    private fun newQueue(radio: RadioRequest?, context: String?, generated: Boolean = radio != null || context != null) {
         this.radio = radio
         stationContext = context
+        this.generated = generated
         steering = RadioSteering()
         queueGen++
         djCount = 0
@@ -364,11 +381,17 @@ class MusicController(private val context: Context, private val marquee: Marquee
             val c = controller
             if (c == null || gens != queueGen to steerGen) return@launch
             val upcoming = (c.currentMediaItemIndex until c.mediaItemCount).map { meta(c.getMediaItemAt(it)).id }.toSet()
-            val fresh = RadioSteering.toAdd(st?.items.orEmpty(), upcoming) { it.id }
+            val fresh = RadioSteering.toAdd(wanted(st), upcoming) { it.id }
             if (fresh.isEmpty()) { retryTopUp(c); return@launch }
             topUpWaitMs = TOP_UP_RETRY_MS
             addToStation(c, fresh, st?.context)
         }
+    }
+
+    /** A top-up's tracks, without any given a thumbs down since it was asked for. */
+    private fun wanted(st: Station?): List<ItemSummary> {
+        val marks = marquee.dislikes.marks.value
+        return st?.items.orEmpty().filterNot { marks.disliked(it.id, it.disliked) }
     }
 
     /** With nothing left to play there may be no next track to try again on. */
@@ -429,7 +452,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
             val c = controller ?: return@launch
             if (st == null || gen != queueGen) return@launch
             // Nothing new (or no answer): the tracks already queued play on.
-            if (st.items.isEmpty()) return@launch
+            val fresh = wanted(st)
+            if (fresh.isEmpty()) return@launch
             // From the end back, removing each run of the station's entries in one go.
             val at = c.currentMediaItemIndex
             var i = c.mediaItemCount - 1
@@ -441,7 +465,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
                 i = from - 1
             }
             val upcoming = (c.currentMediaItemIndex until c.mediaItemCount).map { meta(c.getMediaItemAt(it)).id }.toSet()
-            addToStation(c, RadioSteering.toAdd(st.items, upcoming) { it.id }, st.context)
+            addToStation(c, RadioSteering.toAdd(fresh, upcoming) { it.id }, st.context)
         }
     }
 
@@ -516,10 +540,56 @@ class MusicController(private val context: Context, private val marquee: Marquee
     fun rate(id: Long, rating: Double?) {
         val before = _rating.value.takeIf { lastId == id }
         if (lastId == id) _rating.value = rating
+        val undo = marquee.dislikes.rated(id, rating)
         scope.launch {
             // Kept on the device and sent later when the server can't be reached (USER-18).
             val ok = marquee.sync.saveShowing(marquee.sync.rating(id, rating))
-            if (!ok && lastId == id) _rating.value = before
+            if (!ok) {
+                undo()
+                if (lastId == id) _rating.value = before
+            }
+        }
+    }
+
+    /**
+     * Gives a song a thumbs down or takes it back (MUSIC-25). It shows at once in every view, with
+     * the heart and a rating of 3.5 or more cleared as the server clears them; a refusal puts them
+     * back. Once saved, a radio or generated station plays on without the song.
+     */
+    fun setDisliked(id: Long, title: String, on: Boolean): Job {
+        val undo = marquee.dislikes.thumbsDown(id, on)
+        val heart = marquee.favorites.marks.value[id]
+        if (on) marquee.favorites.mark(id, false)
+        return scope.launch {
+            val ok = withContext(Dispatchers.IO) { runCatching { if (on) marquee.items.addDislike(id) else marquee.items.removeDislike(id) }.isSuccess }
+            if (!ok) {
+                undo()
+                if (on) { if (heart == null) marquee.favorites.forget(id) else marquee.favorites.mark(id, heart) }
+                android.widget.Toast.makeText(context, if (on) "Couldn't give “$title” a thumbs down" else "Couldn't take back the thumbs down on “$title”", android.widget.Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            if (on) {
+                marquee.favorites.changed()
+                leaveDisliked(id)
+            } else steering.notDisliked(id)
+        }
+    }
+
+    /** A radio or generated station plays on without a song given a thumbs down. */
+    private fun leaveDisliked(id: Long) {
+        val c = controller ?: return
+        val queue = (0 until c.mediaItemCount).map { meta(c.getMediaItemAt(it)).id }
+        val move = RadioSteering.afterDislike(id, generated, queue, c.currentMediaItemIndex, c.shuffleModeEnabled)
+        if (generated) steering.disliked(id)
+        move.remove.forEach(c::removeMediaItem)
+        if (!move.skip) return
+        val next = c.nextMediaItemIndex
+        when {
+            next != C.INDEX_UNSET && next != c.currentMediaItemIndex -> if (casting) castNext() else c.seekToNextMediaItem()
+            casting -> { marquee.cast.pause(); topUpRadio(c) }
+            // The last of the queue goes to its end, where a radio's top-up carries on as it always does.
+            c.duration > 0 && c.repeatMode == Player.REPEAT_MODE_OFF -> c.seekTo(c.duration)
+            else -> c.pause()
         }
     }
 

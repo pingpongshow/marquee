@@ -117,12 +117,13 @@ class OfflineSync(context: Context, private val marquee: Marquee) {
 
     /**
      * Sets or clears a favourite (the heart, USER-12): shown at once everywhere, then saved (or
-     * queued offline). A refusal undoes it and returns false.
+     * queued offline). Favouriting a song clears its thumbs down. A refusal undoes it and returns false.
      */
     suspend fun setFavorite(item: Long, on: Boolean): Boolean {
         marquee.favorites.mark(item, on)
+        val undo = if (on) marquee.dislikes.favourited(item) else null
         val ok = saveShowing(favorite(item, on))
-        if (!ok) marquee.favorites.forget(item)
+        if (!ok) { marquee.favorites.forget(item); undo?.invoke() }
         marquee.favorites.changed()
         return ok
     }

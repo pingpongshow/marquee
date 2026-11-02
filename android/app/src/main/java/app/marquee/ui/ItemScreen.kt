@@ -344,7 +344,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                     tracks.forEachIndexed { i, t ->
                         val inRow = rememberInRowFocus()
                         ListItem(
-                            headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            headlineContent = { Text(t.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                             supportingContent = t.audioFormat?.takeIf { showQuality }?.let { f -> {
                                 Text(app.marquee.music.AudioQuality.short(f), style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)

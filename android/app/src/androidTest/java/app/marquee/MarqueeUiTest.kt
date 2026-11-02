@@ -53,10 +53,12 @@ import org.junit.After
 import app.marquee.api.infrastructure.Serializer
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.RadioRequest
+import app.marquee.api.models.Station
 import app.marquee.core.Downloads
 import app.marquee.api.models.AuthResult
 import app.marquee.api.models.User
 import app.marquee.music.MusicService
+import app.marquee.ui.summary
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -3456,6 +3458,100 @@ class MarqueeUiTest {
             shot("tvn3-no-network")
         } finally {
             shell("svc wifi enable"); shell("svc data enable")
+        }
+    }
+
+    /**
+     * A thumbs down from the mini player (MUSIC-25). On a radio it skips the song, drops its upcoming
+     * copies and clears its heart and high stars; on a plain list it stays, and favouriting takes it back.
+     */
+    @Test fun thumbsDownFromMiniPlayer() {
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        fun onMain(block: () -> Unit) = InstrumentationRegistry.getInstrumentation().runOnMainSync(block)
+        fun item(id: Long) = org.json.JSONObject(adminApi("GET", "/items/$id", asToken = appToken))
+        fun clean(id: Long) {
+            adminApi("DELETE", "/items/$id/dislike", asToken = appToken)
+            adminApi("DELETE", "/items/$id/favorite", asToken = appToken)
+            adminApi("PUT", "/items/$id/rating", """{"rating":null}""", asToken = appToken)
+        }
+        val leaves = tracksOf(308)
+        val seed = leaves.first().getLong("id")
+        val touched = mutableSetOf(seed)
+        try {
+            leaves.take(10).forEach { clean(it.getLong("id")) }
+            // A station with its radio request, as startRadio plays it (the test server has no Soundprint to make one, so its top-ups find nothing).
+            val songs = leaves.take(4).map { app.marquee.items.getItem(it.getLong("id")).summary() }
+            onMain { app.music.playStation(Station("Test radio", songs, context = "radio:item"), RadioRequest(RadioRequest.Seed.ITEM, itemId = seed)) }
+            rule.waitUntil(20_000) { app.music.now.value != null }
+            val song = app.music.now.value!!
+            touched += song.id
+            // A copy further on, as a station coming round again would queue it.
+            val summary = songs.first { it.id == song.id }
+            onMain { app.music.enqueue(listOf(summary), next = false) }
+            rule.waitUntil(10_000) { app.music.queue.value.count { it.id == song.id } == 2 }
+
+            // Rated 4 stars and favourite, in the mini player.
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rate ${song.title}") and hasClickAction(), 15_000)
+            rule.onNode(hasContentDescription("Add ${song.title} to favourites")).performClick()
+            rule.onNode(hasContentDescription("Rate ${song.title}") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("4 stars"), 5_000)
+            rule.onNode(hasContentDescription("4 stars")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rated 4 stars"), 5_000)
+            rule.waitUntil(10_000) { item(song.id).let { it.optBoolean("favorite") && it.optDouble("userRating") == 8.0 } }
+
+            // The thumbs down: on to the next song, the copy gone, and the server has it all.
+            rule.onNode(hasContentDescription("Rated 4 stars") and hasClickAction()).performClick()
+            rule.waitText("Thumbs down")
+            shot("td1-popover")
+            tap("Thumbs down")
+            rule.waitUntil(15_000) { app.music.now.value?.id.let { it != null && it != song.id } }
+            val at = app.music.index.value
+            assertTrue("no copy still to come", app.music.queue.value.drop(at + 1).none { it.id == song.id })
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 5_000)
+            shot("td2-radio-skipped")
+            item(song.id).let {
+                assertTrue("the server has the thumbs down", it.optBoolean("disliked"))
+                assertTrue("the heart was cleared", !it.optBoolean("favorite"))
+                assertTrue("the high rating was cleared", it.isNull("userRating") || it.optDouble("userRating") == 0.0)
+            }
+            assertTrue("this device shows them cleared", app.marquee.favorites.marks.value[song.id] == false &&
+                app.marquee.dislikes.marks.value.let { it.disliked(song.id, null) && it.rating(song.id, 8.0) == null })
+
+            // A plain list keeps playing the song, showing the thumbs down where its stars would be.
+            val other = leaves.first { it.getLong("id") != song.id }.getLong("id")
+            touched += other
+            val list = listOf(other, leaves.last { it.getLong("id") != song.id && it.getLong("id") != other }.getLong("id")).map { app.marquee.items.getItem(it).summary() }
+            onMain { app.music.play(list, 0, source = "An album") }
+            rule.waitUntil(15_000) { app.music.now.value?.id == other }
+            val title = list[0].title
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rate $title") and hasClickAction(), 15_000)
+            rule.onNode(hasContentDescription("Rate $title") and hasClickAction()).performClick()
+            rule.waitText("Thumbs down")
+            tap("Thumbs down")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Thumbs down on $title") and hasClickAction(), 5_000)
+            rule.waitUntil(10_000) { item(other).optBoolean("disliked") }
+            shot("td3-album-stays")
+            assertEquals("an album plays on", other, app.music.now.value?.id)
+
+            // Favouriting clears it, here and on the server.
+            rule.onNode(hasContentDescription("Add $title to favourites")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rate $title") and hasClickAction(), 5_000)
+            rule.waitUntil(10_000) { item(other).let { it.optBoolean("favorite") && !it.optBoolean("disliked") } }
+
+            // Now Playing's own button, beside the heart: clears the heart, and takes itself back.
+            rule.onNode(hasContentDescription("Open Now Playing")).performClick()
+            rule.waitUntilAtLeastOneExists(hasTestTag("now-playing-dislike"), 5_000)
+            rule.onNode(hasTestTag("now-playing-dislike")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Take back the thumbs down on $title", substring = true), 5_000)
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Add $title to favourites"), 5_000)
+            rule.waitUntil(10_000) { item(other).optBoolean("disliked") }
+            shot("td4-now-playing")
+            rule.onNode(hasTestTag("now-playing-dislike")).performClick()
+            rule.waitUntil(10_000) { !item(other).optBoolean("disliked") }
+        } finally {
+            onMain { app.music.stop() }
+            touched.forEach { clean(it) }
         }
     }
 
