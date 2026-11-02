@@ -522,7 +522,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /items/{itemId}/watchlist`.
     /// - Remark: Generated from `#/paths//items/{itemId}/watchlist/delete(removeFromWatchlist)`.
     func removeFromWatchlist(_ input: Operations.RemoveFromWatchlist.Input) async throws -> Operations.RemoveFromWatchlist.Output
-    /// Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down.
+    /// Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited the song or rated it 3.5 stars or more.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/dislike`.
     /// - Remark: Generated from `#/paths//items/{itemId}/dislike/put(addDislike)`.
@@ -2767,16 +2767,18 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down.
+    /// Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited the song or rated it 3.5 stars or more.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/dislike`.
     /// - Remark: Generated from `#/paths//items/{itemId}/dislike/put(addDislike)`.
     public func addDislike(
         path: Operations.AddDislike.Input.Path,
+        query: Operations.AddDislike.Input.Query = .init(),
         headers: Operations.AddDislike.Input.Headers = .init()
     ) async throws -> Operations.AddDislike.Output {
         try await addDislike(Operations.AddDislike.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }
@@ -2786,10 +2788,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{itemId}/dislike/delete(removeDislike)`.
     public func removeDislike(
         path: Operations.RemoveDislike.Input.Path,
+        query: Operations.RemoveDislike.Input.Query = .init(),
         headers: Operations.RemoveDislike.Input.Headers = .init()
     ) async throws -> Operations.RemoveDislike.Output {
         try await removeDislike(Operations.RemoveDislike.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }

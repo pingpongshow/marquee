@@ -115,7 +115,7 @@ func (h *Handlers) AddDislike(ctx context.Context, req AddDislikeRequestObject) 
 	if d.Type != "track" {
 		return AddDislike400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "only songs can have a thumbs down"))}, nil
 	}
-	if err := h.Items.SetDisliked(ctx, sess.User.ID, req.ItemId, true); err != nil {
+	if err := h.Items.SetDislikedAt(ctx, sess.User.ID, req.ItemId, true, req.Params.At); err != nil {
 		return nil, internal(ctx, "dislike", err)
 	}
 	return AddDislike204Response{}, nil
@@ -130,7 +130,7 @@ func (h *Handlers) RemoveDislike(ctx context.Context, req RemoveDislikeRequestOb
 	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); err != nil {
 		return RemoveDislike404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
-	if err := h.Items.SetDisliked(ctx, sess.User.ID, req.ItemId, false); err != nil {
+	if err := h.Items.SetDislikedAt(ctx, sess.User.ID, req.ItemId, false, req.Params.At); err != nil {
 		return nil, internal(ctx, "dislike", err)
 	}
 	return RemoveDislike204Response{}, nil

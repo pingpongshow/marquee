@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 )
 
 // Favourites, songs rated 3.5 stars or more, and popular songs make the list, best first;
@@ -180,5 +181,93 @@ func TestThumbsDown(t *testing.T) {
 	}
 	if got, _ := s.DislikedSongs(ctx, me); got[bad] {
 		t.Fatal("taking it back should clear it")
+	}
+}
+
+// A thumbs down made offline and sent later loses to a newer heart or high rating and to a newer
+// thumbs down change, and an older heart sent later doesn't undo a newer thumbs down.
+func TestThumbsDownSentLater(t *testing.T) {
+	d := testDB(t)
+	ctx := context.Background()
+	s := NewStore(d)
+	me := mustExec(t, d, `INSERT INTO users(username, display_name) VALUES ('me', 'Me')`)
+	lib := mustExec(t, d, `INSERT INTO libraries(name, type) VALUES ('Music', 'music')`)
+	track := func(title string) int64 {
+		return mustExec(t, d, `INSERT INTO items(library_id, type, title, sort_title) VALUES (?, 'track', ?, ?)`, lib, title, title)
+	}
+	now := time.Now().UTC()
+	early, late := now.Add(-2*time.Hour), now.Add(-time.Hour)
+	disliked := func(id int64) bool {
+		t.Helper()
+		got, err := s.DislikedSongs(ctx, me)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got[id]
+	}
+	favorite := func(id int64, at time.Time) {
+		t.Helper()
+		if fresh, err := s.Fresh(ctx, me, id, "favorite", &at); err != nil {
+			t.Fatal(err)
+		} else if fresh {
+			if err := s.SetFavorite(ctx, me, id, true); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// A newer heart stands.
+	a := track("A")
+	favorite(a, late)
+	if err := s.SetDislikedAt(ctx, me, a, true, &early); err != nil {
+		t.Fatal(err)
+	}
+	if disliked(a) {
+		t.Fatal("an older thumbs down beat a newer heart")
+	}
+	// A newer high rating stands, a newer low one doesn't get in the way.
+	b, c := track("B"), track("C")
+	high, low := 9.0, 2.0
+	for id, r := range map[int64]*float64{b: &high, c: &low} {
+		if _, err := s.Fresh(ctx, me, id, "rating", &late); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.SetRating(ctx, me, id, r); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.SetDislikedAt(ctx, me, id, true, &early); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if disliked(b) || !disliked(c) {
+		t.Fatalf("after ratings: high %v, low %v", disliked(b), disliked(c))
+	}
+	// An older heart sent later doesn't take back a newer thumbs down.
+	e := track("E")
+	if err := s.SetDislikedAt(ctx, me, e, true, &late); err != nil {
+		t.Fatal(err)
+	}
+	favorite(e, early)
+	if !disliked(e) {
+		t.Fatal("an older heart took back a newer thumbs down")
+	}
+	// Among thumbs down changes the newest stands, and a change made now always applies.
+	if err := s.SetDislikedAt(ctx, me, e, false, &early); err != nil {
+		t.Fatal(err)
+	}
+	if !disliked(e) {
+		t.Fatal("an older take-back undid a newer thumbs down")
+	}
+	if err := s.SetDislikedAt(ctx, me, e, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if disliked(e) {
+		t.Fatal("a take-back made now should apply")
+	}
+	if err := s.SetDislikedAt(ctx, me, a, true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !disliked(a) {
+		t.Fatal("a thumbs down made now should apply over an earlier heart")
 	}
 }

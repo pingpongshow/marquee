@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ---------- Favourites (the heart) ----------
@@ -50,6 +51,38 @@ func (s *Store) SetDisliked(ctx context.Context, uid, itemID int64, on bool) err
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE user_item_state SET disliked_at = NULL WHERE user_id = ? AND item_id = ?`, uid, itemID)
 	return err
+}
+
+// SetDislikedAt is SetDisliked for a change made at a given time (nil = now), which may be one
+// made offline and sent later (USER-18). It's ignored if a newer one was made, or if the song
+// has since been favourited or rated 3.5 stars or more; and it holds off any older heart or
+// rating still to come.
+func (s *Store) SetDislikedAt(ctx context.Context, uid, itemID int64, on bool, at *time.Time) error {
+	fresh, err := s.Fresh(ctx, uid, itemID, "dislike", at)
+	if err != nil || !fresh {
+		return err
+	}
+	if on {
+		if at != nil {
+			var liked bool
+			err := s.db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM user_item_state u JOIN change_clock c ON c.user_id = u.user_id AND c.item_id = u.item_id
+				WHERE u.user_id = ? AND u.item_id = ? AND c.at > ?
+				AND ((c.field = 'favorite' AND u.favorite_at IS NOT NULL) OR (c.field = 'rating' AND u.rating >= ?)))`,
+				uid, itemID, at.UTC().Format(clockLayout), topRating).Scan(&liked)
+			if err != nil {
+				return err
+			}
+			if liked {
+				return nil
+			}
+		}
+		for _, field := range []string{"favorite", "rating"} {
+			if _, err := s.Fresh(ctx, uid, itemID, field, at); err != nil {
+				return err
+			}
+		}
+	}
+	return s.SetDisliked(ctx, uid, itemID, on)
 }
 
 // DislikedSongs is the set of songs uid gave a thumbs down.

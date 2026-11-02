@@ -87,9 +87,10 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * PUT /items/{itemId}/dislike
-     * Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down.
+     * Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you&#39;ve since favourited the song or rated it 3.5 stars or more.
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -98,8 +99,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @throws ServerException If the API returns a server error response
      */
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun addDislike(itemId: kotlin.Long) : Unit {
-        val localVarResponse = addDislikeWithHttpInfo(itemId = itemId)
+    fun addDislike(itemId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = addDislikeWithHttpInfo(itemId = itemId, at = at)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> Unit
@@ -118,16 +119,17 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * PUT /items/{itemId}/dislike
-     * Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down.
+     * Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you&#39;ve since favourited the song or rated it 3.5 stars or more.
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Throws(IllegalStateException::class, IOException::class)
-    fun addDislikeWithHttpInfo(itemId: kotlin.Long) : ApiResponse<Unit?> {
-        val localVariableConfig = addDislikeRequestConfig(itemId = itemId)
+    fun addDislikeWithHttpInfo(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = addDislikeRequestConfig(itemId = itemId, at = at)
 
         return request<Unit, Unit>(
             localVariableConfig
@@ -138,11 +140,17 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * To obtain the request config of the operation addDislike
      *
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return RequestConfig
      */
-    fun addDislikeRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+    fun addDislikeRequestConfig(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
@@ -3217,6 +3225,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * Take back your thumbs down on a song (MUSIC-25).
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -3225,8 +3234,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @throws ServerException If the API returns a server error response
      */
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun removeDislike(itemId: kotlin.Long) : Unit {
-        val localVarResponse = removeDislikeWithHttpInfo(itemId = itemId)
+    fun removeDislike(itemId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = removeDislikeWithHttpInfo(itemId = itemId, at = at)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> Unit
@@ -3248,13 +3257,14 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * Take back your thumbs down on a song (MUSIC-25).
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Throws(IllegalStateException::class, IOException::class)
-    fun removeDislikeWithHttpInfo(itemId: kotlin.Long) : ApiResponse<Unit?> {
-        val localVariableConfig = removeDislikeRequestConfig(itemId = itemId)
+    fun removeDislikeWithHttpInfo(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = removeDislikeRequestConfig(itemId = itemId, at = at)
 
         return request<Unit, Unit>(
             localVariableConfig
@@ -3265,11 +3275,17 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * To obtain the request config of the operation removeDislike
      *
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return RequestConfig
      */
-    fun removeDislikeRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+    fun removeDislikeRequestConfig(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 

@@ -1923,7 +1923,9 @@ paths:
     put:
       tags: [items]
       operationId: addDislike
-      summary: "Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down."
+      summary: "Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited the song or rated it 3.5 stars or more."
+      parameters:
+        - $ref: "#/components/parameters/ChangedAt"
       responses:
         "204": { description: Added. }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -1933,6 +1935,8 @@ paths:
       tags: [items]
       operationId: removeDislike
       summary: Take back your thumbs down on a song (MUSIC-25).
+      parameters:
+        - $ref: "#/components/parameters/ChangedAt"
       responses:
         "204": { description: Removed. }
         "401": { $ref: "#/components/responses/Unauthorized" }

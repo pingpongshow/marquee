@@ -19300,7 +19300,7 @@ public enum Operations {
             }
         }
     }
-    /// Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down.
+    /// Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited the song or rated it 3.5 stars or more.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/dislike`.
     /// - Remark: Generated from `#/paths//items/{itemId}/dislike/put(addDislike)`.
@@ -19320,6 +19320,21 @@ public enum Operations {
                 }
             }
             public var path: Operations.AddDislike.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/dislike/PUT/query`.
+            public struct Query: Sendable, Hashable {
+                /// When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/dislike/PUT/query/at`.
+                public var at: Components.Parameters.ChangedAt?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - at: When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                public init(at: Components.Parameters.ChangedAt? = nil) {
+                    self.at = at
+                }
+            }
+            public var query: Operations.AddDislike.Input.Query
             /// - Remark: Generated from `#/paths/items/{itemId}/dislike/PUT/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AddDislike.AcceptableContentType>]
@@ -19336,12 +19351,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.AddDislike.Input.Path,
+                query: Operations.AddDislike.Input.Query = .init(),
                 headers: Operations.AddDislike.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }
@@ -19501,6 +19519,21 @@ public enum Operations {
                 }
             }
             public var path: Operations.RemoveDislike.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/dislike/DELETE/query`.
+            public struct Query: Sendable, Hashable {
+                /// When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/dislike/DELETE/query/at`.
+                public var at: Components.Parameters.ChangedAt?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - at: When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                public init(at: Components.Parameters.ChangedAt? = nil) {
+                    self.at = at
+                }
+            }
+            public var query: Operations.RemoveDislike.Input.Query
             /// - Remark: Generated from `#/paths/items/{itemId}/dislike/DELETE/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveDislike.AcceptableContentType>]
@@ -19517,12 +19550,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.RemoveDislike.Input.Path,
+                query: Operations.RemoveDislike.Input.Query = .init(),
                 headers: Operations.RemoveDislike.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }

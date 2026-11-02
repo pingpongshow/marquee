@@ -1394,7 +1394,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. */
+        /** Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited the song or rated it 3.5 stars or more. */
         put: operations["addDislike"];
         post?: never;
         /** Take back your thumbs down on a song (MUSIC-25). */
@@ -10976,7 +10976,10 @@ export interface operations {
     };
     addDislike: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
             header?: never;
             path: {
                 itemId: components["parameters"]["ItemId"];
@@ -10999,7 +11002,10 @@ export interface operations {
     };
     removeDislike: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
             header?: never;
             path: {
                 itemId: components["parameters"]["ItemId"];
