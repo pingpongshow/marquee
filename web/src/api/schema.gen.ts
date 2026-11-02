@@ -959,6 +959,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/top-songs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request. */
+        get: operations["listTopSongs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/images/{artworkId}": {
         parameters: {
             query?: never;
@@ -2107,7 +2126,7 @@ export interface paths {
         /** Your conversions for offline viewing, newest first. */
         get: operations["listDownloads"];
         put?: never;
-        /** Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server (one at a time) and become ready later. */
+        /** Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server and become ready later (one video at a time, and one song at a time alongside it, so an album doesn't wait for a film). */
         post: operations["createDownload"];
         delete?: never;
         options?: never;
@@ -3876,6 +3895,80 @@ export interface paths {
         patch: operations["updatePlaylist"];
         trace?: never;
     };
+    "/playlists/{playlistId}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        /** Who your playlist is shared with (MUSIC-24). */
+        get: operations["getPlaylistSharing"];
+        /** Choose who your playlist is shared with (MUSIC-24). They see it once they accept, and can't change it. */
+        put: operations["setPlaylistSharing"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/playlist-share-targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The people on this server you can share a playlist with (MUSIC-24). */
+        get: operations["listPlaylistShareTargets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/playlist-shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Playlists shared with you that you haven't accepted yet (MUSIC-24). */
+        get: operations["listPlaylistInvites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/playlist-shares/{playlistId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Accept a playlist shared with you. It joins your playlists, read-only (MUSIC-24). */
+        put: operations["acceptPlaylistShare"];
+        post?: never;
+        /** Decline a playlist shared with you, or remove it from your playlists. The owner's playlist is untouched; you need them to share it again to get it back (MUSIC-24). */
+        delete: operations["removePlaylistShare"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/playlists/{playlistId}/items": {
         parameters: {
             query?: never;
@@ -4169,7 +4262,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it. */
+        /**
+         * A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
+         * @description Stations never run out: once everything that fits is in exclude, songs excluded longest ago come round again, so keep appending what comes back and asking when few are left. An artist, album or track without Soundprint analysis gets a station from its artist, similar artists and genres instead of a 409.
+         */
         post: operations["musicRadio"];
         delete?: never;
         options?: never;
@@ -7206,6 +7302,40 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             rules?: components["schemas"]["SmartRules"];
+            /** @description Someone else's playlist, shared with you (MUSIC-24): you can play it or remove it from your playlists (DELETE /me/playlist-shares/{playlistId}), but not change it. */
+            readOnly?: boolean;
+            /** @description Whose playlist this is. Set on playlists shared with you. */
+            ownerName?: string;
+            /** @description Your playlist is shared with everyone on the server. */
+            sharedWithAll?: boolean;
+            /** @description How many people your playlist is offered to or shared with by name. */
+            shareCount?: number;
+        };
+        PlaylistShareTarget: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        PlaylistShare: {
+            /** Format: int64 */
+            userId: number;
+            name: string;
+            /**
+             * @description pending: they haven't accepted yet.
+             * @enum {string}
+             */
+            status: "pending" | "accepted";
+        };
+        PlaylistSharing: {
+            /** @description Shared with everyone on the server. */
+            all: boolean;
+            shares: components["schemas"]["PlaylistShare"][];
+        };
+        PlaylistSharingUpdate: {
+            /** @description Who it's shared with by name. Anyone left out loses it, unless it's shared with everyone. Listing someone who removed it offers it to them again. */
+            userIds: number[];
+            /** @description Share with everyone on the server, including people added later (admins only). Turning it on offers it again to anyone who removed it. Left out, it stays as it is. */
+            all?: boolean;
         };
         PlaylistCreate: {
             title: string;
@@ -7333,7 +7463,7 @@ export interface components {
             libraryId?: number;
             /** @default 50 */
             limit: number;
-            /** @description Tracks already queued (to continue a station). */
+            /** @description Tracks already queued (to continue a station), oldest first. */
             exclude?: number[];
             /** @description Tracks of this station the listener skipped quickly (in the first 30 s, before half way). The station steers away from their sound and holds back artists skipped twice (MUSIC-17). Send them when topping up a station, and top it up early after two quick skips in a row. */
             skipped?: number[];
@@ -9998,6 +10128,33 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listTopSongs: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     getImage: {
         parameters: {
             query?: {
@@ -11985,7 +12142,7 @@ export interface operations {
                      */
                     fileId?: number;
                     /**
-                     * @description high 1080p, medium 720p, low 480p (HEVC MP4).
+                     * @description Videos: high 1080p, medium 720p, low 480p (HEVC MP4). Songs: high 256 kbps, medium 160 kbps, low 96 kbps (AAC M4A; never above the original's bitrate).
                      * @enum {string}
                      */
                     quality: "original" | "high" | "medium" | "low";
@@ -15007,6 +15164,147 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlaylistSharing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistSharing"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setPlaylistSharing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistSharingUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistSharing"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listPlaylistShareTargets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistShareTarget"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listPlaylistInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Playlist"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    acceptPlaylistShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Playlist"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removePlaylistShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

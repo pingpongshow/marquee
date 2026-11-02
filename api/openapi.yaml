@@ -1357,6 +1357,29 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /items/{itemId}/top-songs:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: listTopSongs
+      summary: "An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request."
+      parameters:
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /images/{artworkId}:
     get:
       tags: [images]
@@ -2733,7 +2756,7 @@ paths:
     post:
       tags: [downloads]
       operationId: createDownload
-      summary: Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server (one at a time) and become ready later.
+      summary: Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server and become ready later (one video at a time, and one song at a time alongside it, so an album doesn't wait for a film).
       requestBody:
         required: true
         content:
@@ -2744,7 +2767,7 @@ paths:
               properties:
                 itemId: { type: integer, format: int64 }
                 fileId: { type: integer, format: int64, description: A specific version; default is the best. }
-                quality: { type: string, enum: [original, high, medium, low], description: "high 1080p, medium 720p, low 480p (HEVC MP4)." }
+                quality: { type: string, enum: [original, high, medium, low], description: "Videos: high 1080p, medium 720p, low 480p (HEVC MP4). Songs: high 256 kbps, medium 160 kbps, low 96 kbps (AAC M4A; never above the original's bitrate)." }
       responses:
         "200":
           description: Ready or queued.
@@ -4765,6 +4788,94 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /playlists/{playlistId}/shares:
+    parameters:
+      - $ref: "#/components/parameters/PlaylistId"
+    get:
+      tags: [playlists]
+      operationId: getPlaylistSharing
+      summary: Who your playlist is shared with (MUSIC-24).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlaylistSharing" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [playlists]
+      operationId: setPlaylistSharing
+      summary: Choose who your playlist is shared with (MUSIC-24). They see it once they accept, and can't change it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaylistSharingUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlaylistSharing" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /me/playlist-share-targets:
+    get:
+      tags: [playlists]
+      operationId: listPlaylistShareTargets
+      summary: The people on this server you can share a playlist with (MUSIC-24).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PlaylistShareTarget" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /me/playlist-shares:
+    get:
+      tags: [playlists]
+      operationId: listPlaylistInvites
+      summary: Playlists shared with you that you haven't accepted yet (MUSIC-24).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /me/playlist-shares/{playlistId}:
+    parameters:
+      - $ref: "#/components/parameters/PlaylistId"
+    put:
+      tags: [playlists]
+      operationId: acceptPlaylistShare
+      summary: Accept a playlist shared with you. It joins your playlists, read-only (MUSIC-24).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [playlists]
+      operationId: removePlaylistShare
+      summary: Decline a playlist shared with you, or remove it from your playlists. The owner's playlist is untouched; you need them to share it again to get it back (MUSIC-24).
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /playlists/{playlistId}/items:
     parameters:
       - $ref: "#/components/parameters/PlaylistId"
@@ -5116,6 +5227,7 @@ paths:
       tags: [music]
       operationId: musicRadio
       summary: A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
+      description: "Stations never run out: once everything that fits is in exclude, songs excluded longest ago come round again, so keep appending what comes back and asking when few are left. An artist, album or track without Soundprint analysis gets a station from its artist, similar artists and genres instead of a 409."
       requestBody:
         required: true
         content:
@@ -8087,6 +8199,44 @@ components:
           items: { type: integer, format: int64 }
         updatedAt: { type: string, format: date-time }
         rules: { $ref: "#/components/schemas/SmartRules" }
+        readOnly: { type: boolean, description: "Someone else's playlist, shared with you (MUSIC-24): you can play it or remove it from your playlists (DELETE /me/playlist-shares/{playlistId}), but not change it." }
+        ownerName: { type: string, description: Whose playlist this is. Set on playlists shared with you. }
+        sharedWithAll: { type: boolean, description: "Your playlist is shared with everyone on the server." }
+        shareCount: { type: integer, description: "How many people your playlist is offered to or shared with by name." }
+
+    PlaylistShareTarget:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+
+    PlaylistShare:
+      type: object
+      required: [userId, name, status]
+      properties:
+        userId: { type: integer, format: int64 }
+        name: { type: string }
+        status: { type: string, enum: [pending, accepted], description: "pending: they haven't accepted yet." }
+
+    PlaylistSharing:
+      type: object
+      required: [all, shares]
+      properties:
+        all: { type: boolean, description: Shared with everyone on the server. }
+        shares:
+          type: array
+          items: { $ref: "#/components/schemas/PlaylistShare" }
+
+    PlaylistSharingUpdate:
+      type: object
+      required: [userIds]
+      properties:
+        userIds:
+          type: array
+          description: Who it's shared with by name. Anyone left out loses it, unless it's shared with everyone. Listing someone who removed it offers it to them again.
+          items: { type: integer, format: int64 }
+        all: { type: boolean, description: "Share with everyone on the server, including people added later (admins only). Turning it on offers it again to anyone who removed it. Left out, it stays as it is." }
 
     PlaylistCreate:
       type: object
@@ -8212,7 +8362,7 @@ components:
         limit: { type: integer, minimum: 5, maximum: 100, default: 50 }
         exclude:
           type: array
-          description: Tracks already queued (to continue a station).
+          description: Tracks already queued (to continue a station), oldest first.
           items: { type: integer, format: int64 }
         skipped:
           type: array

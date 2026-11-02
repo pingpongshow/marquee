@@ -12035,6 +12035,22 @@ extension Components {
             public var updatedAt: Foundation.Date
             /// - Remark: Generated from `#/components/schemas/Playlist/rules`.
             public var rules: Components.Schemas.SmartRules?
+            /// Someone else's playlist, shared with you (MUSIC-24): you can play it or remove it from your playlists (DELETE /me/playlist-shares/{playlistId}), but not change it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Playlist/readOnly`.
+            public var readOnly: Swift.Bool?
+            /// Whose playlist this is. Set on playlists shared with you.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Playlist/ownerName`.
+            public var ownerName: Swift.String?
+            /// Your playlist is shared with everyone on the server.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Playlist/sharedWithAll`.
+            public var sharedWithAll: Swift.Bool?
+            /// How many people your playlist is offered to or shared with by name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Playlist/shareCount`.
+            public var shareCount: Swift.Int?
             /// Creates a new `Playlist`.
             ///
             /// - Parameters:
@@ -12046,6 +12062,10 @@ extension Components {
             ///   - imageIds: Posters/covers of up to four items, for the playlist's mosaic.
             ///   - updatedAt:
             ///   - rules:
+            ///   - readOnly: Someone else's playlist, shared with you (MUSIC-24): you can play it or remove it from your playlists (DELETE /me/playlist-shares/{playlistId}), but not change it.
+            ///   - ownerName: Whose playlist this is. Set on playlists shared with you.
+            ///   - sharedWithAll: Your playlist is shared with everyone on the server.
+            ///   - shareCount: How many people your playlist is offered to or shared with by name.
             public init(
                 id: Swift.Int64,
                 title: Swift.String,
@@ -12054,7 +12074,11 @@ extension Components {
                 durationMs: Swift.Int64,
                 imageIds: [Swift.Int64],
                 updatedAt: Foundation.Date,
-                rules: Components.Schemas.SmartRules? = nil
+                rules: Components.Schemas.SmartRules? = nil,
+                readOnly: Swift.Bool? = nil,
+                ownerName: Swift.String? = nil,
+                sharedWithAll: Swift.Bool? = nil,
+                shareCount: Swift.Int? = nil
             ) {
                 self.id = id
                 self.title = title
@@ -12064,6 +12088,10 @@ extension Components {
                 self.imageIds = imageIds
                 self.updatedAt = updatedAt
                 self.rules = rules
+                self.readOnly = readOnly
+                self.ownerName = ownerName
+                self.sharedWithAll = sharedWithAll
+                self.shareCount = shareCount
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -12074,6 +12102,123 @@ extension Components {
                 case imageIds
                 case updatedAt
                 case rules
+                case readOnly
+                case ownerName
+                case sharedWithAll
+                case shareCount
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlaylistShareTarget`.
+        public struct PlaylistShareTarget: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlaylistShareTarget/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/PlaylistShareTarget/name`.
+            public var name: Swift.String
+            /// Creates a new `PlaylistShareTarget`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - name:
+            public init(
+                id: Swift.Int64,
+                name: Swift.String
+            ) {
+                self.id = id
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlaylistShare`.
+        public struct PlaylistShare: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlaylistShare/userId`.
+            public var userId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/PlaylistShare/name`.
+            public var name: Swift.String
+            /// pending: they haven't accepted yet.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistShare/status`.
+            @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case pending = "pending"
+                case accepted = "accepted"
+            }
+            /// pending: they haven't accepted yet.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistShare/status`.
+            public var status: Components.Schemas.PlaylistShare.StatusPayload
+            /// Creates a new `PlaylistShare`.
+            ///
+            /// - Parameters:
+            ///   - userId:
+            ///   - name:
+            ///   - status: pending: they haven't accepted yet.
+            public init(
+                userId: Swift.Int64,
+                name: Swift.String,
+                status: Components.Schemas.PlaylistShare.StatusPayload
+            ) {
+                self.userId = userId
+                self.name = name
+                self.status = status
+            }
+            public enum CodingKeys: String, CodingKey {
+                case userId
+                case name
+                case status
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlaylistSharing`.
+        public struct PlaylistSharing: Codable, Hashable, Sendable {
+            /// Shared with everyone on the server.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistSharing/all`.
+            public var all: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/PlaylistSharing/shares`.
+            public var shares: [Components.Schemas.PlaylistShare]
+            /// Creates a new `PlaylistSharing`.
+            ///
+            /// - Parameters:
+            ///   - all: Shared with everyone on the server.
+            ///   - shares:
+            public init(
+                all: Swift.Bool,
+                shares: [Components.Schemas.PlaylistShare]
+            ) {
+                self.all = all
+                self.shares = shares
+            }
+            public enum CodingKeys: String, CodingKey {
+                case all
+                case shares
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlaylistSharingUpdate`.
+        public struct PlaylistSharingUpdate: Codable, Hashable, Sendable {
+            /// Who it's shared with by name. Anyone left out loses it, unless it's shared with everyone. Listing someone who removed it offers it to them again.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistSharingUpdate/userIds`.
+            public var userIds: [Swift.Int64]
+            /// Share with everyone on the server, including people added later (admins only). Turning it on offers it again to anyone who removed it. Left out, it stays as it is.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistSharingUpdate/all`.
+            public var all: Swift.Bool?
+            /// Creates a new `PlaylistSharingUpdate`.
+            ///
+            /// - Parameters:
+            ///   - userIds: Who it's shared with by name. Anyone left out loses it, unless it's shared with everyone. Listing someone who removed it offers it to them again.
+            ///   - all: Share with everyone on the server, including people added later (admins only). Turning it on offers it again to anyone who removed it. Left out, it stays as it is.
+            public init(
+                userIds: [Swift.Int64],
+                all: Swift.Bool? = nil
+            ) {
+                self.userIds = userIds
+                self.all = all
+            }
+            public enum CodingKeys: String, CodingKey {
+                case userIds
+                case all
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaylistCreate`.
@@ -12610,7 +12755,7 @@ extension Components {
             public var libraryId: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/RadioRequest/limit`.
             public var limit: Swift.Int?
-            /// Tracks already queued (to continue a station).
+            /// Tracks already queued (to continue a station), oldest first.
             ///
             /// - Remark: Generated from `#/components/schemas/RadioRequest/exclude`.
             public var exclude: [Swift.Int64]?
@@ -12630,7 +12775,7 @@ extension Components {
             ///   - value: With genre: the genre; decade: e.g. 1990; mood: a word or phrase.
             ///   - libraryId:
             ///   - limit:
-            ///   - exclude: Tracks already queued (to continue a station).
+            ///   - exclude: Tracks already queued (to continue a station), oldest first.
             ///   - skipped: Tracks of this station the listener skipped quickly (in the first 30 s, before half way). The station steers away from their sound and holds back artists skipped twice (MUSIC-17). Send them when topping up a station, and top it up early after two quick skips in a row.
             ///   - finished: Tracks of this station the listener played through. The station steers towards their sound.
             public init(

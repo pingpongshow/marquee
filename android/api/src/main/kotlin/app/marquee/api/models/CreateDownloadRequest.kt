@@ -32,7 +32,7 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param itemId 
- * @param quality high 1080p, medium 720p, low 480p (HEVC MP4).
+ * @param quality Videos: high 1080p, medium 720p, low 480p (HEVC MP4). Songs: high 256 kbps, medium 160 kbps, low 96 kbps (AAC M4A; never above the original's bitrate).
  * @param fileId A specific version; default is the best.
  */
 @Serializable
@@ -42,7 +42,7 @@ data class CreateDownloadRequest (
     @SerialName(value = "itemId")
     val itemId: kotlin.Long,
 
-    /* high 1080p, medium 720p, low 480p (HEVC MP4). */
+    /* Videos: high 1080p, medium 720p, low 480p (HEVC MP4). Songs: high 256 kbps, medium 160 kbps, low 96 kbps (AAC M4A; never above the original's bitrate). */
     @SerialName(value = "quality")
     val quality: CreateDownloadRequest.Quality,
 
@@ -53,7 +53,7 @@ data class CreateDownloadRequest (
 ) {
 
     /**
-     * high 1080p, medium 720p, low 480p (HEVC MP4).
+     * Videos: high 1080p, medium 720p, low 480p (HEVC MP4). Songs: high 256 kbps, medium 160 kbps, low 96 kbps (AAC M4A; never above the original's bitrate).
      *
      * Values: ORIGINAL,HIGH,MEDIUM,LOW
      */

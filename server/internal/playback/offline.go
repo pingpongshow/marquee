@@ -25,6 +25,9 @@ var OfflineQualities = map[string]OfflineQuality{
 	"low":    {"480p", 480, 900},
 }
 
+// OfflineAudioKbps are the same qualities for songs (AAC in M4A).
+var OfflineAudioKbps = map[string]int{"high": 256, "medium": 160, "low": 96}
+
 // ErrNotVideo is returned when converting something that isn't a video.
 var ErrNotVideo = errors.New("only videos can be converted")
 
@@ -70,19 +73,58 @@ func (m *Manager) OfflineJob(ctx context.Context, r Request, quality, out string
 	return job, s.Media.DurationMS, nil
 }
 
+// offlineAudioArgs converts a song to M4A at kbps, or at the original's bitrate when that's
+// lower, so a download is never larger for no gain. AAC already at or below kbps is copied,
+// since converting it again only loses quality.
+func offlineAudioArgs(input string, a *AudioStream, srcKbps, kbps int, out string) []string {
+	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-i", input, "-map", "0:" + strconv.Itoa(a.Index), "-map_metadata", "0", "-vn", "-sn", "-dn"}
+	if a.BitrateKbps > 0 {
+		srcKbps = a.BitrateKbps
+	}
+	if a.Codec == "aac" && !heAAC(a) && srcKbps > 0 && srcKbps <= kbps {
+		args = append(args, "-c:a", "copy")
+	} else {
+		if srcKbps > 0 && srcKbps < kbps {
+			kbps = max(srcKbps, 64)
+		}
+		channels := "2"
+		if a.Channels == 1 {
+			channels = "1"
+		}
+		args = append(args, "-c:a", "aac", "-b:a", strconv.Itoa(kbps)+"k", "-ac", channels)
+	}
+	return append(args, "-progress", "pipe:1", "-nostats", "-f", "ipod", "-movflags", "+faststart", out)
+}
+
+// ConvertAudio converts a song for download, reporting progress (0–1).
+func (m *Manager) ConvertAudio(ctx context.Context, r Request, quality, out string, progress func(float64)) error {
+	kbps, ok := OfflineAudioKbps[quality]
+	if !ok {
+		return fmt.Errorf("unknown quality %q", quality)
+	}
+	s := &Session{UserID: r.UserID, ItemID: r.ItemID}
+	if err := m.load(ctx, s, r); err != nil {
+		return err
+	}
+	if s.Media.Audio == nil {
+		return errors.New("this song has no audio")
+	}
+	return m.runConversion(ctx, "aac", offlineAudioArgs(s.Path, s.Media.Audio, s.Media.BitrateKbps, kbps, out), s.Media.DurationMS, progress)
+}
+
 // RunOffline runs a conversion, reporting progress (0–1). If the hardware encoder fails it
 // tries the CPU once.
 func (m *Manager) RunOffline(ctx context.Context, job Job, durationMS int64, progress func(float64)) error {
-	err := m.runOffline(ctx, job, durationMS, progress)
+	err := m.runConversion(ctx, job.Encoder, job.Args(), durationMS, progress)
 	if err != nil && ctx.Err() == nil && job.Encoder != "software" {
 		job.Encoder = "software"
-		err = m.runOffline(ctx, job, durationMS, progress)
+		err = m.runConversion(ctx, job.Encoder, job.Args(), durationMS, progress)
 	}
 	return err
 }
 
-func (m *Manager) runOffline(ctx context.Context, job Job, durationMS int64, progress func(float64)) error {
-	cmd := exec.CommandContext(ctx, m.FFmpeg, job.Args()...)
+func (m *Manager) runConversion(ctx context.Context, encoder string, args []string, durationMS int64, progress func(float64)) error {
+	cmd := exec.CommandContext(ctx, m.FFmpeg, args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -106,7 +148,7 @@ func (m *Manager) runOffline(ctx context.Context, job Job, durationMS int64, pro
 		if i := strings.LastIndex(msg, "\n"); i >= 0 {
 			msg = msg[i+1:]
 		}
-		return fmt.Errorf("convert (%s): %w: %s", job.Encoder, err, msg)
+		return fmt.Errorf("convert (%s): %w: %s", encoder, err, msg)
 	}
 	return nil
 }

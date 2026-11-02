@@ -592,7 +592,7 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     /**
      * POST /music/radio
      * A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
-     * 
+     * Stations never run out: once everything that fits is in exclude, songs excluded longest ago come round again, so keep appending what comes back and asking when few are left. An artist, album or track without Soundprint analysis gets a station from its artist, similar artists and genres instead of a 409.
      * @param radioRequest 
      * @return Station
      * @throws IllegalStateException If the request is not correctly configured
@@ -624,7 +624,7 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     /**
      * POST /music/radio
      * A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
-     * 
+     * Stations never run out: once everything that fits is in exclude, songs excluded longest ago come round again, so keep appending what comes back and asking when few are left. An artist, album or track without Soundprint analysis gets a station from its artist, similar artists and genres instead of a 409.
      * @param radioRequest 
      * @return ApiResponse<Station?>
      * @throws IllegalStateException If the request is not correctly configured

@@ -1,5 +1,6 @@
-// Package downloads converts videos for offline viewing on phones and tablets (M7). Jobs
-// run one at a time on the server's encoders; finished files are kept for a week.
+// Package downloads converts videos and songs for offline use on phones and tablets (M7).
+// Videos run one at a time on the server's encoders, songs one at a time beside them, so an
+// album doesn't wait for a film; finished files are kept for a week.
 package downloads
 
 import (
@@ -46,7 +47,7 @@ type Service struct {
 	Request func(ctx context.Context, userID, itemID, fileID int64) (playback.Request, error)
 
 	once sync.Once
-	wake chan struct{}
+	wake map[bool]chan struct{} // by whether it's the songs' worker
 	mu   sync.Mutex
 	live map[string]float64 // progress of running jobs
 	// cancel stops the job converting now (by id), when it's deleted meanwhile.
@@ -61,29 +62,31 @@ func newID() string {
 
 func (s *Service) init() {
 	s.once.Do(func() {
-		s.wake = make(chan struct{}, 1)
+		s.wake = map[bool]chan struct{}{true: make(chan struct{}, 1), false: make(chan struct{}, 1)}
 		s.live = map[string]float64{}
 	})
 }
 
-// Create queues a conversion, or returns an existing one for the same item and quality.
-func (s *Service) Create(ctx context.Context, userID, itemID, fileID int64, quality string) (Job, error) {
+// Create queues a conversion, or returns this device's existing one for the same item and quality.
+func (s *Service) Create(ctx context.Context, userID, deviceID, itemID, fileID int64, quality string) (Job, error) {
 	s.init()
 	if _, ok := playback.OfflineQualities[quality]; !ok {
 		return Job{}, errors.New("quality must be high, medium or low")
 	}
 	var id string
 	err := s.DB.QueryRowContext(ctx, `SELECT id FROM download_jobs WHERE user_id = ? AND item_id = ? AND quality = ?
-		AND COALESCE(file_id, 0) = ? AND status != 'failed'`, userID, itemID, quality, fileID).Scan(&id)
+		AND COALESCE(file_id, 0) = ? AND COALESCE(device_id, 0) = ? AND status != 'failed'`, userID, itemID, quality, fileID, deviceID).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		id = newID()
-		if _, err := s.DB.ExecContext(ctx, `INSERT INTO download_jobs (id, user_id, item_id, file_id, quality) VALUES (?, ?, ?, ?, ?)`,
-			id, userID, itemID, nullID(fileID), quality); err != nil {
+		if _, err := s.DB.ExecContext(ctx, `INSERT INTO download_jobs (id, user_id, device_id, item_id, file_id, quality) VALUES (?, ?, ?, ?, ?, ?)`,
+			id, userID, nullID(deviceID), itemID, nullID(fileID), quality); err != nil {
 			return Job{}, err
 		}
-		select {
-		case s.wake <- struct{}{}:
-		default:
+		for _, w := range s.wake {
+			select {
+			case w <- struct{}{}:
+			default:
+			}
 		}
 	} else if err != nil {
 		return Job{}, err
@@ -133,7 +136,7 @@ func (s *Service) Get(ctx context.Context, userID int64, id string) (Job, error)
 // List returns a user's jobs, newest first.
 func (s *Service) List(ctx context.Context, userID int64) ([]Job, error) {
 	s.init()
-	rows, err := s.DB.QueryContext(ctx, `SELECT `+cols+` FROM download_jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT 500`, userID)
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+cols+` FROM download_jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT 2000`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -173,24 +176,43 @@ func (s *Service) Run(ctx context.Context) {
 	s.init()
 	// Jobs cut short by a restart start over.
 	s.DB.ExecContext(ctx, `UPDATE download_jobs SET status = 'queued', progress = 0 WHERE status = 'converting'`)
+	go s.work(ctx, true)
 	tick := time.NewTicker(time.Hour)
 	defer tick.Stop()
 	for {
 		s.cleanup(ctx)
-		for ctx.Err() == nil && s.next(ctx) {
+		for ctx.Err() == nil && s.next(ctx, false) {
 		}
 		select {
 		case <-ctx.Done():
 			return
-		case <-s.wake:
+		case <-s.wake[false]:
 		case <-tick.C:
 		}
 	}
 }
 
-// next runs the oldest queued job; false when there is none.
-func (s *Service) next(ctx context.Context) bool {
-	j, err := s.scan(s.DB.QueryRowContext(ctx, `SELECT `+cols+` FROM download_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1`))
+// work runs the queued jobs of one kind until ctx ends.
+func (s *Service) work(ctx context.Context, songs bool) {
+	for {
+		for ctx.Err() == nil && s.next(ctx, songs) {
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.wake[songs]:
+		}
+	}
+}
+
+// next runs the oldest queued job of a kind (songs or the rest); false when there is none.
+func (s *Service) next(ctx context.Context, songs bool) bool {
+	kind := `NOT IN`
+	if songs {
+		kind = `IN`
+	}
+	j, err := s.scan(s.DB.QueryRowContext(ctx, `SELECT `+cols+` FROM download_jobs WHERE status = 'queued'
+		AND item_id `+kind+` (SELECT id FROM items WHERE type = 'track') ORDER BY created_at LIMIT 1`))
 	if err != nil {
 		return false
 	}
@@ -209,11 +231,18 @@ func (s *Service) next(ctx context.Context) bool {
 		return fail(err)
 	}
 	out := filepath.Join(s.Dir, j.ID+".mp4")
-	job, dur, err := s.Playback.OfflineJob(ctx, r, j.Quality, out)
-	if err != nil {
-		return fail(err)
+	if songs {
+		out = filepath.Join(s.Dir, j.ID+".m4a")
 	}
-	slog.Info("converting for download", "item", j.ItemID, "quality", j.Quality, "encoder", job.Encoder)
+	var job playback.Job
+	var dur int64
+	if !songs {
+		job, dur, err = s.Playback.OfflineJob(ctx, r, j.Quality, out)
+		if err != nil {
+			return fail(err)
+		}
+		slog.Info("converting for download", "item", j.ItemID, "quality", j.Quality, "encoder", job.Encoder)
+	}
 	jobCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	s.mu.Lock()
@@ -227,11 +256,16 @@ func (s *Service) next(ctx context.Context) bool {
 	if s.DB.QueryRowContext(ctx, `SELECT 1 FROM download_jobs WHERE id = ?`, j.ID).Scan(&exists) != nil {
 		cancel()
 	}
-	err = s.Playback.RunOffline(jobCtx, job, dur, func(p float64) {
+	report := func(p float64) {
 		s.mu.Lock()
 		s.live[j.ID] = p
 		s.mu.Unlock()
-	})
+	}
+	if songs {
+		err = s.Playback.ConvertAudio(jobCtx, r, j.Quality, out, report)
+	} else {
+		err = s.Playback.RunOffline(jobCtx, job, dur, report)
+	}
 	s.mu.Lock()
 	delete(s.live, j.ID)
 	delete(s.cancel, j.ID)

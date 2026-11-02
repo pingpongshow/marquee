@@ -59,7 +59,7 @@ open class DownloadsApi(basePath: kotlin.String = defaultBasePath, client: Call.
 
     /**
      * POST /downloads
-     * Prepare an item to download for offline playback. \&quot;original\&quot; is ready at once; other qualities are converted on the server (one at a time) and become ready later.
+     * Prepare an item to download for offline playback. \&quot;original\&quot; is ready at once; other qualities are converted on the server and become ready later (one video at a time, and one song at a time alongside it, so an album doesn&#39;t wait for a film).
      * 
      * @param createDownloadRequest 
      * @return Download
@@ -91,7 +91,7 @@ open class DownloadsApi(basePath: kotlin.String = defaultBasePath, client: Call.
 
     /**
      * POST /downloads
-     * Prepare an item to download for offline playback. \&quot;original\&quot; is ready at once; other qualities are converted on the server (one at a time) and become ready later.
+     * Prepare an item to download for offline playback. \&quot;original\&quot; is ready at once; other qualities are converted on the server and become ready later (one video at a time, and one song at a time alongside it, so an album doesn&#39;t wait for a film).
      * 
      * @param createDownloadRequest 
      * @return ApiResponse<Download?>

@@ -2384,6 +2384,93 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * GET /items/{itemId}/top-songs
+     * An artist&#39;s top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what&#39;s popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request.
+     * 
+     * @param itemId 
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return ItemPage
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listTopSongs(itemId: kotlin.Long, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100) : ItemPage {
+        val localVarResponse = listTopSongsWithHttpInfo(itemId = itemId, offset = offset, limit = limit)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemPage
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/top-songs
+     * An artist&#39;s top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what&#39;s popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request.
+     * 
+     * @param itemId 
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return ApiResponse<ItemPage?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listTopSongsWithHttpInfo(itemId: kotlin.Long, offset: kotlin.Int?, limit: kotlin.Int?) : ApiResponse<ItemPage?> {
+        val localVariableConfig = listTopSongsRequestConfig(itemId = itemId, offset = offset, limit = limit)
+
+        return request<Unit, ItemPage>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listTopSongs
+     *
+     * @param itemId 
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return RequestConfig
+     */
+    fun listTopSongsRequestConfig(itemId: kotlin.Long, offset: kotlin.Int?, limit: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (offset != null) {
+                    put("offset", listOf(offset.toString()))
+                }
+                if (limit != null) {
+                    put("limit", listOf(limit.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/top-songs".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * PUT /items/{itemId}/not-interested
      * Not interested (USER-16): stop suggesting this movie or show to you. It leaves every suggestion row (Home, Because you watched, Muse…) and counts as something you turned away from, steering suggestions away from titles like it.
      * 

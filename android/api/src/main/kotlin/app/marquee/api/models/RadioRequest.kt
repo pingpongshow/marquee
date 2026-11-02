@@ -36,7 +36,7 @@ import kotlinx.serialization.Contextual
  * @param `value` With genre: the genre; decade: e.g. 1990; mood: a word or phrase.
  * @param libraryId 
  * @param limit 
- * @param exclude Tracks already queued (to continue a station).
+ * @param exclude Tracks already queued (to continue a station), oldest first.
  * @param skipped Tracks of this station the listener skipped quickly (in the first 30 s, before half way). The station steers away from their sound and holds back artists skipped twice (MUSIC-17). Send them when topping up a station, and top it up early after two quick skips in a row.
  * @param finished Tracks of this station the listener played through. The station steers towards their sound.
  */
@@ -62,7 +62,7 @@ data class RadioRequest (
     @SerialName(value = "limit")
     val limit: kotlin.Int? = 50,
 
-    /* Tracks already queued (to continue a station). */
+    /* Tracks already queued (to continue a station), oldest first. */
     @SerialName(value = "exclude")
     val exclude: kotlin.collections.List<kotlin.Long>? = null,
 

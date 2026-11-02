@@ -34,6 +34,9 @@ import app.marquee.api.models.Playlist
 import app.marquee.api.models.PlaylistCreate
 import app.marquee.api.models.PlaylistItemPage
 import app.marquee.api.models.PlaylistKind
+import app.marquee.api.models.PlaylistShareTarget
+import app.marquee.api.models.PlaylistSharing
+import app.marquee.api.models.PlaylistSharingUpdate
 import app.marquee.api.models.UpdatePlaylistRequest
 
 import kotlinx.serialization.SerialName
@@ -60,6 +63,79 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "/api/v1")
         }
+    }
+
+    /**
+     * PUT /me/playlist-shares/{playlistId}
+     * Accept a playlist shared with you. It joins your playlists, read-only (MUSIC-24).
+     * 
+     * @param playlistId 
+     * @return Playlist
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun acceptPlaylistShare(playlistId: kotlin.Long) : Playlist {
+        val localVarResponse = acceptPlaylistShareWithHttpInfo(playlistId = playlistId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Playlist
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /me/playlist-shares/{playlistId}
+     * Accept a playlist shared with you. It joins your playlists, read-only (MUSIC-24).
+     * 
+     * @param playlistId 
+     * @return ApiResponse<Playlist?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun acceptPlaylistShareWithHttpInfo(playlistId: kotlin.Long) : ApiResponse<Playlist?> {
+        val localVariableConfig = acceptPlaylistShareRequestConfig(playlistId = playlistId)
+
+        return request<Unit, Playlist>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation acceptPlaylistShare
+     *
+     * @param playlistId 
+     * @return RequestConfig
+     */
+    fun acceptPlaylistShareRequestConfig(playlistId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/me/playlist-shares/{playlistId}".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
     }
 
     /**
@@ -358,6 +434,149 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
     }
 
     /**
+     * GET /playlists/{playlistId}/shares
+     * Who your playlist is shared with (MUSIC-24).
+     * 
+     * @param playlistId 
+     * @return PlaylistSharing
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getPlaylistSharing(playlistId: kotlin.Long) : PlaylistSharing {
+        val localVarResponse = getPlaylistSharingWithHttpInfo(playlistId = playlistId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlaylistSharing
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /playlists/{playlistId}/shares
+     * Who your playlist is shared with (MUSIC-24).
+     * 
+     * @param playlistId 
+     * @return ApiResponse<PlaylistSharing?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getPlaylistSharingWithHttpInfo(playlistId: kotlin.Long) : ApiResponse<PlaylistSharing?> {
+        val localVariableConfig = getPlaylistSharingRequestConfig(playlistId = playlistId)
+
+        return request<Unit, PlaylistSharing>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getPlaylistSharing
+     *
+     * @param playlistId 
+     * @return RequestConfig
+     */
+    fun getPlaylistSharingRequestConfig(playlistId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/playlists/{playlistId}/shares".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /me/playlist-shares
+     * Playlists shared with you that you haven&#39;t accepted yet (MUSIC-24).
+     * 
+     * @return kotlin.collections.List<Playlist>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listPlaylistInvites() : kotlin.collections.List<Playlist> {
+        val localVarResponse = listPlaylistInvitesWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<Playlist>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /me/playlist-shares
+     * Playlists shared with you that you haven&#39;t accepted yet (MUSIC-24).
+     * 
+     * @return ApiResponse<kotlin.collections.List<Playlist>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listPlaylistInvitesWithHttpInfo() : ApiResponse<kotlin.collections.List<Playlist>?> {
+        val localVariableConfig = listPlaylistInvitesRequestConfig()
+
+        return request<Unit, kotlin.collections.List<Playlist>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listPlaylistInvites
+     *
+     * @return RequestConfig
+     */
+    fun listPlaylistInvitesRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/me/playlist-shares",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /playlists/{playlistId}/items
      * 
      * 
@@ -437,6 +656,76 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/playlists/{playlistId}/items".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /me/playlist-share-targets
+     * The people on this server you can share a playlist with (MUSIC-24).
+     * 
+     * @return kotlin.collections.List<PlaylistShareTarget>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listPlaylistShareTargets() : kotlin.collections.List<PlaylistShareTarget> {
+        val localVarResponse = listPlaylistShareTargetsWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<PlaylistShareTarget>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /me/playlist-share-targets
+     * The people on this server you can share a playlist with (MUSIC-24).
+     * 
+     * @return ApiResponse<kotlin.collections.List<PlaylistShareTarget>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listPlaylistShareTargetsWithHttpInfo() : ApiResponse<kotlin.collections.List<PlaylistShareTarget>?> {
+        val localVariableConfig = listPlaylistShareTargetsRequestConfig()
+
+        return request<Unit, kotlin.collections.List<PlaylistShareTarget>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listPlaylistShareTargets
+     *
+     * @return RequestConfig
+     */
+    fun listPlaylistShareTargetsRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/me/playlist-share-targets",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -667,6 +956,154 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/playlists/{playlistId}/items/{entryId}".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())).replace("{"+"entryId"+"}", encodeURIComponent(entryId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /me/playlist-shares/{playlistId}
+     * Decline a playlist shared with you, or remove it from your playlists. The owner&#39;s playlist is untouched; you need them to share it again to get it back (MUSIC-24).
+     * 
+     * @param playlistId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removePlaylistShare(playlistId: kotlin.Long) : Unit {
+        val localVarResponse = removePlaylistShareWithHttpInfo(playlistId = playlistId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /me/playlist-shares/{playlistId}
+     * Decline a playlist shared with you, or remove it from your playlists. The owner&#39;s playlist is untouched; you need them to share it again to get it back (MUSIC-24).
+     * 
+     * @param playlistId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removePlaylistShareWithHttpInfo(playlistId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = removePlaylistShareRequestConfig(playlistId = playlistId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removePlaylistShare
+     *
+     * @param playlistId 
+     * @return RequestConfig
+     */
+    fun removePlaylistShareRequestConfig(playlistId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/me/playlist-shares/{playlistId}".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /playlists/{playlistId}/shares
+     * Choose who your playlist is shared with (MUSIC-24). They see it once they accept, and can&#39;t change it.
+     * 
+     * @param playlistId 
+     * @param playlistSharingUpdate 
+     * @return PlaylistSharing
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun setPlaylistSharing(playlistId: kotlin.Long, playlistSharingUpdate: PlaylistSharingUpdate) : PlaylistSharing {
+        val localVarResponse = setPlaylistSharingWithHttpInfo(playlistId = playlistId, playlistSharingUpdate = playlistSharingUpdate)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlaylistSharing
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /playlists/{playlistId}/shares
+     * Choose who your playlist is shared with (MUSIC-24). They see it once they accept, and can&#39;t change it.
+     * 
+     * @param playlistId 
+     * @param playlistSharingUpdate 
+     * @return ApiResponse<PlaylistSharing?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun setPlaylistSharingWithHttpInfo(playlistId: kotlin.Long, playlistSharingUpdate: PlaylistSharingUpdate) : ApiResponse<PlaylistSharing?> {
+        val localVariableConfig = setPlaylistSharingRequestConfig(playlistId = playlistId, playlistSharingUpdate = playlistSharingUpdate)
+
+        return request<PlaylistSharingUpdate, PlaylistSharing>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setPlaylistSharing
+     *
+     * @param playlistId 
+     * @param playlistSharingUpdate 
+     * @return RequestConfig
+     */
+    fun setPlaylistSharingRequestConfig(playlistId: kotlin.Long, playlistSharingUpdate: PlaylistSharingUpdate) : RequestConfig<PlaylistSharingUpdate> {
+        val localVariableBody = playlistSharingUpdate
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/playlists/{playlistId}/shares".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

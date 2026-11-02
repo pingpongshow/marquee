@@ -20,6 +20,12 @@ type Playlist struct {
 	ImageIDs   []int64
 	UpdatedAt  time.Time
 	Rules      *SmartRules // smart playlists only
+	// Sharing (MUSIC-24). ReadOnly and OwnerName are set on someone else's playlist;
+	// SharedWithAll and ShareCount on the viewer's own.
+	ReadOnly      bool
+	OwnerName     string
+	SharedWithAll bool
+	ShareCount    int
 }
 
 type PlaylistEntry struct {
@@ -31,9 +37,13 @@ var leafTypes = map[string]string{"video": "'movie', 'episode', 'video'", "audio
 
 const playlistCols = `pl.id, pl.title, pl.kind, pl.updated_at, COALESCE(pl.smart_rule, ''), pl.user_id,
 	(SELECT COUNT(*) FROM playlist_items x WHERE x.playlist_id = pl.id),
-	(SELECT COALESCE(SUM(i.duration_ms), 0) FROM playlist_items x JOIN items i ON i.id = x.item_id WHERE x.playlist_id = pl.id)`
+	(SELECT COALESCE(SUM(i.duration_ms), 0) FROM playlist_items x JOIN items i ON i.id = x.item_id WHERE x.playlist_id = pl.id),
+	pl.shared_with_all, (SELECT display_name FROM users u WHERE u.id = pl.user_id),
+	(SELECT COUNT(*) FROM playlist_shares sh WHERE sh.playlist_id = pl.id AND sh.status IN ('pending', 'accepted'))`
 
-func (s *Store) scanPlaylists(ctx context.Context, q string, args ...any) ([]Playlist, error) {
+// scanPlaylists reads playlists as acc sees them: on someone else's playlist, only what acc
+// may see counts, and a smart one fills in from acc's own library and history.
+func (s *Store) scanPlaylists(ctx context.Context, acc Access, q string, args ...any) ([]Playlist, error) {
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -44,12 +54,18 @@ func (s *Store) scanPlaylists(ctx context.Context, q string, args ...any) ([]Pla
 		var p Playlist
 		var updated, rules string
 		var owner int64
-		if err := rows.Scan(&p.ID, &p.Title, &p.Kind, &updated, &rules, &owner, &p.ItemCount, &p.DurationMS); err != nil {
+		if err := rows.Scan(&p.ID, &p.Title, &p.Kind, &updated, &rules, &owner, &p.ItemCount, &p.DurationMS, &p.SharedWithAll, &p.OwnerName, &p.ShareCount); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		p.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
 		p.Rules = parseRules(rules)
+		p.ReadOnly = owner != acc.UserID
+		if p.ReadOnly {
+			p.SharedWithAll, p.ShareCount = false, 0
+		} else {
+			p.OwnerName = ""
+		}
 		owners = append(owners, owner)
 		out = append(out, p)
 	}
@@ -60,7 +76,11 @@ func (s *Store) scanPlaylists(ctx context.Context, q string, args ...any) ([]Pla
 	for i := range out {
 		if r := out[i].Rules; r != nil {
 			// Smart: work out the contents now.
-			list, total, err := s.SmartItems(ctx, Access{UserID: owners[i]}, out[i].Kind, *r, 0, 2000)
+			viewer := Access{UserID: owners[i]}
+			if out[i].ReadOnly {
+				viewer = acc
+			}
+			list, total, err := s.SmartItems(ctx, viewer, out[i].Kind, *r, 0, 2000)
 			if err != nil {
 				return nil, err
 			}
@@ -76,9 +96,17 @@ func (s *Store) scanPlaylists(ctx context.Context, q string, args ...any) ([]Pla
 			continue
 		}
 		out[i].ImageIDs = []int64{}
+		visible, vargs := "1", []any(nil)
+		if out[i].ReadOnly {
+			visible, vargs = acc.clause()
+			if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(SUM(i.duration_ms), 0)`+summaryFrom+` JOIN playlist_items x ON x.item_id = i.id
+				WHERE x.playlist_id = ? AND `+visible, append([]any{out[i].ID}, vargs...)...).Scan(&out[i].ItemCount, &out[i].DurationMS); err != nil {
+				return nil, err
+			}
+		}
 		err := eachRow(ctx, s.db, `SELECT DISTINCT `+art("poster", "i", "p", "g")+` AS a FROM playlist_items x JOIN items i ON i.id = x.item_id
 			LEFT JOIN items p ON p.id = i.parent_id LEFT JOIN items g ON g.id = i.grandparent_id
-			WHERE x.playlist_id = ? AND a IS NOT NULL ORDER BY x.ord LIMIT 4`, []any{out[i].ID}, func(r *sql.Rows) error {
+			WHERE x.playlist_id = ? AND a IS NOT NULL AND `+visible+` ORDER BY x.ord LIMIT 4`, append([]any{out[i].ID}, vargs...), func(r *sql.Rows) error {
 			var id int64
 			if err := r.Scan(&id); err != nil {
 				return err
@@ -93,20 +121,22 @@ func (s *Store) scanPlaylists(ctx context.Context, q string, args ...any) ([]Pla
 	return out, nil
 }
 
-// Playlists lists a user's playlists (kind "" = all), most recently changed first.
-func (s *Store) Playlists(ctx context.Context, uid int64, kind string) ([]Playlist, error) {
-	q := `SELECT ` + playlistCols + ` FROM playlists pl WHERE pl.user_id = ? AND pl.kind IN ('video', 'audio')`
-	args := []any{uid}
+// Playlists lists a user's playlists and those shared with them that they accepted (kind "" =
+// all), most recently changed first.
+func (s *Store) Playlists(ctx context.Context, acc Access, kind string) ([]Playlist, error) {
+	q := `SELECT ` + playlistCols + ` FROM playlists pl WHERE (pl.user_id = ? OR ` + acceptedShare + `) AND pl.kind IN ('video', 'audio')`
+	args := []any{acc.UserID, acc.UserID}
 	if kind != "" {
 		q += ` AND pl.kind = ?`
 		args = append(args, kind)
 	}
-	return s.scanPlaylists(ctx, q+` ORDER BY pl.updated_at DESC`, args...)
+	return s.scanPlaylists(ctx, acc, q+` ORDER BY pl.updated_at DESC`, args...)
 }
 
-// Playlist returns one of the user's playlists.
+// Playlist returns one of the user's own playlists: what may change it goes through here, so
+// a playlist shared with them is not found.
 func (s *Store) Playlist(ctx context.Context, uid, id int64) (Playlist, error) {
-	list, err := s.scanPlaylists(ctx, `SELECT `+playlistCols+` FROM playlists pl WHERE pl.id = ? AND pl.user_id = ?`, id, uid)
+	list, err := s.scanPlaylists(ctx, Access{UserID: uid}, `SELECT `+playlistCols+` FROM playlists pl WHERE pl.id = ? AND pl.user_id = ?`, id, uid)
 	if err != nil {
 		return Playlist{}, err
 	}
@@ -206,7 +236,7 @@ func (s *Store) AddToPlaylist(ctx context.Context, acc Access, id int64, itemIDs
 
 // PlaylistItems returns a page of a playlist's entries that acc can see.
 func (s *Store) PlaylistItems(ctx context.Context, acc Access, id int64, offset, limit int) ([]PlaylistEntry, int, error) {
-	pl, err := s.Playlist(ctx, acc.UserID, id)
+	pl, err := s.ReadablePlaylist(ctx, acc, id)
 	if err != nil {
 		return nil, 0, err
 	}

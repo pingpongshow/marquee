@@ -369,6 +369,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}/popular`.
     /// - Remark: Generated from `#/paths//items/{itemId}/popular/get(listPopularTracks)`.
     func listPopularTracks(_ input: Operations.ListPopularTracks.Input) async throws -> Operations.ListPopularTracks.Output
+    /// An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/top-songs`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/top-songs/get(listTopSongs)`.
+    func listTopSongs(_ input: Operations.ListTopSongs.Input) async throws -> Operations.ListTopSongs.Output
     /// Artwork resized to a cached width. Responses are immutable (a changed image gets a new id).
     ///
     /// Usable directly in <img> tags; authenticate with the `token` query parameter.
@@ -749,7 +754,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /downloads`.
     /// - Remark: Generated from `#/paths//downloads/get(listDownloads)`.
     func listDownloads(_ input: Operations.ListDownloads.Input) async throws -> Operations.ListDownloads.Output
-    /// Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server (one at a time) and become ready later.
+    /// Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server and become ready later (one video at a time, and one song at a time alongside it, so an album doesn't wait for a film).
     ///
     /// - Remark: HTTP `POST /downloads`.
     /// - Remark: Generated from `#/paths//downloads/post(createDownload)`.
@@ -1304,6 +1309,36 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /playlists/{playlistId}`.
     /// - Remark: Generated from `#/paths//playlists/{playlistId}/delete(deletePlaylist)`.
     func deletePlaylist(_ input: Operations.DeletePlaylist.Input) async throws -> Operations.DeletePlaylist.Output
+    /// Who your playlist is shared with (MUSIC-24).
+    ///
+    /// - Remark: HTTP `GET /playlists/{playlistId}/shares`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/shares/get(getPlaylistSharing)`.
+    func getPlaylistSharing(_ input: Operations.GetPlaylistSharing.Input) async throws -> Operations.GetPlaylistSharing.Output
+    /// Choose who your playlist is shared with (MUSIC-24). They see it once they accept, and can't change it.
+    ///
+    /// - Remark: HTTP `PUT /playlists/{playlistId}/shares`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/shares/put(setPlaylistSharing)`.
+    func setPlaylistSharing(_ input: Operations.SetPlaylistSharing.Input) async throws -> Operations.SetPlaylistSharing.Output
+    /// The people on this server you can share a playlist with (MUSIC-24).
+    ///
+    /// - Remark: HTTP `GET /me/playlist-share-targets`.
+    /// - Remark: Generated from `#/paths//me/playlist-share-targets/get(listPlaylistShareTargets)`.
+    func listPlaylistShareTargets(_ input: Operations.ListPlaylistShareTargets.Input) async throws -> Operations.ListPlaylistShareTargets.Output
+    /// Playlists shared with you that you haven't accepted yet (MUSIC-24).
+    ///
+    /// - Remark: HTTP `GET /me/playlist-shares`.
+    /// - Remark: Generated from `#/paths//me/playlist-shares/get(listPlaylistInvites)`.
+    func listPlaylistInvites(_ input: Operations.ListPlaylistInvites.Input) async throws -> Operations.ListPlaylistInvites.Output
+    /// Accept a playlist shared with you. It joins your playlists, read-only (MUSIC-24).
+    ///
+    /// - Remark: HTTP `PUT /me/playlist-shares/{playlistId}`.
+    /// - Remark: Generated from `#/paths//me/playlist-shares/{playlistId}/put(acceptPlaylistShare)`.
+    func acceptPlaylistShare(_ input: Operations.AcceptPlaylistShare.Input) async throws -> Operations.AcceptPlaylistShare.Output
+    /// Decline a playlist shared with you, or remove it from your playlists. The owner's playlist is untouched; you need them to share it again to get it back (MUSIC-24).
+    ///
+    /// - Remark: HTTP `DELETE /me/playlist-shares/{playlistId}`.
+    /// - Remark: Generated from `#/paths//me/playlist-shares/{playlistId}/delete(removePlaylistShare)`.
+    func removePlaylistShare(_ input: Operations.RemovePlaylistShare.Input) async throws -> Operations.RemovePlaylistShare.Output
     /// - Remark: HTTP `GET /playlists/{playlistId}/items`.
     /// - Remark: Generated from `#/paths//playlists/{playlistId}/items/get(listPlaylistItems)`.
     func listPlaylistItems(_ input: Operations.ListPlaylistItems.Input) async throws -> Operations.ListPlaylistItems.Output
@@ -1399,6 +1434,8 @@ public protocol APIProtocol: Sendable {
     /// - Remark: Generated from `#/paths//items/{itemId}/sounds-like/get(soundsLike)`.
     func soundsLike(_ input: Operations.SoundsLike.Input) async throws -> Operations.SoundsLike.Output
     /// A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
+    ///
+    /// Stations never run out: once everything that fits is in exclude, songs excluded longest ago come round again, so keep appending what comes back and asking when few are left. An artist, album or track without Soundprint analysis gets a station from its artist, similar artists and genres instead of a 409.
     ///
     /// - Remark: HTTP `POST /music/radio`.
     /// - Remark: Generated from `#/paths//music/radio/post(musicRadio)`.
@@ -2335,6 +2372,21 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/top-songs`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/top-songs/get(listTopSongs)`.
+    public func listTopSongs(
+        path: Operations.ListTopSongs.Input.Path,
+        query: Operations.ListTopSongs.Input.Query = .init(),
+        headers: Operations.ListTopSongs.Input.Headers = .init()
+    ) async throws -> Operations.ListTopSongs.Output {
+        try await listTopSongs(Operations.ListTopSongs.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
     /// Artwork resized to a cached width. Responses are immutable (a changed image gets a new id).
     ///
     /// Usable directly in <img> tags; authenticate with the `token` query parameter.
@@ -3265,7 +3317,7 @@ extension APIProtocol {
     public func listDownloads(headers: Operations.ListDownloads.Input.Headers = .init()) async throws -> Operations.ListDownloads.Output {
         try await listDownloads(Operations.ListDownloads.Input(headers: headers))
     }
-    /// Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server (one at a time) and become ready later.
+    /// Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server and become ready later (one video at a time, and one song at a time alongside it, so an album doesn't wait for a film).
     ///
     /// - Remark: HTTP `POST /downloads`.
     /// - Remark: Generated from `#/paths//downloads/post(createDownload)`.
@@ -4632,6 +4684,74 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Who your playlist is shared with (MUSIC-24).
+    ///
+    /// - Remark: HTTP `GET /playlists/{playlistId}/shares`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/shares/get(getPlaylistSharing)`.
+    public func getPlaylistSharing(
+        path: Operations.GetPlaylistSharing.Input.Path,
+        headers: Operations.GetPlaylistSharing.Input.Headers = .init()
+    ) async throws -> Operations.GetPlaylistSharing.Output {
+        try await getPlaylistSharing(Operations.GetPlaylistSharing.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Choose who your playlist is shared with (MUSIC-24). They see it once they accept, and can't change it.
+    ///
+    /// - Remark: HTTP `PUT /playlists/{playlistId}/shares`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/shares/put(setPlaylistSharing)`.
+    public func setPlaylistSharing(
+        path: Operations.SetPlaylistSharing.Input.Path,
+        headers: Operations.SetPlaylistSharing.Input.Headers = .init(),
+        body: Operations.SetPlaylistSharing.Input.Body
+    ) async throws -> Operations.SetPlaylistSharing.Output {
+        try await setPlaylistSharing(Operations.SetPlaylistSharing.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// The people on this server you can share a playlist with (MUSIC-24).
+    ///
+    /// - Remark: HTTP `GET /me/playlist-share-targets`.
+    /// - Remark: Generated from `#/paths//me/playlist-share-targets/get(listPlaylistShareTargets)`.
+    public func listPlaylistShareTargets(headers: Operations.ListPlaylistShareTargets.Input.Headers = .init()) async throws -> Operations.ListPlaylistShareTargets.Output {
+        try await listPlaylistShareTargets(Operations.ListPlaylistShareTargets.Input(headers: headers))
+    }
+    /// Playlists shared with you that you haven't accepted yet (MUSIC-24).
+    ///
+    /// - Remark: HTTP `GET /me/playlist-shares`.
+    /// - Remark: Generated from `#/paths//me/playlist-shares/get(listPlaylistInvites)`.
+    public func listPlaylistInvites(headers: Operations.ListPlaylistInvites.Input.Headers = .init()) async throws -> Operations.ListPlaylistInvites.Output {
+        try await listPlaylistInvites(Operations.ListPlaylistInvites.Input(headers: headers))
+    }
+    /// Accept a playlist shared with you. It joins your playlists, read-only (MUSIC-24).
+    ///
+    /// - Remark: HTTP `PUT /me/playlist-shares/{playlistId}`.
+    /// - Remark: Generated from `#/paths//me/playlist-shares/{playlistId}/put(acceptPlaylistShare)`.
+    public func acceptPlaylistShare(
+        path: Operations.AcceptPlaylistShare.Input.Path,
+        headers: Operations.AcceptPlaylistShare.Input.Headers = .init()
+    ) async throws -> Operations.AcceptPlaylistShare.Output {
+        try await acceptPlaylistShare(Operations.AcceptPlaylistShare.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Decline a playlist shared with you, or remove it from your playlists. The owner's playlist is untouched; you need them to share it again to get it back (MUSIC-24).
+    ///
+    /// - Remark: HTTP `DELETE /me/playlist-shares/{playlistId}`.
+    /// - Remark: Generated from `#/paths//me/playlist-shares/{playlistId}/delete(removePlaylistShare)`.
+    public func removePlaylistShare(
+        path: Operations.RemovePlaylistShare.Input.Path,
+        headers: Operations.RemovePlaylistShare.Input.Headers = .init()
+    ) async throws -> Operations.RemovePlaylistShare.Output {
+        try await removePlaylistShare(Operations.RemovePlaylistShare.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// - Remark: HTTP `GET /playlists/{playlistId}/items`.
     /// - Remark: Generated from `#/paths//playlists/{playlistId}/items/get(listPlaylistItems)`.
     public func listPlaylistItems(
@@ -4855,6 +4975,8 @@ extension APIProtocol {
         ))
     }
     /// A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
+    ///
+    /// Stations never run out: once everything that fits is in exclude, songs excluded longest ago come round again, so keep appending what comes back and asking when few are left. An artist, album or track without Soundprint analysis gets a station from its artist, similar artists and genres instead of a 409.
     ///
     /// - Remark: HTTP `POST /music/radio`.
     /// - Remark: Generated from `#/paths//music/radio/post(musicRadio)`.

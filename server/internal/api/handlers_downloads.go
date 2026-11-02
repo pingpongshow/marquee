@@ -39,7 +39,7 @@ func toAPIDownload(j downloads.Job) Download {
 	if j.Status == "ready" {
 		d.Size = nz(j.Size)
 		d.Url = ptr("/api/v1/download/job/" + j.ID)
-		d.FileName = ptr(j.ID + ".mp4")
+		d.FileName = ptr(filepath.Base(j.Path))
 	}
 	return d
 }
@@ -76,7 +76,7 @@ func (h *Handlers) CreateDownload(ctx context.Context, req CreateDownloadRequest
 		return CreateDownload200JSONResponse{Id: fmt.Sprintf("original-%d", id), ItemId: b.ItemId, Quality: DownloadQualityOriginal, Status: DownloadStatusReady, Progress: 1,
 			Size: &size, Url: ptr(fmt.Sprintf("/api/v1/download/original/%d?fileId=%d", b.ItemId, id)), FileName: ptr(filepath.Base(path))}, nil
 	}
-	j, err := h.Downloads.Create(ctx, sess.User.ID, b.ItemId, fileID, string(b.Quality))
+	j, err := h.Downloads.Create(ctx, sess.User.ID, sess.DeviceID, b.ItemId, fileID, string(b.Quality))
 	if err != nil {
 		return CreateDownload400JSONResponse{BadRequestJSONResponse(apiErr("invalid", err.Error()))}, nil
 	}
@@ -220,7 +220,7 @@ func (h *Handlers) DownloadFiles() http.Handler {
 				http.NotFound(w, r)
 				return
 			}
-			path, name = j.Path, j.ID+".mp4"
+			path, name = j.Path, filepath.Base(j.Path)
 		default:
 			http.NotFound(w, r)
 			return

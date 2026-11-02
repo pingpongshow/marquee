@@ -272,6 +272,23 @@ func (h *Handlers) ListPopularTracks(ctx context.Context, req ListPopularTracksR
 	return ListPopularTracks200JSONResponse(page(list, len(list), 0)), nil
 }
 
+func (h *Handlers) ListTopSongs(ctx context.Context, req ListTopSongsRequestObject) (ListTopSongsResponseObject, error) {
+	if _, ok := session(ctx); !ok {
+		return ListTopSongs401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); errors.Is(err, items.ErrNotFound) {
+		return ListTopSongs404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
+	} else if err != nil {
+		return nil, internal(ctx, "topSongs", err)
+	}
+	offset, limit := paging(req.Params.Offset, req.Params.Limit)
+	list, total, err := h.Items.TopSongs(ctx, access(ctx), req.ItemId, offset, limit)
+	if err != nil {
+		return nil, internal(ctx, "topSongs", err)
+	}
+	return ListTopSongs200JSONResponse(page(list, total, offset)), nil
+}
+
 func (h *Handlers) GetItem(ctx context.Context, req GetItemRequestObject) (GetItemResponseObject, error) {
 	s, ok := session(ctx)
 	if !ok {

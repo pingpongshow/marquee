@@ -41,6 +41,10 @@ import kotlinx.serialization.Contextual
  * @param imageIds Posters/covers of up to four items, for the playlist's mosaic.
  * @param updatedAt 
  * @param rules 
+ * @param readOnly Someone else's playlist, shared with you (MUSIC-24): you can play it or remove it from your playlists (DELETE /me/playlist-shares/{playlistId}), but not change it.
+ * @param ownerName Whose playlist this is. Set on playlists shared with you.
+ * @param sharedWithAll Your playlist is shared with everyone on the server.
+ * @param shareCount How many people your playlist is offered to or shared with by name.
  */
 @Serializable
 
@@ -69,7 +73,23 @@ data class Playlist (
     val updatedAt: java.time.OffsetDateTime,
 
     @SerialName(value = "rules")
-    val rules: SmartRules? = null
+    val rules: SmartRules? = null,
+
+    /* Someone else's playlist, shared with you (MUSIC-24): you can play it or remove it from your playlists (DELETE /me/playlist-shares/{playlistId}), but not change it. */
+    @SerialName(value = "readOnly")
+    val readOnly: kotlin.Boolean? = null,
+
+    /* Whose playlist this is. Set on playlists shared with you. */
+    @SerialName(value = "ownerName")
+    val ownerName: kotlin.String? = null,
+
+    /* Your playlist is shared with everyone on the server. */
+    @SerialName(value = "sharedWithAll")
+    val sharedWithAll: kotlin.Boolean? = null,
+
+    /* How many people your playlist is offered to or shared with by name. */
+    @SerialName(value = "shareCount")
+    val shareCount: kotlin.Int? = null
 
 ) {
 

@@ -220,7 +220,31 @@ func (h *Handlers) SoundsLike(ctx context.Context, req SoundsLikeRequestObject) 
 	return SoundsLike200JSONResponse(summaries(list)), nil
 }
 
+// radioRepeatGap is how many of the latest tracks stay out when a station comes round again.
+const radioRepeatGap = 50
+
+// MusicRadio builds a station. A station never ends (MUSIC-24): when everything that fits has
+// been queued (it comes back empty, or for some seeds as "nothing to build from"), it starts
+// again leaving out only what played last, then nothing at all (a very small library).
 func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) (MusicRadioResponseObject, error) {
+	res, err := h.musicRadio(ctx, req)
+	exclude := []int64(nil)
+	set(&exclude, req.Body.Exclude)
+	for _, keep := range []int{radioRepeatGap, 0} {
+		st, ok := res.(MusicRadio200JSONResponse)
+		_, none := res.(MusicRadio409JSONResponse)
+		if err != nil || (ok && len(st.Items) > 0) || (!ok && !none) || len(exclude) == 0 {
+			break
+		}
+		exclude = exclude[max(len(exclude)-keep, 0):]
+		body := *req.Body
+		body.Exclude = &exclude
+		res, err = h.musicRadio(ctx, MusicRadioRequestObject{Body: &body})
+	}
+	return res, err
+}
+
+func (h *Handlers) musicRadio(ctx context.Context, req MusicRadioRequestObject) (MusicRadioResponseObject, error) {
 	s, ok := session(ctx)
 	if !ok {
 		return MusicRadio401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
@@ -260,6 +284,16 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 			return MusicRadio400JSONResponse{BadRequestJSONResponse(apiErr("not_found", "item not found"))}, nil
 		}
 		st, err = h.Soundprint.RadioFromItem(ctx, d.ID, d.Title, o)
+		if errors.Is(err, soundprint.ErrNotAnalyzed) || errors.Is(err, soundprint.ErrUnavailable) {
+			// Without analysis: its artist, similar artists and genres.
+			ids, ferr := h.Items.RadioWithoutAnalysis(ctx, acc, d.ID, o.Exclude, o.Length)
+			if ferr != nil {
+				return nil, internal(ctx, "radio", ferr)
+			}
+			if len(ids) > 0 || len(o.Exclude) > 0 {
+				st, err = soundprint.Station{Title: d.Title + " Radio", IDs: ids}, nil
+			}
+		}
 		st.Context = "radio:item"
 	case RadioRequestSeedGenre:
 		ids, gerr := h.Items.TrackIDsByGenre(ctx, acc, value)

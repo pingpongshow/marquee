@@ -168,7 +168,7 @@ func (h *Handlers) pinnedRow(ctx context.Context, uid int64, id string, n int) (
 			return list, err
 		}}, true
 	case "playlist":
-		p, err := h.Items.Playlist(ctx, uid, ref)
+		p, err := h.Items.ReadablePlaylist(ctx, acc, ref)
 		if err != nil {
 			return homeRow{}, false
 		}
