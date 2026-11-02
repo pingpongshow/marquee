@@ -6,6 +6,7 @@ import { Alert, Spinner } from "@/components/ui";
 import { Poster } from "../browse/Poster";
 import { useMusicActions } from "../player/MusicPlayer";
 import { formatTrackTime } from "../browse/format";
+import { TrackRadioButton } from "./RadioButtons";
 import { useRadio } from "./useRadio";
 
 /** A mood or style (genre) of a music library (MUSIC-18): its radio, albums and a track sampler. */
@@ -151,14 +152,15 @@ export function MoodStylePage() {
         ) : (
           <ol className="divide-y divide-border rounded-lg bg-surface">
             {tracks.map((t, i) => (
-              <li key={t.id}>
+              <li key={t.id} className="flex items-center gap-1 pr-3 hover:bg-surface-2">
                 <button
                   onClick={() =>
                     music.play(tracks, i, {
                       source: `${value}${isMood ? "" : " Radio"}`,
+                      station: true,
                     })
                   }
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
+                  className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left"
                 >
                   <span className="w-6 text-right text-xs text-faint">
                     {i + 1}
@@ -183,6 +185,7 @@ export function MoodStylePage() {
                   </span>
                   <Play className="size-4 text-muted" aria-hidden />
                 </button>
+                <TrackRadioButton item={t} />
               </li>
             ))}
           </ol>

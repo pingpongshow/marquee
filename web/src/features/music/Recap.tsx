@@ -9,6 +9,7 @@ import { Alert, Button, Select, Spinner } from "@/components/ui";
 import { toast } from "@/components/Toast";
 import { useMusicActions } from "../player/MusicPlayer";
 import { ignoreShortcut } from "@/lib/keys";
+import { TrackRadioButton } from "./RadioButtons";
 import { recapYearsQuery } from "./RecapCard";
 
 const recapQuery = (year: number) => ({
@@ -99,6 +100,7 @@ function EntryRow({ e, rank, onPlay }: { e: RecapEntry; rank: number; onPlay?: (
           {nf(e.plays)} {e.plays === 1 ? "play" : "plays"}
         </div>
       </div>
+      {e.item.type === "track" && <TrackRadioButton item={e.item} className="p-2! text-white/80! hover:text-white!" />}
       {onPlay && (
         <button onClick={onPlay} className="rounded-full bg-white p-2.5 text-black hover:bg-amber-200" aria-label={`Play ${e.item.title}`}>
           <Play className="size-4 fill-current" />

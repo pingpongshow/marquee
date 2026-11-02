@@ -208,6 +208,38 @@ export function departure(
   return null;
 }
 
+/**
+ * What a thumbs down does to the queue (MUSIC-25). A station loses what's still to come of the song
+ * (under repeat, what has played comes round again, so that too) and moves on if it's playing. If
+ * nothing can follow, the song stays current: the caller stops it. An album or the listener's own
+ * playlist keeps the song and carries on.
+ */
+export function thumbsDown(q: Queue, itemId: number, station: boolean): Queue {
+  if (!station) return q;
+  const playing = current(q);
+  const dropped = new Set(
+    q.entries.filter(
+      (e, i) =>
+        e.item.id === itemId &&
+        e !== playing &&
+        (i > q.index || q.repeat !== "off"),
+    ),
+  );
+  const onPlaying = playing?.item.id === itemId;
+  if (!dropped.size && !onPlaying) return q;
+  const entries = q.entries.filter((e) => !dropped.has(e));
+  const out: Queue = {
+    ...q,
+    entries,
+    index: playing ? entries.indexOf(playing) : q.index,
+    original: q.original?.filter((e) => !dropped.has(e)) ?? null,
+  };
+  const following = onPlaying ? skipIndex(out) : -1;
+  return following >= 0 && following !== out.index
+    ? { ...out, index: following }
+    : out;
+}
+
 export function remove(q: Queue, key: number): Queue {
   const i = q.entries.findIndex((e) => e.key === key);
   if (i < 0) return q;

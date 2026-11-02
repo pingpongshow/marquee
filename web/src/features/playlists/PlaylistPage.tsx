@@ -97,7 +97,8 @@ export function PlaylistPage() {
 
   const play = (start: number, shuffle = false) => {
     if (p.kind === "audio") {
-      music.play(items, start, { shuffle, source: p.title });
+      // A smart playlist is generated: a thumbs down takes a song out of it (MUSIC-25).
+      music.play(items, start, { shuffle, source: p.title, station: !!p.rules });
       return;
     }
     // Video plays in the player, which goes on through the playlist in this order (the seed

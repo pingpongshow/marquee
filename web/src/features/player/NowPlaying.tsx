@@ -20,6 +20,7 @@ import {
   SlidersVertical,
   SkipForward,
   Star,
+  ThumbsDown,
   Volume2,
   X,
 } from "lucide-react";
@@ -299,8 +300,8 @@ export function MiniPlayer() {
 /** The playing track as it is now, not as it was queued (the queue holds a snapshot). */
 function useFreshTrack(item: ItemSummary): ItemSummary {
   const fresh = useQuery(itemQuery(item.id)).data;
-  // Both are left out when unset, so a cleared rating or heart mustn't fall back to the snapshot.
-  return fresh ? { ...item, favorite: fresh.favorite, userRating: fresh.userRating } : item;
+  // They're left out when unset, so a cleared rating, heart or thumbs down mustn't fall back to the snapshot.
+  return fresh ? { ...item, favorite: fresh.favorite, userRating: fresh.userRating, disliked: fresh.disliked } : item;
 }
 
 /** The queue row of the playing track, whose heart can be changed from the bar or Now Playing. */
@@ -336,7 +337,7 @@ function BarPopover({ label, trigger, className, children }: { label: string; tr
 const ratingText = (v?: number) => (v ? `Rated ${v / 2} star${v === 2 ? "" : "s"}` : "Not rated");
 
 /**
- * The bar's add to playlist, heart and rating for the playing track. They sit in the bar on a
+ * The bar's add to playlist, heart, and rating with its thumbs down for the playing track. They sit in the bar on a
  * wide screen; on a narrower one they're tucked behind one button so the title keeps its room.
  * Memoised: the bar redraws with the playhead.
  */
@@ -344,7 +345,7 @@ const BarTrackActions = memo(function BarTrackActions({ item }: { item: ItemSumm
   const t = useFreshTrack(item);
   // The track the dialog opened for, even if the music moves on while it's open.
   const [adding, setAdding] = useState<ItemSummary | null>(null);
-  const rating = <Rating key={t.id} itemId={t.id} value={t.userRating} label={ratingText} testId="bar-rating" />;
+  const rating = <Rating key={t.id} itemId={t.id} value={t.userRating} label={ratingText} testId="bar-rating" song={t} />;
   return (
     <>
       <div className="hidden items-center lg:flex" data-testid="bar-actions">
@@ -353,19 +354,23 @@ const BarTrackActions = memo(function BarTrackActions({ item }: { item: ItemSumm
         </button>
         <FavoriteButton key={t.id} item={t} />
         <BarPopover
-          label={t.userRating ? `Your rating: ${t.userRating / 2} stars` : "Rate this track"}
+          label={t.disliked ? "You gave this a thumbs down" : t.userRating ? `Your rating: ${t.userRating / 2} stars` : "Rate this track"}
           trigger={
-            <>
-              <Star className={clsx("size-5", t.userRating && "fill-accent text-accent")} aria-hidden />
-              {!!t.userRating && <span className="text-xs tabular-nums">{t.userRating / 2}</span>}
-            </>
+            t.disliked ? (
+              <ThumbsDown className="size-5 fill-accent text-accent" aria-hidden />
+            ) : (
+              <>
+                <Star className={clsx("size-5", t.userRating && "fill-accent text-accent")} aria-hidden />
+                {!!t.userRating && <span className="text-xs tabular-nums">{t.userRating / 2}</span>}
+              </>
+            )
           }
         >
           {rating}
         </BarPopover>
       </div>
       <BarPopover label="Add to playlist, favourite or rate" trigger={<MoreHorizontal className="size-5" />} className="lg:hidden">
-        <div className="w-56 space-y-1" data-testid="bar-actions-tucked">
+        <div className="w-68 space-y-1" data-testid="bar-actions-tucked">
           <div className="flex items-center justify-between gap-2 px-2 py-1">
             <span className="text-sm">Your rating</span>
             {rating}
@@ -688,8 +693,11 @@ export function NowPlaying() {
           </div>
           <Controls large />
           <div className="flex flex-wrap items-center justify-center gap-6">
-            <NowPlayingRating key={t.id} item={t} />
-            <NowPlayingFavorite key={`fav-${t.id}`} item={t} />
+            {/* The stars' thumbs down stays beside the heart however this wraps. */}
+            <div className="flex items-center gap-1">
+              <NowPlayingRating key={t.id} item={t} />
+              <NowPlayingFavorite key={`fav-${t.id}`} item={t} />
+            </div>
             <Volume className="flex" />
             <CrossfadeSelect />
             <DJSelect />
@@ -707,9 +715,10 @@ export function NowPlaying() {
   );
 }
 
-/** The playing track's stars, from the track's current state. */
+/** The playing track's stars and thumbs down, from the track's current state. */
 function NowPlayingRating({ item }: { item: ItemSummary }) {
-  return <Rating itemId={item.id} value={useFreshTrack(item).userRating} />;
+  const t = useFreshTrack(item);
+  return <Rating itemId={t.id} value={t.userRating} song={t.type === "track" ? t : undefined} thumbClassName="hover:bg-white/10" />;
 }
 
 /** The playing track's heart, from the track's current state. */

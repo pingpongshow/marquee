@@ -28,7 +28,7 @@ export function ItemRatings({ item }: { item: ItemDetail }) {
     <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium tracking-wide text-muted uppercase">Your rating</span>
-        <Rating key={item.id} itemId={item.id} value={item.userRating} />
+        <Rating key={item.id} itemId={item.id} value={item.userRating} song={item.type === "track" ? item : undefined} />
       </div>
       {reviewable(item.type) && (
         <button type="button" onClick={open} className="flex items-center gap-2 rounded-md text-left hover:text-text" data-testid="community-rating">
@@ -93,7 +93,7 @@ export function Reviews({ item }: { item: ItemDetail }) {
       <div className="rounded-lg border border-border bg-surface p-4">
         <div className="mb-2 flex items-center gap-3">
           <span className="text-sm font-medium">Your rating</span>
-          <Rating itemId={item.id} value={item.userRating} size="sm" label="Rate it" />
+          <Rating itemId={item.id} value={item.userRating} size="sm" label="Rate it" song={item.type === "track" ? item : undefined} />
         </div>
         <textarea
           aria-label="Your comment"

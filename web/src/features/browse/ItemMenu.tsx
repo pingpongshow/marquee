@@ -9,6 +9,7 @@ import { fetchLeaves, meQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import { Menu, MenuDivider, MenuItem } from "@/components/Menu";
 import { JourneyDialog } from "../music/Journey";
+import { useSetDisliked } from "../music/Rating";
 import { useRadio } from "../music/useRadio";
 import { AddToPlaylistDialog } from "../playlists/AddToPlaylist";
 import { useMusicActions } from "../player/MusicPlayer";
@@ -61,6 +62,7 @@ export function ItemMenu({
   });
   const notInterested = useNotInterested();
   const setFavorite = useSetFavorite();
+  const setDisliked = useSetDisliked();
   const isMusic = music.has(item.type);
   const leaves = async () => (item.type === "track" ? [item] : await fetchLeaves(item.id));
   // Runs a menu action that loads tracks first; a failed load shows instead of vanishing.
@@ -121,6 +123,11 @@ export function ItemMenu({
         {favoriteTypes.has(item.type) && (
           <MenuItem icon={item.favorite ? <HeartOff /> : <Heart />} onClick={() => setFavorite.mutate({ itemId: item.id, on: !item.favorite })}>
             {item.favorite ? "Remove from favourites" : "Add to favourites"}
+          </MenuItem>
+        )}
+        {item.type === "track" && (
+          <MenuItem icon={<ThumbsDown className={clsx(item.disliked && "fill-current")} />} onClick={() => setDisliked.mutate({ itemId: item.id, on: !item.disliked })}>
+            {item.disliked ? "Take back thumbs down" : "Thumbs down"}
           </MenuItem>
         )}
         {watchable.has(item.type) && (

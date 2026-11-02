@@ -29,7 +29,8 @@ export type DJMode = "wander" | "superfan" | "deep_cuts" | "same_era";
 /** Older stored DJ mode names, carried over to the current ones. */
 const legacyDJ: Record<string, DJMode> = { stretch: "wander", groupie: "superfan", contempo: "same_era" };
 /** context is the station's or mix's Station.context, sent with each play (MUSIC-17). */
-export type Source = { title: string; radio?: RadioRequest; context?: string };
+/** station: a generated list (a radio, mix, Muse, Journey…), which a thumbs-down song leaves at once. */
+export type Source = { title: string; radio?: RadioRequest; context?: string; station?: boolean };
 
 /** Player state that changes on track/queue/setting changes, not with the playhead. */
 type State = {
@@ -72,8 +73,10 @@ type Actions = {
   play: (
     tracks: ItemSummary[],
     start?: number,
-    opts?: { shuffle?: boolean; source?: string },
+    opts?: { shuffle?: boolean; source?: string; station?: boolean },
   ) => void;
+  /** A song got a thumbs down: a station moves past it and loses what's left of it (MUSIC-25). */
+  thumbsDown: (itemId: number) => void;
   playNext: (tracks: ItemSummary[]) => void;
   addToQueue: (tracks: ItemSummary[]) => void;
   remove: (key: number) => void;
@@ -481,8 +484,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const stalledRetry = useRef<number | undefined>(undefined);
   const [topUpTries, setTopUpTries] = useState(0);
   const onRadio = useRef(false);
+  const onStation = useRef(false);
   useEffect(() => {
     onRadio.current = !!source?.radio;
+    onStation.current = !!source?.station;
   }, [source]);
   const stall = useCallback(() => {
     stalled.current = true;
@@ -931,7 +936,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       playStation: (station, radio) => {
         unload(1 - active.current);
         resetSteer();
-        setSource({ title: station.title, radio, context: station.context });
+        setSource({ title: station.title, radio, context: station.context, station: true });
         setQueue((q) => Q.load(q, station.items, 0, false, Math.random, station.context));
       },
       setCrossfade: (s) => {
@@ -958,9 +963,32 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       },
       play: (tracks, start = 0, opts) => {
         unload(1 - active.current);
-        setSource(opts?.source ? { title: opts.source } : undefined);
+        setSource(opts?.source ? { title: opts.source, station: opts.station } : undefined);
         resetSteer();
         setQueue((q) => Q.load(q, tracks, start, opts?.shuffle));
+      },
+      thumbsDown: (itemId) => {
+        const q = queueRef.current;
+        const nq = Q.thumbsDown(q, itemId, onStation.current);
+        if (nq === q) return;
+        // A top-up on its way may have been chosen before the server knew. Drop it: if the queue
+        // is near its end, this change asks again.
+        stationGen.current++;
+        refilling.current = false;
+        const idle = 1 - active.current;
+        const pre = loaded.current[idle];
+        if (pre && !nq.entries.some((e) => e.key === pre.key)) unload(idle);
+        const playing = Q.current(q)?.item.id === itemId;
+        // Steers the station as a quick skip, however far the song had got.
+        if (playing) progress.current = { ...progress.current, time: 0 };
+        queueRef.current = nq;
+        setQueue(nq);
+        if (playing && Q.current(nq)?.item.id === itemId) {
+          // Nothing to move on to: it mustn't keep playing. A radio carries on when more arrives.
+          userPaused.current = true;
+          activeEl()?.pause();
+          if (onRadio.current) stall();
+        }
       },
       playNext: (tracks) => {
         unload(1 - active.current); // the preloaded "next" track may have changed
@@ -1004,7 +1032,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setExpanded,
       close,
     }),
-    [unload, applyGain, next, prev, toggle, activeEl, close],
+    [unload, applyGain, next, prev, toggle, activeEl, close, stall],
   );
 
   const state = useMemo(

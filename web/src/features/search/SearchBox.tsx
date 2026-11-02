@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { imageUrl } from "@/api/client";
 import { searchQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
+import { TrackRadioButton } from "../music/RadioButtons";
 
 export const groupLabels: Record<string, string> = { movie: "Movies", show: "Shows", episode: "Episodes", artist: "Artists", album: "Albums", track: "Tracks", video: "Videos" };
 
@@ -80,15 +81,18 @@ export function SearchBox() {
             <div key={g.type} className="py-1">
               <div className="px-4 py-1 text-[11px] font-semibold tracking-wider text-faint uppercase">{groupLabels[g.type]}</div>
               {g.items.map((it) => (
-                <button key={it.id} onClick={() => go(it)} className="flex w-full items-center gap-3 px-4 py-1.5 text-left hover:bg-surface-2">
-                  <span className="h-12 w-8 shrink-0 overflow-hidden rounded bg-surface-3">
-                    {it.images?.poster && <img src={imageUrl(it.images.poster, 40)} alt="" loading="lazy" className="size-full object-cover" />}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm">{it.title}</span>
-                    <span className="block truncate text-xs text-muted">{resultSubtitle(it)}</span>
-                  </span>
-                </button>
+                <div key={it.id} className="flex items-center hover:bg-surface-2">
+                  <button onClick={() => go(it)} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-1.5 text-left">
+                    <span className="h-12 w-8 shrink-0 overflow-hidden rounded bg-surface-3">
+                      {it.images?.poster && <img src={imageUrl(it.images.poster, 40)} alt="" loading="lazy" className="size-full object-cover" />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm">{it.title}</span>
+                      <span className="block truncate text-xs text-muted">{resultSubtitle(it)}</span>
+                    </span>
+                  </button>
+                  {it.type === "track" && <TrackRadioButton item={it} className="mr-3" />}
+                </div>
               ))}
             </div>
           ))}
