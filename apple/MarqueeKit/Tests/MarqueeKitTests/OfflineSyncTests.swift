@@ -64,6 +64,31 @@ struct PendingQueueTests {
         #expect(q.count(server: "b", user: 1) == 2)
     }
 
+    @Test func aThumbsDownWaitsAndTheLatestLikeTakesItBack() {
+        var q = PendingQueue()
+        func waiting(_ item: Int64 = 7) -> Bool? { q.dislike(item: item, server: "a", user: 1) }
+        #expect(waiting() == nil)
+        q.add(tagged(.dislike(7, true), at: 1))
+        #expect(waiting() == true)
+        #expect(q.dislike(item: 7, server: "a", user: 2) == nil)
+        // A low rating and a removed heart don't take it back.
+        q.add(tagged(.rating(7, 2), at: 2))
+        q.add(tagged(.favorite(7, false), at: 3))
+        #expect(waiting() == true)
+        // A later heart does, and a later thumbs down gives it back.
+        q.add(tagged(.favorite(7, true), at: 4))
+        #expect(waiting() == false)
+        q.add(tagged(.dislike(7, true), at: 5))
+        #expect(waiting() == true)
+        // A later high rating does too.
+        q.add(tagged(.rating(7, 8), at: 6))
+        #expect(waiting() == false)
+        // A taken-back thumbs down is off, and doesn't reach another song.
+        q.add(tagged(.dislike(8, false), at: 7))
+        #expect(waiting(8) == false)
+        #expect(waiting(9) == nil)
+    }
+
     @Test func sendsInTheOrderChangesWereMade() {
         var q = PendingQueue()
         q.add(tagged(.watched(1, true), at: 1))

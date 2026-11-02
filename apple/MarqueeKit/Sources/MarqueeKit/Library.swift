@@ -144,14 +144,11 @@ public extension AppSession {
         try await OfflineSync.shared.submit(.favorite(id, on))
     }
 
-    /// Gives a song this person's thumbs down, or takes it back (MUSIC-25). Needs the server: it
-    /// isn't kept to sync later, so the control is hidden while offline.
-    func setDisliked(_ id: Int64, _ on: Bool) async throws {
-        if on {
-            _ = try await api.addDislike(path: .init(itemId: id)).noContent
-        } else {
-            _ = try await api.removeDislike(path: .init(itemId: id)).noContent
-        }
+    /// Gives a song this person's thumbs down, or takes it back (MUSIC-25). Kept to send later
+    /// when the server can't be reached (USER-18). Returns true when the server took it.
+    @discardableResult
+    func setDisliked(_ id: Int64, _ on: Bool) async throws -> Bool {
+        try await OfflineSync.shared.submit(.dislike(id, on))
     }
 
     func watchlist() async throws -> [Item] { try await api.getWatchlist().ok.body.json }

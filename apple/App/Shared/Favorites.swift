@@ -61,17 +61,12 @@ final class DislikeStore {
     /// The rating (0–10) from which a song can't also have a thumbs down: 3.5 stars.
     static let highRating = 7.0
 
-    /// Whether it's on offer: for songs, and only while the server can be reached (it isn't kept
-    /// to sync later).
-    static func canDislike(_ item: Item, app: AppSession) -> Bool { item._type == .track && !app.isOffline }
+    /// Whether it's on offer: for songs. Made offline, it's kept to send later (USER-18).
+    static func canDislike(_ item: Item) -> Bool { item._type == .track }
 
-    /// This session's change or what the server sent. A heart or high rating waiting to sync
-    /// (USER-18) has already taken it back.
+    /// This session's change, what's waiting to sync (USER-18), or what the server sent.
     func isDisliked(_ id: Int64, _ fallback: Bool?) -> Bool {
-        if let o = overrides[id] { return o }
-        if OfflineSync.shared.pendingFavorite(id) == true { return false }
-        if let pending = OfflineSync.shared.pendingRating(id), (pending ?? 0) >= Self.highRating { return false }
-        return fallback ?? false
+        overrides[id] ?? OfflineSync.shared.pendingDislike(id) ?? fallback ?? false
     }
 
     func isDisliked(_ item: Item) -> Bool { isDisliked(item.id, item.disliked) }
@@ -121,7 +116,7 @@ struct ThumbsDownMenuItem: View {
     let item: Item
 
     var body: some View {
-        if DislikeStore.canDislike(item, app: app) {
+        if DislikeStore.canDislike(item) {
             let on = DislikeStore.shared.isDisliked(item)
             Button { DislikeStore.shared.set(item, !on, app: app, music: music) } label: {
                 Label(on ? "Take Back Thumbs Down" : "Thumbs Down", systemImage: on ? "hand.thumbsdown.fill" : "hand.thumbsdown")
@@ -142,7 +137,7 @@ struct RowDislike: View {
     var identifier: String?
 
     var body: some View {
-        if DislikeStore.canDislike(item, app: app) {
+        if DislikeStore.canDislike(item) {
             let on = DislikeStore.shared.isDisliked(item)
             Button { DislikeStore.shared.set(item, !on, app: app, music: music) } label: {
                 Image(systemName: on ? "hand.thumbsdown.fill" : "hand.thumbsdown")

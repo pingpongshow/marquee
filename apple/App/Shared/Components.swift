@@ -361,7 +361,7 @@ struct RowRating: View {
         Menu {
             // First: at the mini player the menu opens upwards in reverse order, and as the last
             // entry this scrolled out of sight behind the ratings.
-            if DislikeStore.canDislike(item, app: app) {
+            if DislikeStore.canDislike(item) {
                 ThumbsDownMenuItem(item: item)
                 Divider()
             }

@@ -122,6 +122,49 @@ final class OfflineSyncUITests: XCTestCase {
     /// Offline: rate a track, mark a movie watched and add it to the watchlist. The page keeps
     /// the new values, Settings counts 3 waiting; reconnected (relaunched without the offline
     /// switch), they reach the server and the row goes.
+    /// A thumbs down made offline shows at once, waits, and reaches the server on reconnecting.
+    func testThumbsDownMadeOfflineSyncsOnReconnect() throws {
+        let user = try temporaryUser()
+        let music = try library("music", "Music")
+        let tracks = (try api("GET", "/libraries/\(music)/items?type=track&limit=500") as? [String: Any])?["items"] as? [[String: Any]]
+        let track = try XCTUnwrap(tracks?.first { $0["title"] as? String == "Floating 1" }?["id"] as? Int)
+        signIn(user.name, user.password)
+
+        openLibrary("Music")
+        let shortcut = app.buttons["musicShowLibrary"]
+        XCTAssertTrue(shortcut.waitForExistence(timeout: 15))
+        shortcut.tap()
+        let albums = app.buttons["musicLibrary.albums"]
+        for _ in 0..<10 where !(albums.exists && albums.isHittable) { app.swipeUp() }
+        albums.tap()
+        let album = app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch
+        for _ in 0..<4 where !album.waitForExistence(timeout: 2) { app.swipeUp() }
+        album.tap()
+        let row = app.buttons["rowRating.\(track)"]
+        for _ in 0..<4 where !(row.exists && row.isHittable) { app.swipeUp() }
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        let give = app.buttons["Thumbs Down"].firstMatch
+        XCTAssertTrue(give.waitForExistence(timeout: 5))
+        give.tap()
+        sleep(2)
+        XCTAssertFalse(app.alerts.firstMatch.exists, "no error: it's kept to send later")
+        row.tap()
+        XCTAssertTrue(app.buttons["Take Back Thumbs Down"].firstMatch.waitForExistence(timeout: 5), "it shows as given")
+        shot("os5-thumbs-down-offline")
+        let before = try api("GET", "/items/\(track)", token: user.token) as? [String: Any] ?? [:]
+        XCTAssertNotEqual(before["disliked"] as? Bool, true, "not on the server yet")
+
+        app.terminate()
+        app.launchArguments = []
+        app.launch()
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 20))
+        let synced = try eventually {
+            (try api("GET", "/items/\(track)", token: user.token) as? [String: Any] ?? [:])["disliked"] as? Bool == true
+        }
+        XCTAssertTrue(synced, "the thumbs down reached the server")
+    }
+
     func testChangesMadeOfflineSyncOnReconnect() throws {
         let user = try temporaryUser()
         let music = try library("music", "Music")

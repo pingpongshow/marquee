@@ -9,7 +9,7 @@ import OpenAPIRuntime
 /// person it belongs to, and the time it was made, which the server uses to ignore it when a
 /// newer change of the same kind was made elsewhere.
 public struct PendingChange: Codable, Equatable, Sendable {
-    public enum Kind: String, Codable, Sendable { case rating, watched, watchlist, favorite, comment, progress }
+    public enum Kind: String, Codable, Sendable { case rating, watched, watchlist, favorite, dislike, comment, progress }
 
     public var kind: Kind
     public var itemID: Int64
@@ -20,7 +20,8 @@ public struct PendingChange: Codable, Equatable, Sendable {
     public var user: Int64?
     /// rating: 0–10, nil clears.
     public var rating: Double?
-    /// watched: true = watched; watchlist: true = on the list; favorite: true = a favourite.
+    /// watched: true = watched; watchlist: true = on the list; favorite: true = a favourite;
+    /// dislike: true = a thumbs down.
     public var on: Bool?
     /// comment: the text ("" removes it), or nil with `reviewUser` to delete that person's review.
     public var comment: String?
@@ -49,6 +50,7 @@ public struct PendingChange: Codable, Equatable, Sendable {
     public static func watched(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .watched, itemID: item, on: on) }
     public static func watchlist(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .watchlist, itemID: item, on: on) }
     public static func favorite(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .favorite, itemID: item, on: on) }
+    public static func dislike(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .dislike, itemID: item, on: on) }
     public static func comment(_ item: Int64, _ text: String) -> PendingChange { .init(kind: .comment, itemID: item, comment: text) }
     public static func deleteReview(_ item: Int64, user: Int64) -> PendingChange { .init(kind: .comment, itemID: item, reviewUser: user) }
     public static func progress(_ item: Int64, positionMs: Int64, watched: Bool) -> PendingChange {
@@ -105,6 +107,16 @@ public struct PendingQueue: Codable, Equatable, Sendable {
         entries.last { $0.kind == kind && $0.itemID == item && $0.belongs(server: server, user: user) }
     }
 
+    /// Whether what's waiting leaves a song with a thumbs down: the latest of a thumbs down, a
+    /// heart or a rating of 3.5 stars or more (each takes back the others); nil when none waits.
+    public func dislike(item: Int64, server: String, user: Int64) -> Bool? {
+        func newest(_ kind: PendingChange.Kind) -> PendingChange? { latest(kind, item: item, server: server, user: user) }
+        let thumbs = newest(.dislike).map { (at: $0.at, on: $0.on == true) }
+        let heart = newest(.favorite).flatMap { $0.on == true ? (at: $0.at, on: false) : nil }
+        let rating = newest(.rating).flatMap { ($0.rating ?? 0) >= 7 ? (at: $0.at, on: false) : nil }
+        return [thumbs, heart, rating].compactMap { $0 }.max { $0.at < $1.at }?.on
+    }
+
     /// Removes a change once the server took it or rejected it for good; keeps it otherwise.
     public mutating func resolve(_ change: PendingChange, _ outcome: SyncOutcome) {
         guard outcome != .keep, let i = entries.firstIndex(of: change) else { return }
@@ -140,7 +152,7 @@ struct OfflineChangesMiddleware: ClientMiddleware {
     static let operations: Set<String> = [
         Operations.RateItem.id, Operations.MarkWatched.id, Operations.MarkUnwatched.id,
         Operations.AddToWatchlist.id, Operations.RemoveFromWatchlist.id,
-        Operations.AddFavorite.id, Operations.RemoveFavorite.id,
+        Operations.AddFavorite.id, Operations.RemoveFavorite.id, Operations.AddDislike.id, Operations.RemoveDislike.id,
         Operations.SetReview.id, Operations.DeleteReview.id, Operations.SyncProgress.id,
     ]
     func intercept(_ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String,
@@ -248,6 +260,11 @@ public final class OfflineSync {
     public func pendingWatchlist(_ item: Int64) -> Bool? { latest(.watchlist, item)?.on }
 
     public func pendingFavorite(_ item: Int64) -> Bool? { latest(.favorite, item)?.on }
+
+    public func pendingDislike(_ item: Int64) -> Bool? {
+        guard let s = scope else { return nil }
+        return queue.dislike(item: item, server: s.server, user: s.user)
+    }
 
     /// A waiting comment of your own ("" = removed).
     public func pendingComment(_ item: Int64) -> String? {
@@ -424,6 +441,22 @@ public final class OfflineSync {
                 }
             }
             switch try await client.removeFavorite(path: .init(itemId: c.itemID), query: .init(at: c.at)) {
+            case .noContent: return (204, nil)
+            case .unauthorized: return (401, nil)
+            case .notFound: return (404, nil)
+            case let .undocumented(code, _): return (code, nil)
+            }
+        case .dislike:
+            if c.on == true {
+                switch try await client.addDislike(path: .init(itemId: c.itemID), query: .init(at: c.at)) {
+                case .noContent: return (204, nil)
+                case let .badRequest(r): return (400, try? r.body.json.message)
+                case .unauthorized: return (401, nil)
+                case .notFound: return (404, nil)
+                case let .undocumented(code, _): return (code, nil)
+                }
+            }
+            switch try await client.removeDislike(path: .init(itemId: c.itemID), query: .init(at: c.at)) {
             case .noContent: return (204, nil)
             case .unauthorized: return (401, nil)
             case .notFound: return (404, nil)
