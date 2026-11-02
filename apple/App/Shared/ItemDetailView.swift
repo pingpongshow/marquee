@@ -859,9 +859,7 @@ struct TrackRow: View {
                     Button { onMove(track) } label: { Label("Move to Album…", systemImage: "square.stack") }
                 }
             }
-            #if os(iOS)
             TrackRadioButton(track: track)
-            #endif
             RowFavorite(item: track)
             RowRating(item: track, gap: isTV ? 8 : 4)
         }

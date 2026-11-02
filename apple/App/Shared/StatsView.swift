@@ -34,7 +34,7 @@ struct StatsView: View {
                     }
                     top("Top artists", s.artists)
                     top("Top albums", s.albums)
-                    top("Top tracks", s.tracks)
+                    top("Top tracks", s.tracks, trackRadio: true)
                     top("Top movies", s.movies)
                     top("Top shows", s.shows)
                 }
@@ -50,11 +50,18 @@ struct StatsView: View {
         }
     }
 
-    @ViewBuilder private func top(_ title: String, _ list: [Schemas.StatsCount]) -> some View {
+    @ViewBuilder private func top(_ title: String, _ list: [Schemas.StatsCount], trackRadio: Bool = false) -> some View {
         if !list.isEmpty {
             Section(title) {
                 ForEach(Array(list.enumerated()), id: \.offset) { i, c in
-                    row(i, c)
+                    if trackRadio, let id = c.id {
+                        HStack(spacing: 4) {
+                            row(i, c)
+                            TrackRadioButton(trackID: id)
+                        }
+                    } else {
+                        row(i, c)
+                    }
                 }
             }
         }

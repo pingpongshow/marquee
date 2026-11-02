@@ -128,6 +128,7 @@ struct RootView: View {
         WatchStore.shared.reset()
         RatingStore.shared.reset()
         FavoriteStore.shared.reset()
+        DislikeStore.shared.reset()
         WatchlistStore.shared.reset()
         VodSuggestionHides.shared.reset()
         SearchText.shared.query = ""

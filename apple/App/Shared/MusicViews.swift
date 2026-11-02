@@ -528,6 +528,7 @@ struct MoodStyleView: View {
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
+                                TrackRadioButton(track: t)
                                 RowRating(item: t)
                             }
                         }

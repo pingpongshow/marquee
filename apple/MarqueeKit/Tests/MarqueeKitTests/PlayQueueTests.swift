@@ -234,3 +234,86 @@ private func ids(_ q: PlayQueue) -> [Int64] { q.entries.map(\.item.id) }
     #expect(q.stationExclude().count == 2000)
     #expect(q.stationExclude().first == 501)
 }
+
+// MARK: - A thumbs down on a station (MUSIC-25)
+
+@Test func thumbsDownOnPlayingSongMovesOnAndRemovesCopies() {
+    var q = PlayQueue()
+    q.load([track(1), track(2), track(3), track(2), track(4)], start: 1)
+    #expect(q.removeAll(of: 2) == false)
+    #expect(ids(q) == [1, 3, 4])
+    #expect(q.current?.item.id == 3)
+    #expect(q.upcoming.map(\.item.id) == [4])
+}
+
+@Test func thumbsDownOnAnotherSongKeepsThePlayingOne() {
+    var q = PlayQueue()
+    q.load([track(1), track(2), track(3), track(4), track(1)], start: 2)
+    #expect(q.removeAll(of: 1) == false)
+    #expect(ids(q) == [2, 3, 4])
+    #expect(q.current?.item.id == 3)
+}
+
+@Test func thumbsDownOnSongNotQueuedChangesNothing() {
+    var q = PlayQueue()
+    q.load([track(1), track(2)], start: 1)
+    #expect(q.removeAll(of: 9) == false)
+    #expect(ids(q) == [1, 2])
+    #expect(q.current?.item.id == 2)
+}
+
+@Test func thumbsDownOnLastTrackSaysNothingTookItsPlace() {
+    var q = PlayQueue()
+    q.load([track(1), track(2)], start: 1)
+    #expect(q.removeAll(of: 2) == true)
+    #expect(ids(q) == [1])
+
+    var only = PlayQueue()
+    only.load([track(1), track(1)])
+    #expect(only.removeAll(of: 1) == true)
+    #expect(only.entries.isEmpty)
+    #expect(only.current == nil)
+}
+
+@Test func thumbsDownCantComeRoundAgainOnRepeatAll() {
+    var q = PlayQueue()
+    q.load([track(5), track(1), track(5), track(2), track(5)], start: 2)
+    q.cycleRepeat()
+    #expect(q.repeatMode == .all)
+    #expect(q.removeAll(of: 5) == false)
+    #expect(ids(q) == [1, 2])
+    #expect(q.current?.item.id == 2)
+    // The last track playing: wraps to the start rather than ending.
+    #expect(q.removeAll(of: 2) == false)
+    #expect(ids(q) == [1])
+    #expect(q.current?.item.id == 1)
+}
+
+@Test func thumbsDownDoesntHoldOnRepeatOne() {
+    var q = PlayQueue()
+    q.load([track(1), track(2)])
+    q.cycleRepeat()
+    q.cycleRepeat()
+    #expect(q.repeatMode == .one)
+    #expect(q.removeAll(of: 1) == false)
+    #expect(q.current?.item.id == 2)
+}
+
+@Test func thumbsDownCantComeBackByTurningShuffleOff() {
+    var q = PlayQueue()
+    q.load([track(1), track(2), track(3), track(2), track(4)], start: 1)
+    q.toggleShuffle()
+    #expect(q.current?.item.id == 2)
+    #expect(q.removeAll(of: 2) == false)
+    #expect(!ids(q).contains(2))
+    q.toggleShuffle()
+    #expect(ids(q) == [1, 3, 4])
+    #expect(q.current != nil)
+}
+
+@Test @MainActor func onlyAStationIsASource() {
+    #expect(!MusicPlayer.Source(title: "An Album").isStation)
+    #expect(MusicPlayer.Source(title: "Mood", context: "mood:calm").isStation)
+    #expect(MusicPlayer.Source(title: "Radio", radio: RadioRequest(seed: .item, itemId: 1, limit: 50)).isStation)
+    #expect(MusicPlayer.Source(title: "A Journey", generated: true).isStation)
+}

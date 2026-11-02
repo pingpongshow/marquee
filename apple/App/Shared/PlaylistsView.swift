@@ -275,8 +275,8 @@ struct PlaylistView: View {
     @Environment(MusicPlayer.self) private var music
     @Environment(VideoPresenter.self) private var video
     @Environment(\.dismiss) private var dismiss
-    #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
+    #if os(iOS)
     @Environment(Downloads.self) private var downloads
     #endif
     let id: Int64
@@ -301,23 +301,26 @@ struct PlaylistView: View {
             ForEach(Array(entries.enumerated()), id: \.element.entryId) { i, e in
                 HStack(spacing: 4) {
                     Button { play(i) } label: {
+                        // At iPhone width a song's time joins its subtitle, leaving the title room beside the row's buttons.
+                        let time = formatTime(seconds: Double(e.item.durationMs ?? 0) / 1000)
+                        let timeInline = sizeClass == .compact && e.item._type == .track
                         HStack(spacing: 12) {
                             ArtworkView(item: e.item, shape: e.item._type == .track ? .square : .wide, width: 60).frame(width: e.item._type == .track ? 44 : 80)
                             VStack(alignment: .leading) {
                                 Text(e.item.title).lineLimit(1)
-                                Text(e.item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                Text(timeInline ? "\(time) · \(e.item.subtitle)" : e.item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
                             Spacer()
-                            Text(formatTime(seconds: Double(e.item.durationMs ?? 0) / 1000)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                                .lineLimit(1).fixedSize().layoutPriority(1)
+                            if !timeInline {
+                                Text(time).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                    .lineLimit(1).fixedSize().layoutPriority(1)
+                            }
                         }
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .contextMenu { ItemMenuItems(item: e.item) }
-                    #if os(iOS)
                     if e.item._type == .track { TrackRadioButton(track: e.item) }
-                    #endif
                     if FavoriteStore.canFavorite(e.item) { RowFavorite(item: e.item) }
                     if e.item._type == .track { RowRating(item: e.item, gap: isTV ? 8 : 4) }
                 }

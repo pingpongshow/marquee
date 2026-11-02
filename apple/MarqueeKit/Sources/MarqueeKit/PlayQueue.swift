@@ -138,6 +138,18 @@ public struct PlayQueue: Sendable, Equatable {
         return false
     }
 
+    /// Takes a song given a thumbs down on a station out of the queue, every copy of it, so it
+    /// can't come round again by repeat-all or by turning shuffle off (MUSIC-25). When it's the
+    /// current track, the one that took its place becomes current. Returns true when nothing
+    /// took its place, as `remove` does.
+    @discardableResult
+    public mutating func removeAll(of itemID: Int64) -> Bool {
+        let cur = current?.id
+        for e in entries where e.item.id == itemID && e.id != cur { remove(e.id) }
+        guard let cur, current?.item.id == itemID else { return false }
+        return remove(cur)
+    }
+
     public mutating func move(_ id: Int, to: Int) {
         guard let from = entries.firstIndex(where: { $0.id == id }) else { return }
         let cur = current

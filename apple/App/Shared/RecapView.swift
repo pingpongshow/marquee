@@ -316,21 +316,24 @@ struct RecapView: View {
                 Spacer(minLength: 0)
                 kicker("Your top songs")
                 ForEach(Array(r.topTracks.prefix(isTV ? 5 : 8).enumerated()), id: \.offset) { i, e in
-                    Button { music.play(r.topTracks.map(\.item), start: i, source: "Your Top Songs \(String(r.year))") } label: {
-                        HStack(spacing: 14) {
-                            Text("\(i + 1)").font(.title3.weight(.black).monospacedDigit()).frame(width: 34, alignment: .trailing)
-                            ArtworkView(item: e.item, shape: .square, width: isTV ? 80 : 48).frame(width: isTV ? 80 : 48)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(e.item.title).font(.headline).lineLimit(1)
-                                Text(e.item.artistCredit ?? e.item.grandparentTitle ?? "").font(.caption).opacity(0.8).lineLimit(1)
+                    HStack(spacing: 4) {
+                        Button { music.play(r.topTracks.map(\.item), start: i, source: "Your Top Songs \(String(r.year))") } label: {
+                            HStack(spacing: 14) {
+                                Text("\(i + 1)").font(.title3.weight(.black).monospacedDigit()).frame(width: 34, alignment: .trailing)
+                                ArtworkView(item: e.item, shape: .square, width: isTV ? 80 : 48).frame(width: isTV ? 80 : 48)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(e.item.title).font(.headline).lineLimit(1)
+                                    Text(e.item.artistCredit ?? e.item.grandparentTitle ?? "").font(.caption).opacity(0.8).lineLimit(1)
+                                }
+                                Spacer()
+                                Image(systemName: "play.circle.fill").font(.title2)
                             }
-                            Spacer()
-                            Image(systemName: "play.circle.fill").font(.title2)
+                            .contentShape(Rectangle())
                         }
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Play \(e.item.title)")
+                        TrackRadioButton(track: e.item)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Play \(e.item.title)")
                 }
                 playTopSongs(r).padding(.top, 8)
                 Spacer(minLength: 0)

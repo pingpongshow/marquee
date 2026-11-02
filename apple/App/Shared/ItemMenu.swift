@@ -24,8 +24,10 @@ final class ActionError {
 
 extension MusicPlayer {
     /// Starts a station from a track, album or artist; what went wrong, if it can't, is shown.
-    func startRadio(_ item: Item, app: AppSession) {
-        let req = RadioRequest(seed: .item, itemId: item.id, limit: 50)
+    func startRadio(_ item: Item, app: AppSession) { startRadio(itemID: item.id, app: app) }
+
+    func startRadio(itemID: Int64, app: AppSession) {
+        let req = RadioRequest(seed: .item, itemId: itemID, limit: 50)
         ActionError.run {
             let st = try await app.radio(req)
             guard !st.items.isEmpty else { throw MarqueeError("Couldn't find anything to play for this station.") }
@@ -34,29 +36,34 @@ extension MusicPlayer {
     }
 }
 
-#if os(iOS)
-/// The small button on a track's row: a radio seeded with that track. (On the TV it stays in the
-/// row's menu, as Start Radio: the row's focus targets are enough already.)
+/// The small button on a song's row: a radio seeded with that song. On the TV it's one more focus
+/// target along the row. A radio needs the server, so it isn't there while offline.
 struct TrackRadioButton: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
-    let track: Item
+    private let trackID: Int64
+
+    init(track: Item) { trackID = track.id }
+    init(trackID: Int64) { self.trackID = trackID }
 
     var body: some View {
-        Button { music.startRadio(track, app: app) } label: {
-            Image(systemName: "music.note")
-                .font(.system(size: 13))
-                .foregroundStyle(.tertiary)
-                .frame(minWidth: 30, minHeight: 30)
-                .contentShape(Rectangle())
+        if !app.isOffline {
+            Button { music.startRadio(itemID: trackID, app: app) } label: {
+                Image(systemName: "music.note")
+                    .font(.system(size: isTV ? 22 : 13))
+                    .foregroundStyle(.tertiary)
+                    .frame(minWidth: isTV ? 50 : 30, minHeight: isTV ? 50 : 30)
+                    .contentShape(Rectangle())
+            }
+            #if os(iOS)
+            .buttonStyle(.plain)
+            #endif
+            .fixedSize()
+            .accessibilityLabel("Track Radio")
+            .accessibilityIdentifier("trackRadio.\(trackID)")
         }
-        .buttonStyle(.plain)
-        .fixedSize()
-        .accessibilityLabel("Track Radio")
-        .accessibilityIdentifier("trackRadio.\(track.id)")
     }
 }
-#endif
 
 /// Queue and playlist actions for any item (context menus and "…" buttons).
 struct ItemMenuItems: View {
@@ -99,6 +106,7 @@ struct ItemMenuItems: View {
                 Label(fav ? "Remove from favourites" : "Add to favourites", systemImage: fav ? "heart.slash" : "heart")
             }
         }
+        ThumbsDownMenuItem(item: item)
         if showsLibraryState, [.movie, .show, .episode, .video].contains(item._type) {
             let listed = WatchlistStore.shared.isListed(item)
             Button { WatchlistStore.shared.set(item, !listed, app: app) } label: {

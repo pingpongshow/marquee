@@ -87,6 +87,7 @@ struct DownloadsView: View {
                 }
             }
             .buttonStyle(.plain)
+            if e.item._type == .track, e.state == .done { TrackRadioButton(track: e.item) }
             if case .failed = e.state {
                 Button { ActionError.run { try await downloads.retry(e.id) } } label: {
                     Label("Try Again", systemImage: "arrow.clockwise").labelStyle(.iconOnly).frame(minWidth: 36, minHeight: 36)

@@ -228,6 +228,9 @@ final class RatingStore {
 
     func set(_ id: Int64, _ rating: Double?) { overrides[id] = rating ?? 0 }
 
+    /// The server changed a rating by itself (a thumbs down clears a high one): averages reload.
+    func noteSaved(_ id: Int64) { saves[id, default: 0] += 1 }
+
     /// Another person signed in: their own ratings show, not these.
     func reset() {
         overrides = [:]
@@ -235,14 +238,18 @@ final class RatingStore {
     }
 
     /// Rates (0–10, half stars; nil clears) at once, and puts the old value back if the server
-    /// refuses. Offline, the rating stays and syncs later (USER-18).
+    /// refuses. Offline, the rating stays and syncs later (USER-18). A rating of 3.5 stars or more
+    /// takes back a thumbs down (MUSIC-25), as it does on the server.
     func rate(_ id: Int64, _ rating: Double?, was old: Double?, app: AppSession) {
+        let oldDislike = DislikeStore.shared.override(id)
         set(id, rating)
+        if (rating ?? 0) >= DislikeStore.highRating { DislikeStore.shared.note(id, false) }
         Task {
             do {
                 if try await app.rate(id, rating) { saves[id, default: 0] += 1 }
             } catch {
                 set(id, old)
+                DislikeStore.shared.note(id, oldDislike)
                 ActionError.shared.message = "Couldn't save the rating: \(error.localizedDescription)"
             }
         }
@@ -338,7 +345,8 @@ final class WatchStore {
 }
 
 /// A row's own rating that can be changed in place: small stars when rated, a faint outline
-/// star when not; tapping opens a menu of ratings (half stars) and No rating.
+/// star when not, a thumbs down in their place when given; tapping opens a menu of ratings (half
+/// stars), No rating and, for a song, the thumbs down.
 struct RowRating: View {
     @Environment(AppSession.self) private var app
     let item: Item
@@ -349,21 +357,36 @@ struct RowRating: View {
 
     var body: some View {
         let current = RatingStore.shared.rating(item.id, item.userRating)
+        let disliked = DislikeStore.shared.isDisliked(item)
         Menu {
+            // First: at the mini player the menu opens upwards in reverse order, and as the last
+            // entry this scrolled out of sight behind the ratings.
+            if DislikeStore.canDislike(item, app: app) {
+                ThumbsDownMenuItem(item: item)
+                Divider()
+            }
             Picker("Rating", selection: Binding(get: { current ?? 0 }, set: { choose($0, current) })) {
                 ForEach((1...10).reversed(), id: \.self) { v in Text(Self.label(Double(v))).tag(Double(v)) }
                 Text("No rating").tag(0.0)
             }
         } label: {
             if compact {
-                Image(systemName: (current ?? 0) > 0 ? "star.fill" : "star")
-                    .font(.title3)
-                    .foregroundStyle((current ?? 0) > 0 ? AnyShapeStyle(Color.marqueeGold) : AnyShapeStyle(.secondary))
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
+                Group {
+                    if disliked {
+                        Image(systemName: "hand.thumbsdown.fill").foregroundStyle(Color.marqueeGold)
+                    } else {
+                        Image(systemName: (current ?? 0) > 0 ? "star.fill" : "star")
+                            .foregroundStyle((current ?? 0) > 0 ? AnyShapeStyle(Color.marqueeGold) : AnyShapeStyle(.secondary))
+                    }
+                }
+                .font(.title3)
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
             } else {
                 Group {
-                    if let r = current, r > 0 {
+                    if disliked {
+                        DislikeGlyph(size: isTV ? 18 : 11)
+                    } else if let r = current, r > 0 {
                         RatingGlyphs(rating: r)
                     } else {
                         Image(systemName: "star").font(.system(size: isTV ? 18 : 11, weight: .regular)).foregroundStyle(.tertiary)
@@ -372,7 +395,7 @@ struct RowRating: View {
                 // One width rated or not, so durations beside it line up down a list; wide enough
                 // for five stars (and never narrower than them), with a fixed gap before it so the
                 // duration beside it never touches the stars.
-                .frame(minWidth: isTV ? 110 : 56, alignment: isTV && (current ?? 0) <= 0 ? .center : .trailing)
+                .frame(minWidth: isTV ? 110 : 56, alignment: isTV && (disliked || (current ?? 0) <= 0) ? .center : .trailing)
                 .padding(.leading, gap)
                 .frame(minHeight: isTV ? 50 : 30)
                 .contentShape(Rectangle())
@@ -384,7 +407,7 @@ struct RowRating: View {
         #endif
         .fixedSize()
         .accessibilityLabel("Rating")
-        .accessibilityValue(current.map { Self.label($0) } ?? "Not rated")
+        .accessibilityValue(disliked ? "Thumbs down" : current.map { Self.label($0) } ?? "Not rated")
         .accessibilityIdentifier("rowRating.\(item.id)")
     }
 
@@ -432,14 +455,31 @@ struct RatingGlyphs: View {
     }
 }
 
+/// A thumbs down where a song's stars would be (MUSIC-25).
+struct DislikeGlyph: View {
+    var size: CGFloat = isTV ? 16 : 8
+
+    var body: some View {
+        Image(systemName: "hand.thumbsdown.fill")
+            .font(.system(size: size, weight: .regular))
+            .foregroundStyle(Color.marqueeGold)
+            .fixedSize()
+    }
+}
+
 /// A person's own rating (0–10, half stars) as five small stars, read-only: shown on rows
-/// when the track or title is rated.
+/// when the track or title is rated. A song's thumbs down shows in their place.
 struct RatingBadge: View {
     let itemID: Int64
     let rating: Double?
+    var disliked: Bool?
 
     var body: some View {
-        if let r = RatingStore.shared.rating(itemID, rating), r > 0 {
+        if DislikeStore.shared.isDisliked(itemID, disliked) {
+            DislikeGlyph()
+                .accessibilityLabel("Thumbs down")
+                .accessibilityIdentifier("dislikeBadge")
+        } else if let r = RatingStore.shared.rating(itemID, rating), r > 0 {
             RatingGlyphs(rating: r)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Rated \(RowRating.label(r))")
@@ -511,13 +551,21 @@ struct PosterCard: View {
         }
     }
 
-    /// A track's rating under its titles: changeable on iPhone and iPad, shown on the TV.
+    /// A track's Track Radio and rating under its titles: the rating is changeable on iPhone and
+    /// iPad, and shown on the TV.
     @ViewBuilder private var trackRating: some View {
         if item._type == .track {
             #if os(tvOS)
-            RatingBadge(itemID: item.id, rating: item.userRating)
+            HStack(spacing: 12) {
+                TrackRadioButton(track: item)
+                RatingBadge(itemID: item.id, rating: item.userRating, disliked: item.disliked)
+            }
             #else
-            RowRating(item: item, gap: 0).padding(.top, -6)
+            HStack(spacing: 0) {
+                TrackRadioButton(track: item)
+                RowRating(item: item, gap: 0)
+            }
+            .padding(.top, -6)
             #endif
         }
     }

@@ -301,6 +301,7 @@ struct MusicHomeView: View {
 
 /// Every song in a music library, sortable; a tap plays the list from there.
 struct MusicSongsView: View {
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     let libraryID: Int64
@@ -349,6 +350,10 @@ struct MusicSongsView: View {
         .accessibilityIdentifier("sortMenu")
     }
 
+    private var narrow: Bool { sizeClass == .compact }
+
+    private func time(_ t: Item) -> String { formatTime(seconds: Double(t.durationMs ?? 0) / 1000) }
+
     var body: some View {
         List {
             if let error { ErrorBanner(message: error) }
@@ -359,18 +364,22 @@ struct MusicSongsView: View {
                             ArtworkView(item: t, shape: .square, width: 60).frame(width: 44)
                             VStack(alignment: .leading) {
                                 Text(t.title).lineLimit(1)
-                                Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
+                                // At iPhone width the time goes in here, leaving the title room beside the row's buttons.
+                                Text([narrow ? time(t) : nil, t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
                                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
                             Spacer()
-                            Text(formatTime(seconds: Double(t.durationMs ?? 0) / 1000)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                                .lineLimit(1).fixedSize().layoutPriority(1)
+                            if !narrow {
+                                Text(time(t)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                    .lineLimit(1).fixedSize().layoutPriority(1)
+                            }
                         }
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .contextMenu { ItemMenuItems(item: t) }
                     .accessibilityIdentifier("songRow.\(t.id)")
+                    TrackRadioButton(track: t)
                     RowFavorite(item: t)
                     RowRating(item: t, gap: isTV ? 8 : 4)
                 }
@@ -598,6 +607,7 @@ struct MusicDecadeView: View {
 /// Favourites: this person's favourite tracks, albums and artists (the heart, USER-12), newest
 /// first, or what they rated 4 stars or more, best first.
 struct MusicFavoritesView: View {
+    @Environment(\.horizontalSizeClass) private var sizeClass
     enum Kind: String, CaseIterable, Identifiable {
         case tracks = "Tracks", albums = "Albums", artists = "Artists"
         var id: String { rawValue }
@@ -688,11 +698,16 @@ struct MusicFavoritesView: View {
                             ArtworkView(item: t, shape: .square, width: 60).frame(width: isTV ? 80 : 44)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(t.title).lineLimit(1).foregroundStyle(music.current?.item.id == t.id ? Color.marqueeGold : .primary)
-                                Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
-                                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                // At iPhone width everyone's average goes under the title, leaving it room
+                                // beside the row's buttons.
+                                HStack(spacing: 6) {
+                                    Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
+                                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    if sizeClass == .compact { CommunityBadge(rating: t.communityRating) }
+                                }
                             }
                             Spacer()
-                            CommunityBadge(rating: t.communityRating)
+                            if sizeClass != .compact { CommunityBadge(rating: t.communityRating) }
                         }
                         .padding(.leading, sidePadding)
                         .padding(.vertical, 6)
@@ -701,6 +716,7 @@ struct MusicFavoritesView: View {
                     .buttonStyle(.plain)
                     .contextMenu { ItemMenuItems(item: t) }
                     .accessibilityIdentifier("favoriteTrack.\(t.id)")
+                    TrackRadioButton(track: t)
                     RowFavorite(item: t)
                     RowRating(item: t, gap: isTV ? 8 : 4)
                 }

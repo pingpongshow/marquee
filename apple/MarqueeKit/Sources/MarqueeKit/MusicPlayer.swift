@@ -19,11 +19,16 @@ public final class MusicPlayer {
         public let title: String
         public let radio: RadioRequest?
         public let context: String?
-        public init(title: String, radio: RadioRequest? = nil, context: String? = nil) {
+        /// A generated station that has neither a radio request nor a context of its own.
+        private let generated: Bool
+        public init(title: String, radio: RadioRequest? = nil, context: String? = nil, generated: Bool = false) {
             self.title = title
             self.radio = radio
             self.context = context
+            self.generated = generated
         }
+        /// A radio or generated station, as opposed to an album or the listener's own playlist.
+        public var isStation: Bool { generated || radio != nil || context != nil }
     }
 
     /// Volume levelling (MUSIC-9): auto uses album gain while an album plays in order.
@@ -334,7 +339,7 @@ public final class MusicPlayer {
     /// Plays a generated station; with a radio request it keeps topping itself up.
     public func playStation(_ station: Station, radio: RadioRequest? = nil) {
         guard !station.items.isEmpty else { return }
-        newSource(Source(title: station.title, radio: radio, context: station.context))
+        newSource(Source(title: station.title, radio: radio, context: station.context, generated: true))
         // Each play of its tracks is reported with the station's context (MUSIC-17).
         queue.load(station.items, start: 0, shuffle: false, from: .init(context: station.context))
         retriedEntry = nil
@@ -382,6 +387,35 @@ public final class MusicPlayer {
     public func next() {
         noteMovedOn()
         skipForward()
+    }
+
+    /// A thumbs down has reached the server (MUSIC-25). On a station the song leaves the queue and,
+    /// if it's the one playing, the next track starts. An album or the listener's own playlist
+    /// carries on as it was: the song stays in those.
+    public func thumbedDown(_ id: Int64) {
+        guard source?.isStation == true, queue.entries.contains(where: { $0.item.id == id }) else { return }
+        // A top-up on its way was asked for before the thumbs down, and could bring the song back.
+        refillGeneration += 1
+        refilling = false
+        let wasCurrent = queue.current?.item.id == id
+        if wasCurrent { noteMovedOn() } // the listener's own skip: it steers a radio
+        let ended = queue.removeAll(of: id)
+        guard wasCurrent else {
+            refreshFollowing()
+            topUpRadio()
+            return
+        }
+        retriedEntry = nil
+        startFailures = 0
+        if ended {
+            // Nothing left after it: stops rather than plays the song on. A radio carries on when
+            // its next tracks come.
+            rebuild(autoplay: false, load: false)
+            waitForRadio()
+        } else {
+            rebuild()
+            topUpRadio()
+        }
     }
 
     /// Moves on to the next track (Next, or a track that wouldn't play).
@@ -950,8 +984,9 @@ public final class MusicPlayer {
                 queue.append(st.items, from: from)
             }
             if radioRanOut {
-                // The queue had ended waiting for this: on to the first of what came.
-                queue.setIndex(queue.followingIndex)
+                // The queue had ended waiting for this: on to the first of what came (loading an
+                // empty queue already starts there).
+                if !wasEmpty { queue.setIndex(queue.skipIndex) }
                 rebuild()
             } else {
                 wasEmpty ? rebuild() : refreshFollowing()
