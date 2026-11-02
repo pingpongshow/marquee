@@ -968,7 +968,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request. */
+        /** An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first, without your thumbs-down songs. Artist pages show the first 15, and the whole list on request. */
         get: operations["listTopSongs"];
         put?: never;
         post?: never;
@@ -1379,6 +1379,26 @@ export interface paths {
         put: operations["addToWatchlist"];
         post?: never;
         delete: operations["removeFromWatchlist"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/dislike": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. */
+        put: operations["addDislike"];
+        post?: never;
+        /** Take back your thumbs down on a song (MUSIC-25). */
+        delete: operations["removeDislike"];
         options?: never;
         head?: never;
         patch?: never;
@@ -7689,6 +7709,8 @@ export interface components {
             watchlisted?: boolean;
             /** @description One of the user's favourites (the heart). Absent or false when it isn't. */
             favorite?: boolean;
+            /** @description A song the user gave a thumbs down (MUSIC-25). Absent or false when they didn't. */
+            disliked?: boolean;
             /**
              * @description Set for extras (LIB-8).
              * @enum {string}
@@ -10933,6 +10955,51 @@ export interface operations {
                 /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
                 at?: components["parameters"]["ChangedAt"];
             };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addDislike: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Added. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeDislike: {
+        parameters: {
+            query?: never;
             header?: never;
             path: {
                 itemId: components["parameters"]["ItemId"];

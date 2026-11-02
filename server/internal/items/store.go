@@ -37,6 +37,7 @@ type Summary struct {
 	UserRating    float64 // 0 = not rated
 	Watchlisted   bool
 	Favorite      bool   // the person's favourite (the heart)
+	Disliked      bool   // a song the person gave a thumbs down
 	ExtraType     string // trailer, featurette… ("" for main content)
 	ReleaseType   string // albums: album, ep, single, compilation, live… ("" = unknown)
 	Audio         AudioFormat
@@ -197,7 +198,8 @@ func cols(uid int64) string {
 	` + audioFormatCol + `,
 	COALESCE((SELECT AVG(rating) FROM user_item_state WHERE item_id = i.id AND rating > 0), 0),
 	(SELECT COUNT(*) FROM user_item_state WHERE item_id = i.id AND rating > 0),
-	COALESCE((SELECT favorite_at IS NOT NULL FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0)`
+	COALESCE((SELECT favorite_at IS NOT NULL FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0),
+	COALESCE((SELECT disliked_at IS NOT NULL FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0)`
 }
 
 // audioFormatCol is a track's audio format (codec|kbps|Hz|bits|channels) from its first
@@ -228,7 +230,7 @@ func scanSummary(row interface{ Scan(...any) error }, extra ...any) (Summary, er
 	err := row.Scan(append([]any{&s.ID, &s.LibraryID, &s.Type, &s.Title, &s.OriginalTitle, &s.Year, &s.Index, &s.AbsIndex, &s.Disc,
 		&s.ParentID, &s.GrandparentID, &s.ParentTitle, &s.GrandparentTitle, &s.ArtistCredit, &s.ChildCount, &s.LeafCount,
 		&s.DurationMS, &s.ReleaseDate, &s.Available, &s.MatchState, &added, &s.Poster, &s.Backdrop, &s.Thumb, &s.Logo,
-		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating, &s.Watchlisted, &s.ExtraType, &s.ReleaseType, &audio, &s.CommunityRating, &s.CommunityCount, &s.Favorite}, extra...)...)
+		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating, &s.Watchlisted, &s.ExtraType, &s.ReleaseType, &audio, &s.CommunityRating, &s.CommunityCount, &s.Favorite, &s.Disliked}, extra...)...)
 	s.AddedAt, _ = time.Parse(time.RFC3339Nano, added)
 	s.Audio = parseAudioFormat(audio)
 	return s, err

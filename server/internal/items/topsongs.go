@@ -8,7 +8,10 @@ import (
 )
 
 // topRating is the least rating that makes a song one of someone's top rated: 3.5 stars.
-const topRating = 7.0
+const (
+	topRating    = 7.0
+	topRatingSQL = "7.0"
+)
 
 // songSignals is what puts a song among an artist's top songs.
 type songSignals struct {
@@ -81,7 +84,7 @@ func (s *Store) TopSongs(ctx context.Context, acc Access, artistID int64, offset
 		(SELECT COALESCE(SUM(a.play_count), 0) FROM user_item_state a WHERE a.item_id = i.id)`+summaryFrom+`
 		LEFT JOIN user_item_state u ON u.item_id = i.id AND u.user_id = ?
 		LEFT JOIN music_popular mp ON mp.track_id = i.id AND mp.artist_id = ?
-		WHERE i.type = 'track' AND i.grandparent_id = ? AND `+ac, args, func(r *sql.Rows) error {
+		WHERE i.type = 'track' AND i.grandparent_id = ? AND u.disliked_at IS NULL AND `+ac, args, func(r *sql.Rows) error {
 		var t songSignals
 		if err := r.Scan(&t.id, &t.title, &t.favorite, &t.rating, &t.rank, &t.plays); err != nil {
 			return err
@@ -116,13 +119,13 @@ func (s *Store) RadioWithoutAnalysis(ctx context.Context, acc Access, itemID int
 	// Random and capped, since an enormous genre needn't all be looked at.
 	var own, others []int64
 	rows, err := s.db.QueryContext(ctx, `SELECT i.id, COALESCE(i.grandparent_id = ?, 0)`+summaryFrom+`
-		WHERE i.type = 'track' AND i.id != ? AND `+ac+` AND (i.grandparent_id = ?
+		WHERE i.type = 'track' AND i.id != ? AND i.id NOT IN (SELECT item_id FROM user_item_state WHERE user_id = ? AND disliked_at IS NOT NULL) AND `+ac+` AND (i.grandparent_id = ?
 			OR i.grandparent_id IN (SELECT similar_id FROM music_similar_artists WHERE artist_id = ?)
 			OR i.id IN (SELECT e.id FROM items e JOIN item_tags et ON et.item_id IN (e.id, e.parent_id, e.grandparent_id) JOIN tags t ON t.id = et.tag_id AND t.kind = 'genre'
 				WHERE e.type = 'track' AND et.tag_id IN (
 					SELECT st.tag_id FROM item_tags st JOIN tags sg ON sg.id = st.tag_id AND sg.kind = 'genre'
 					WHERE st.item_id = ? OR st.item_id IN (SELECT id FROM items WHERE parent_id = ? OR grandparent_id = ?))))
-		ORDER BY RANDOM() LIMIT 5000`, append(append([]any{artist, itemID}, aargs...), artist, artist, artist, artist, artist)...)
+		ORDER BY RANDOM() LIMIT 5000`, append(append([]any{artist, itemID, acc.UserID}, aargs...), artist, artist, artist, artist, artist)...)
 	if err != nil {
 		return nil, err
 	}

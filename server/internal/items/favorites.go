@@ -26,11 +26,44 @@ func (s *Store) SetFavorite(ctx context.Context, uid, itemID int64, on bool) err
 	if on {
 		_, err := s.db.ExecContext(ctx, `INSERT INTO user_item_state (user_id, item_id, favorite_at)
 			VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-			ON CONFLICT(user_id, item_id) DO UPDATE SET favorite_at = COALESCE(favorite_at, excluded.favorite_at)`, uid, itemID)
+			ON CONFLICT(user_id, item_id) DO UPDATE SET favorite_at = COALESCE(favorite_at, excluded.favorite_at), disliked_at = NULL`, uid, itemID)
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE user_item_state SET favorite_at = NULL WHERE user_id = ? AND item_id = ?`, uid, itemID)
 	return err
+}
+
+// ---------- Thumbs down (MUSIC-25) ----------
+//
+// A thumbs down is someone's mark on a song they don't like: radios and generated playlists
+// leave it out for them altogether, though it stays in its album and in playlists they made.
+// It takes back a favourite and a high rating, and giving either takes back the thumbs down.
+
+// SetDisliked gives a song uid's thumbs down, or takes it back.
+func (s *Store) SetDisliked(ctx context.Context, uid, itemID int64, on bool) error {
+	if on {
+		_, err := s.db.ExecContext(ctx, `INSERT INTO user_item_state (user_id, item_id, disliked_at)
+			VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			ON CONFLICT(user_id, item_id) DO UPDATE SET disliked_at = COALESCE(disliked_at, excluded.disliked_at), favorite_at = NULL,
+				rating = CASE WHEN rating >= ? THEN NULL ELSE rating END`, uid, itemID, topRating)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE user_item_state SET disliked_at = NULL WHERE user_id = ? AND item_id = ?`, uid, itemID)
+	return err
+}
+
+// DislikedSongs is the set of songs uid gave a thumbs down.
+func (s *Store) DislikedSongs(ctx context.Context, uid int64) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	err := eachRow(ctx, s.db, `SELECT item_id FROM user_item_state WHERE user_id = ? AND disliked_at IS NOT NULL`, []any{uid}, func(r *sql.Rows) error {
+		var id int64
+		if err := r.Scan(&id); err != nil {
+			return err
+		}
+		out[id] = true
+		return nil
+	})
+	return out, err
 }
 
 // Favorites lists acc's user's favourites of the given types (nil = any) in libIDs (nil =

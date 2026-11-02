@@ -13689,6 +13689,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/favorite`.
             public var favorite: Swift.Bool?
+            /// A song the user gave a thumbs down (MUSIC-25). Absent or false when they didn't.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/disliked`.
+            public var disliked: Swift.Bool?
             /// Set for extras (LIB-8).
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/extraType`.
@@ -13764,6 +13768,7 @@ extension Components {
             ///   - userRating: The user's rating, 0–10 (10 = loved).
             ///   - watchlisted: On the user's watchlist (USER-8).
             ///   - favorite: One of the user's favourites (the heart). Absent or false when it isn't.
+            ///   - disliked: A song the user gave a thumbs down (MUSIC-25). Absent or false when they didn't.
             ///   - extraType: Set for extras (LIB-8).
             ///   - releaseType: Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
             ///   - audioFormat:
@@ -13799,6 +13804,7 @@ extension Components {
                 userRating: Swift.Double? = nil,
                 watchlisted: Swift.Bool? = nil,
                 favorite: Swift.Bool? = nil,
+                disliked: Swift.Bool? = nil,
                 extraType: Components.Schemas.ItemSummary.ExtraTypePayload? = nil,
                 releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload? = nil,
                 audioFormat: Components.Schemas.AudioFormat? = nil,
@@ -13834,6 +13840,7 @@ extension Components {
                 self.userRating = userRating
                 self.watchlisted = watchlisted
                 self.favorite = favorite
+                self.disliked = disliked
                 self.extraType = extraType
                 self.releaseType = releaseType
                 self.audioFormat = audioFormat
@@ -13870,6 +13877,7 @@ extension Components {
                 case userRating
                 case watchlisted
                 case favorite
+                case disliked
                 case extraType
                 case releaseType
                 case audioFormat

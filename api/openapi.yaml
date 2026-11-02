@@ -1363,7 +1363,7 @@ paths:
     get:
       tags: [items]
       operationId: listTopSongs
-      summary: "An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request."
+      summary: "An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first, without your thumbs-down songs. Artist pages show the first 15, and the whole list on request."
       parameters:
         - name: offset
           in: query
@@ -1912,6 +1912,27 @@ paths:
       operationId: removeFromWatchlist
       parameters:
         - $ref: "#/components/parameters/ChangedAt"
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/dislike:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    put:
+      tags: [items]
+      operationId: addDislike
+      summary: "Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down."
+      responses:
+        "204": { description: Added. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [items]
+      operationId: removeDislike
+      summary: Take back your thumbs down on a song (MUSIC-25).
       responses:
         "204": { description: Removed. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -8575,6 +8596,7 @@ components:
         userRating: { type: number, description: "The user's rating, 0–10 (10 = loved)." }
         watchlisted: { type: boolean, description: On the user's watchlist (USER-8). }
         favorite: { type: boolean, description: "One of the user's favourites (the heart). Absent or false when it isn't." }
+        disliked: { type: boolean, description: "A song the user gave a thumbs down (MUSIC-25). Absent or false when they didn't." }
         extraType:
           type: string
           description: Set for extras (LIB-8).

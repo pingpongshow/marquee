@@ -369,7 +369,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}/popular`.
     /// - Remark: Generated from `#/paths//items/{itemId}/popular/get(listPopularTracks)`.
     func listPopularTracks(_ input: Operations.ListPopularTracks.Input) async throws -> Operations.ListPopularTracks.Output
-    /// An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request.
+    /// An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first, without your thumbs-down songs. Artist pages show the first 15, and the whole list on request.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/top-songs`.
     /// - Remark: Generated from `#/paths//items/{itemId}/top-songs/get(listTopSongs)`.
@@ -522,6 +522,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /items/{itemId}/watchlist`.
     /// - Remark: Generated from `#/paths//items/{itemId}/watchlist/delete(removeFromWatchlist)`.
     func removeFromWatchlist(_ input: Operations.RemoveFromWatchlist.Input) async throws -> Operations.RemoveFromWatchlist.Output
+    /// Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/dislike`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/dislike/put(addDislike)`.
+    func addDislike(_ input: Operations.AddDislike.Input) async throws -> Operations.AddDislike.Output
+    /// Take back your thumbs down on a song (MUSIC-25).
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/dislike`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/dislike/delete(removeDislike)`.
+    func removeDislike(_ input: Operations.RemoveDislike.Input) async throws -> Operations.RemoveDislike.Output
     /// Make a movie, show, episode, song, album or artist one of your favourites (the heart). Favourites are yours alone (a managed profile has its own); recommendations, Muse, radios and mixes weight them above star ratings.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/favorite`.
@@ -2372,7 +2382,7 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request.
+    /// An artist's top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what's popular (ListenBrainz and plays on this server), best first, without your thumbs-down songs. Artist pages show the first 15, and the whole list on request.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/top-songs`.
     /// - Remark: Generated from `#/paths//items/{itemId}/top-songs/get(listTopSongs)`.
@@ -2754,6 +2764,32 @@ extension APIProtocol {
         try await removeFromWatchlist(Operations.RemoveFromWatchlist.Input(
             path: path,
             query: query,
+            headers: headers
+        ))
+    }
+    /// Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/dislike`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/dislike/put(addDislike)`.
+    public func addDislike(
+        path: Operations.AddDislike.Input.Path,
+        headers: Operations.AddDislike.Input.Headers = .init()
+    ) async throws -> Operations.AddDislike.Output {
+        try await addDislike(Operations.AddDislike.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Take back your thumbs down on a song (MUSIC-25).
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/dislike`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/dislike/delete(removeDislike)`.
+    public func removeDislike(
+        path: Operations.RemoveDislike.Input.Path,
+        headers: Operations.RemoveDislike.Input.Headers = .init()
+    ) async throws -> Operations.RemoveDislike.Output {
+        try await removeDislike(Operations.RemoveDislike.Input(
+            path: path,
             headers: headers
         ))
     }

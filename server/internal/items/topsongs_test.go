@@ -99,3 +99,86 @@ func TestRadioWithoutAnalysis(t *testing.T) {
 		t.Fatalf("continuing: %v %v", got, err)
 	}
 }
+
+// A thumbs down leaves a song out of Top Songs, radios without analysis, smart playlists and
+// the year's playlist, takes back a favourite and a high rating, and comes off with either.
+func TestThumbsDown(t *testing.T) {
+	d := testDB(t)
+	ctx := context.Background()
+	s := NewStore(d)
+	me := mustExec(t, d, `INSERT INTO users(username, display_name) VALUES ('me', 'Me')`)
+	them := mustExec(t, d, `INSERT INTO users(username, display_name) VALUES ('them', 'Them')`)
+	lib := mustExec(t, d, `INSERT INTO libraries(name, type) VALUES ('Music', 'music')`)
+	artist := mustExec(t, d, `INSERT INTO items(library_id, type, title, sort_title) VALUES (?, 'artist', 'A', 'A')`, lib)
+	track := func(title string) int64 {
+		return mustExec(t, d, `INSERT INTO items(library_id, type, title, sort_title, grandparent_id) VALUES (?, 'track', ?, ?, ?)`, lib, title, title, artist)
+	}
+	bad, good := track("Bad"), track("Good")
+	acc := Access{UserID: me}
+	if err := s.SetFavorite(ctx, me, bad, true); err != nil {
+		t.Fatal(err)
+	}
+	rating := 9.0
+	if err := s.SetRating(ctx, me, bad, &rating); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetFavorite(ctx, me, good, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetDisliked(ctx, me, bad, true); err != nil {
+		t.Fatal(err)
+	}
+	sum, err := s.ByIDs(ctx, acc, []int64{bad})
+	if err != nil || len(sum) != 1 || !sum[0].Disliked || sum[0].Favorite || sum[0].UserRating != 0 {
+		t.Fatalf("after a thumbs down: %+v %v", sum, err)
+	}
+	// Someone else's list isn't touched.
+	if other, err := s.DislikedSongs(ctx, them); err != nil || len(other) != 0 {
+		t.Fatalf("their thumbs down: %v %v", other, err)
+	}
+	if list, _, err := s.TopSongs(ctx, acc, artist, 0, 10); err != nil || len(list) != 1 || list[0].ID != good {
+		t.Fatalf("top songs: %+v %v", list, err)
+	}
+	if ids, err := s.RadioWithoutAnalysis(ctx, acc, artist, nil, 10); err != nil || slices.Contains(ids, bad) || !slices.Contains(ids, good) {
+		t.Fatalf("radio: %v %v", ids, err)
+	}
+	if list, total, err := s.SmartItems(ctx, acc, "audio", SmartRules{Match: "all", Conditions: []Condition{{Field: "title", Op: "notContains", Value: "Nope"}}}, 0, 10); err != nil || total != 1 || list[0].ID != good {
+		t.Fatalf("smart: %+v %d %v", list, total, err)
+	}
+	if p, err := s.SaveRecapPlaylist(ctx, acc, 2026, []int64{bad, good}); err != nil || p.ItemCount != 1 {
+		t.Fatalf("year's playlist: %+v %v", p, err)
+	}
+	// Still in its album, and in a playlist they make.
+	if p, err := s.CreatePlaylist(ctx, acc, "Mine", "audio", []int64{bad}, nil); err != nil || p.ItemCount != 1 {
+		t.Fatalf("own playlist: %+v %v", p, err)
+	}
+	// A low rating leaves it; a high one or a favourite takes it back.
+	low := 2.0
+	if err := s.SetRating(ctx, me, bad, &low); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.DislikedSongs(ctx, me); !got[bad] {
+		t.Fatal("a low rating took back the thumbs down")
+	}
+	high := 8.0
+	if err := s.SetRating(ctx, me, bad, &high); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.DislikedSongs(ctx, me); got[bad] {
+		t.Fatal("a high rating should take back the thumbs down")
+	}
+	s.SetDisliked(ctx, me, bad, true)
+	if err := s.SetFavorite(ctx, me, bad, true); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.DislikedSongs(ctx, me); got[bad] {
+		t.Fatal("a favourite should take back the thumbs down")
+	}
+	s.SetDisliked(ctx, me, bad, true)
+	if err := s.SetDisliked(ctx, me, bad, false); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.DislikedSongs(ctx, me); got[bad] {
+		t.Fatal("taking it back should clear it")
+	}
+}

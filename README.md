@@ -72,6 +72,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 ### Music
 - **Soundprint:** every track is analysed on your server, powering radios, "sounds like this", **Muse** (describe a playlist in words), **Sound Journey** (a path from one track to another), a DJ, and mood and style pages.
 - **Artist Radio and Track Radio:** endless stations from an artist or any song, with similar artists and tracks.
+- **Thumbs down:** a song you flag stays out of your radios and generated playlists.
 - Artist pages lead with your top songs: favourites, songs you rated 3.5 stars or more, and what's popular.
 - **Shared playlists:** playlists are private until you share them with chosen people (an admin can share with everyone). They accept, can play but not change them, and can remove them from their list.
 - Daily mixes from your listening, artist bios, smart playlists, favourites, synced lyrics, gapless playback, crossfade, an equaliser, and **Your Year in Music**.

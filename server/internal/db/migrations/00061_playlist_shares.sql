@@ -12,11 +12,7 @@ CREATE TABLE playlist_shares (
     PRIMARY KEY (playlist_id, user_id)
 );
 CREATE INDEX playlist_shares_user ON playlist_shares(user_id, status);
--- Each device has its own conversion: the first to finish deletes it, which mustn't leave
--- another device with nothing to fetch.
-ALTER TABLE download_jobs ADD COLUMN device_id INTEGER;
 
 -- +goose Down
-ALTER TABLE download_jobs DROP COLUMN device_id;
 DROP TABLE playlist_shares;
 ALTER TABLE playlists DROP COLUMN shared_with_all;

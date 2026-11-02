@@ -102,6 +102,40 @@ func (h *Handlers) RemoveFavorite(ctx context.Context, req RemoveFavoriteRequest
 	return RemoveFavorite204Response{}, nil
 }
 
+// AddDislike gives a song the caller's thumbs down (MUSIC-25).
+func (h *Handlers) AddDislike(ctx context.Context, req AddDislikeRequestObject) (AddDislikeResponseObject, error) {
+	sess, ok := session(ctx)
+	if !ok {
+		return AddDislike401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	d, err := h.Items.Get(ctx, itemAccess(ctx), req.ItemId, false)
+	if err != nil {
+		return AddDislike404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	if d.Type != "track" {
+		return AddDislike400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "only songs can have a thumbs down"))}, nil
+	}
+	if err := h.Items.SetDisliked(ctx, sess.User.ID, req.ItemId, true); err != nil {
+		return nil, internal(ctx, "dislike", err)
+	}
+	return AddDislike204Response{}, nil
+}
+
+// RemoveDislike takes back the caller's thumbs down on a song.
+func (h *Handlers) RemoveDislike(ctx context.Context, req RemoveDislikeRequestObject) (RemoveDislikeResponseObject, error) {
+	sess, ok := session(ctx)
+	if !ok {
+		return RemoveDislike401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); err != nil {
+		return RemoveDislike404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	if err := h.Items.SetDisliked(ctx, sess.User.ID, req.ItemId, false); err != nil {
+		return nil, internal(ctx, "dislike", err)
+	}
+	return RemoveDislike204Response{}, nil
+}
+
 // ---------- collections (META-7) ----------
 
 func (h *Handlers) CreateCollection(ctx context.Context, req CreateCollectionRequestObject) (CreateCollectionResponseObject, error) {

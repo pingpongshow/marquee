@@ -143,6 +143,7 @@ func toAPISummary(s items.Summary) ItemSummary {
 	}
 	out.Watchlisted = nz(s.Watchlisted)
 	out.Favorite = nz(s.Favorite)
+	out.Disliked = nz(s.Disliked)
 	if s.ExtraType != "" {
 		out.ExtraType = ptr(ItemSummaryExtraType(s.ExtraType))
 	}
@@ -254,7 +255,8 @@ func (h *Handlers) ListPopularTracks(ctx context.Context, req ListPopularTracksR
 		return nil, internal(ctx, "popular", err)
 	}
 	var ids []int64
-	rows, err := h.DB.QueryContext(ctx, `SELECT track_id FROM music_popular WHERE artist_id = ? ORDER BY rank`, req.ItemId)
+	rows, err := h.DB.QueryContext(ctx, `SELECT mp.track_id FROM music_popular mp WHERE mp.artist_id = ? AND mp.track_id NOT IN
+		(SELECT item_id FROM user_item_state WHERE user_id = ? AND disliked_at IS NOT NULL) ORDER BY mp.rank`, req.ItemId, access(ctx).UserID)
 	if err != nil {
 		return nil, internal(ctx, "popular", err)
 	}
@@ -373,7 +375,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		OriginallyAvailableAt: sum.OriginallyAvailableAt, Available: sum.Available,
 		MatchState: ItemDetailMatchState(sum.MatchState), AddedAt: sum.AddedAt, Images: sum.Images,
 		ViewOffsetMs: sum.ViewOffsetMs, ViewCount: sum.ViewCount, WatchedLeafCount: sum.WatchedLeafCount, LastViewedAt: sum.LastViewedAt,
-		UserRating: sum.UserRating, Watchlisted: sum.Watchlisted, Favorite: sum.Favorite, ExtraType: (*ItemDetailExtraType)(sum.ExtraType),
+		UserRating: sum.UserRating, Watchlisted: sum.Watchlisted, Favorite: sum.Favorite, Disliked: sum.Disliked, ExtraType: (*ItemDetailExtraType)(sum.ExtraType),
 		ReleaseType:    (*ItemDetailReleaseType)(sum.ReleaseType),
 		AudienceRating: nz(float32(d.AudienceRating)), Credits: make([]Credit, len(d.Credits)),
 		Summary: nz(d.Plot), Tagline: nz(d.Tagline), ContentRating: nz(d.ContentRating), Studio: nz(d.Studio),

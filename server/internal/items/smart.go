@@ -172,7 +172,7 @@ func (s *Store) SmartItems(ctx context.Context, acc Access, kind string, rules S
 	if kind == "video" {
 		types = "'movie', 'episode', 'video'"
 	}
-	from := smartFrom(acc.UserID) + ` WHERE i.type IN (` + types + `) AND i.extra_type IS NULL AND ` + ac + ` AND ` + rc
+	from := smartFrom(acc.UserID) + ` WHERE i.type IN (` + types + `) AND i.extra_type IS NULL AND us.disliked_at IS NULL AND ` + ac + ` AND ` + rc
 	args := append(append([]any{}, aargs...), rargs...)
 	order := smartSorts[rules.Sort]
 	if order == "" {

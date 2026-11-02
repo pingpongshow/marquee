@@ -86,6 +86,77 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * PUT /items/{itemId}/dislike
+     * Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down.
+     * 
+     * @param itemId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun addDislike(itemId: kotlin.Long) : Unit {
+        val localVarResponse = addDislikeWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /items/{itemId}/dislike
+     * Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down.
+     * 
+     * @param itemId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun addDislikeWithHttpInfo(itemId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = addDislikeRequestConfig(itemId = itemId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation addDislike
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun addDislikeRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/items/{itemId}/dislike".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * PUT /items/{itemId}/favorite
      * Make a movie, show, episode, song, album or artist one of your favourites (the heart). Favourites are yours alone (a managed profile has its own); recommendations, Muse, radios and mixes weight them above star ratings.
      * 
@@ -2385,7 +2456,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * GET /items/{itemId}/top-songs
-     * An artist&#39;s top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what&#39;s popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request.
+     * An artist&#39;s top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what&#39;s popular (ListenBrainz and plays on this server), best first, without your thumbs-down songs. Artist pages show the first 15, and the whole list on request.
      * 
      * @param itemId 
      * @param offset  (optional, default to 0)
@@ -2419,7 +2490,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * GET /items/{itemId}/top-songs
-     * An artist&#39;s top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what&#39;s popular (ListenBrainz and plays on this server), best first. Artist pages show the first 15, and the whole list on request.
+     * An artist&#39;s top songs for you (MUSIC-24): your favourites, songs you rated 3.5 stars or more (7 of 10), and what&#39;s popular (ListenBrainz and plays on this server), best first, without your thumbs-down songs. Artist pages show the first 15, and the whole list on request.
      * 
      * @param itemId 
      * @param offset  (optional, default to 0)
@@ -3134,6 +3205,77 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}/related".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /items/{itemId}/dislike
+     * Take back your thumbs down on a song (MUSIC-25).
+     * 
+     * @param itemId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removeDislike(itemId: kotlin.Long) : Unit {
+        val localVarResponse = removeDislikeWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /items/{itemId}/dislike
+     * Take back your thumbs down on a song (MUSIC-25).
+     * 
+     * @param itemId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removeDislikeWithHttpInfo(itemId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = removeDislikeRequestConfig(itemId = itemId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removeDislike
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun removeDislikeRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/items/{itemId}/dislike".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

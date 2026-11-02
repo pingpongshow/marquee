@@ -46,8 +46,26 @@ func keepFor(acc items.Access, libraryID *int64) soundprint.Filter {
 	}
 }
 
+// keep is keepFor for what's generated for someone, which leaves out their thumbs-down songs
+// (MUSIC-25).
+func (h *Handlers) keep(ctx context.Context, acc items.Access, libraryID *int64) soundprint.Filter {
+	inner := keepFor(acc, libraryID)
+	disliked, err := h.Items.DislikedSongs(ctx, acc.UserID)
+	if err != nil || len(disliked) == 0 {
+		return inner
+	}
+	return func(t *soundprint.Track) bool { return !disliked[t.ItemID] && inner(t) }
+}
+
+// station fills in a generated list. Every one comes through here, so seeds and saved mixes
+// lose thumbs-down songs too.
 func (h *Handlers) station(ctx context.Context, st soundprint.Station) (Station, error) {
-	list, err := h.Items.ByIDs(ctx, access(ctx), st.IDs)
+	acc := access(ctx)
+	disliked, err := h.Items.DislikedSongs(ctx, acc.UserID)
+	if err != nil {
+		return Station{}, err
+	}
+	list, err := h.Items.ByIDs(ctx, acc, slices.DeleteFunc(slices.Clone(st.IDs), func(id int64) bool { return disliked[id] }))
 	if err != nil {
 		return Station{}, err
 	}
@@ -191,7 +209,7 @@ func (h *Handlers) SoundsLike(ctx context.Context, req SoundsLikeRequestObject) 
 	limit := 20
 	set(&limit, req.Params.Limit)
 	limit = clampCount(limit, 1, 50)
-	keep := keepFor(acc, nil)
+	keep := h.keep(ctx, acc, nil)
 	var ids []int64
 	switch d.Type {
 	case "track":
@@ -251,7 +269,7 @@ func (h *Handlers) musicRadio(ctx context.Context, req MusicRadioRequestObject) 
 	}
 	b := req.Body
 	acc := access(ctx)
-	o := soundprint.Options{Length: 50, Keep: keepFor(acc, b.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{},
+	o := soundprint.Options{Length: 50, Keep: h.keep(ctx, acc, b.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{},
 		Favour: h.Soundprint.Favour(ctx, s.User.ID), CoPlay: h.Soundprint.CoPlay, Languages: h.Soundprint.ListenerLanguages(ctx, s.User.ID)}
 	set(&o.Length, b.Limit)
 	o.Length = clampCount(o.Length, 5, 100)
@@ -375,7 +393,7 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	n := 30
 	set(&n, req.Body.Limit)
 	n = clampCount(n, 5, 100)
-	o := soundprint.Options{Keep: keepFor(access(ctx), req.Body.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID),
+	o := soundprint.Options{Keep: h.keep(ctx, access(ctx), req.Body.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID),
 		Favour: h.Soundprint.Favour(ctx, s.User.ID), Arc: true, AllowAside: asideWords(prompt)}
 	// Read the prompt (AI, or keywords against the library's genres and artists), filter,
 	// then rank by sound, "like" artists, genres and, with AI, lyric themes.
@@ -442,7 +460,7 @@ func (h *Handlers) MusicJourney(ctx context.Context, req MusicJourneyRequestObje
 	n := 15
 	set(&n, b.Length)
 	n = clampCount(n, 3, 60)
-	ts := h.Soundprint.Index.Journey(from, to, n, soundprint.Options{Keep: keepFor(acc, nil)})
+	ts := h.Soundprint.Index.Journey(from, to, n, soundprint.Options{Keep: h.keep(ctx, acc, nil)})
 	out, err := h.station(ctx, soundprint.Station{Title: "Sound Journey", IDs: soundprint.TrackIDs(ts), Context: "journey"})
 	if err != nil {
 		return nil, internal(ctx, "journey", err)
@@ -463,7 +481,7 @@ func (h *Handlers) MusicMixes(ctx context.Context, req MusicMixesRequestObject) 
 	if fav != nil {
 		out = append(out, *fav)
 	}
-	for i, m := range h.Soundprint.DailyMixes(ctx, s.User.ID, mixScope(req.Params.LibraryId), keepFor(access(ctx), req.Params.LibraryId)) {
+	for i, m := range h.Soundprint.DailyMixes(ctx, s.User.ID, mixScope(req.Params.LibraryId), h.keep(ctx, access(ctx), req.Params.LibraryId)) {
 		m.Context = mixContext(m.ID)
 		st, err := h.station(ctx, m.Station)
 		if err != nil {
@@ -598,7 +616,7 @@ func (h *Handlers) MusicDJ(ctx context.Context, req MusicDJRequestObject) (Music
 	if t == nil || h.Items.Visible(ctx, acc, b.TrackId) != nil {
 		return none, nil
 	}
-	o := soundprint.Options{Keep: keepFor(acc, &t.LibraryID), Avoid: h.Soundprint.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{}}
+	o := soundprint.Options{Keep: h.keep(ctx, acc, &t.LibraryID), Avoid: h.Soundprint.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{}}
 	if b.Exclude != nil {
 		for _, id := range *b.Exclude {
 			o.Exclude[id] = true

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"time"
@@ -264,12 +265,17 @@ func RecapPlaylistTitle(year int) string { return fmt.Sprintf("Your Top Songs %d
 // SaveRecapPlaylist creates the person's "Your Top Songs <year>" audio playlist from ids,
 // or replaces the items of the one made before. ErrNotFound when there's nothing to add.
 func (s *Store) SaveRecapPlaylist(ctx context.Context, acc Access, year int, ids []int64) (Playlist, error) {
+	disliked, err := s.DislikedSongs(ctx, acc.UserID)
+	if err != nil {
+		return Playlist{}, err
+	}
+	ids = slices.DeleteFunc(slices.Clone(ids), func(id int64) bool { return disliked[id] })
 	if len(ids) == 0 {
 		return Playlist{}, ErrNotFound
 	}
 	title := RecapPlaylistTitle(year)
 	var id int64
-	err := s.db.QueryRowContext(ctx, `SELECT id FROM playlists WHERE user_id = ? AND kind = 'audio' AND title = ? AND smart_rule IS NULL
+	err = s.db.QueryRowContext(ctx, `SELECT id FROM playlists WHERE user_id = ? AND kind = 'audio' AND title = ? AND smart_rule IS NULL
 		ORDER BY id LIMIT 1`, acc.UserID, title).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		p, err := s.CreatePlaylist(ctx, acc, title, "audio", ids, nil)
