@@ -161,6 +161,38 @@ export function replaceUpcoming(
   };
 }
 
+/** The most tracks a station's top-up leaves out by name (MUSIC-24). */
+const MAX_EXCLUDE = 2000;
+
+/**
+ * What a station's top-up leaves out: the queue's tracks oldest first, each once where it last
+ * came (a station that has come round again holds repeats), the latest 2000 at most. The server
+ * goes by the end of this list when it starts a station again, so the order matters.
+ */
+export function stationExclude(q: Queue, max = MAX_EXCLUDE): number[] {
+  const seen = new Set<number>();
+  for (let i = q.entries.length - 1; i >= 0 && seen.size < max; i--)
+    seen.add(q.entries[i]!.item.id);
+  return [...seen].reverse();
+}
+
+/**
+ * Adds a station's top-up to the queue (MUSIC-24). Its tracks may have played before: stations
+ * never end, so they come round again, each as a new entry. An empty top-up changes nothing, so
+ * what's coming stays and the next track asks again. `replace` swaps the station's upcoming
+ * tracks for it (steering); `resume` moves on to its first track (the queue had run out).
+ */
+export function topUp(
+  q: Queue,
+  items: ItemSummary[],
+  ctx: string,
+  { replace = false, resume = false } = {},
+): Queue {
+  if (!items.length) return q;
+  const next = replace ? replaceUpcoming(q, items, ctx) : append(q, items, ctx || undefined);
+  return resume ? { ...next, index: next.entries.length - items.length } : next;
+}
+
 /**
  * How a station's track went when the listener left it (MUSIC-17): "finished" when played
  * to 80% (or the end), "skipped" when left in the first 30 s and before half way, else null.

@@ -58,6 +58,13 @@ export const itemChildrenQuery = (itemId: number) =>
     queryFn: () => unwrap(api.GET("/items/{itemId}/children", { params: { path: { itemId }, query: { limit: 500 } } })),
   });
 
+/** An artist's top songs for this person, best first (MUSIC-24). */
+export const topSongsQuery = (itemId: number, limit: number) =>
+  queryOptions({
+    queryKey: ["items", itemId, "top-songs", limit],
+    queryFn: () => unwrap(api.GET("/items/{itemId}/top-songs", { params: { path: { itemId }, query: { limit } } })),
+  });
+
 export const browseQuery = (path: string | null) =>
   queryOptions({
     queryKey: ["browse", path],
@@ -224,6 +231,25 @@ export const playlistItemsQuery = (id: number) =>
     queryKey: ["playlists", id, "items"],
     queryFn: () => unwrap(api.GET("/playlists/{playlistId}/items", { params: { path: { playlistId: id }, query: { limit: 2000 } } })),
   });
+
+/** Who your playlist is shared with (MUSIC-24). */
+export const playlistSharingQuery = (id: number) =>
+  queryOptions({
+    queryKey: ["playlists", id, "sharing"],
+    queryFn: () => unwrap(api.GET("/playlists/{playlistId}/shares", { params: { path: { playlistId: id } } })),
+  });
+
+/** The people you can share a playlist with. */
+export const playlistShareTargetsQuery = queryOptions({
+  queryKey: ["playlists", "share-targets"],
+  queryFn: () => unwrap(api.GET("/me/playlist-share-targets")),
+});
+
+/** Playlists shared with you that you haven't answered yet. */
+export const playlistInvitesQuery = queryOptions({
+  queryKey: ["playlists", "invites"],
+  queryFn: () => unwrap(api.GET("/me/playlist-shares")),
+});
 
 /** Playable items under any item (itself for a movie, episode or track). */
 export function fetchLeaves(itemId: number, opts?: { shuffle?: boolean; unwatched?: boolean }) {

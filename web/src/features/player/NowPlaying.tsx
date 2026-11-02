@@ -9,18 +9,21 @@ import {
   Maximize2,
   MicVocal,
   Moon,
+  MoreHorizontal,
   Pause,
   Play,
+  Plus,
   Repeat,
   Repeat1,
   Shuffle,
   SkipBack,
   SlidersVertical,
   SkipForward,
+  Star,
   Volume2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, imageUrl, unwrap } from "@/api/client";
 import { Menu, MenuItem } from "@/components/Menu";
 import { Rating } from "../music/Rating";
@@ -37,6 +40,7 @@ import {
 import type { Entry } from "./queue";
 import { EqualizerSheet } from "./Equalizer";
 import { audioQualityLabel, isHiRes, setShowAudioQuality, streamedLabel, useShowAudioQuality } from "./audioQuality";
+import { AddToPlaylistDialog } from "../playlists/AddToPlaylist";
 import { queueTitle, SaveAsPlaylistDialog } from "../playlists/SaveAsPlaylist";
 
 export function fmtTime(s: number) {
@@ -235,6 +239,7 @@ export function MiniPlayer() {
             </div>
           </div>
         </button>
+        {t.type === "track" && <BarTrackActions item={t} />}
         <span className="hidden text-xs text-muted tabular-nums md:inline">
           {fmtTime(m.time)} /{" "}
           {fmtTime(
@@ -290,6 +295,95 @@ export function MiniPlayer() {
     </div>
   );
 }
+
+/** The playing track as it is now, not as it was queued (the queue holds a snapshot). */
+function useFreshTrack(item: ItemSummary): ItemSummary {
+  const fresh = useQuery(itemQuery(item.id)).data;
+  // Both are left out when unset, so a cleared rating or heart mustn't fall back to the snapshot.
+  return fresh ? { ...item, favorite: fresh.favorite, userRating: fresh.userRating } : item;
+}
+
+/** The queue row of the playing track, whose heart can be changed from the bar or Now Playing. */
+function FreshRowFavorite({ item }: { item: ItemSummary }) {
+  return <RowFavorite item={useFreshTrack(item)} />;
+}
+
+/** Opens above its button, clear of the bar; closes on a click elsewhere or Escape. */
+function BarPopover({ label, trigger, className, children }: { label: string; trigger: ReactNode; className?: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <div ref={box} className={clsx("relative", className)}>
+      <button onClick={() => setOpen((v) => !v)} className={clsx("flex items-center gap-1 rounded-full p-2 hover:bg-surface-2", open && "text-accent")} aria-label={label} title={label} aria-expanded={open}>
+        {trigger}
+      </button>
+      {open && <div className="absolute right-0 bottom-full z-10 mb-5 rounded-lg border border-border bg-surface p-2 shadow-2xl">{children}</div>}
+    </div>
+  );
+}
+
+const ratingText = (v?: number) => (v ? `Rated ${v / 2} star${v === 2 ? "" : "s"}` : "Not rated");
+
+/**
+ * The bar's add to playlist, heart and rating for the playing track. They sit in the bar on a
+ * wide screen; on a narrower one they're tucked behind one button so the title keeps its room.
+ * Memoised: the bar redraws with the playhead.
+ */
+const BarTrackActions = memo(function BarTrackActions({ item }: { item: ItemSummary }) {
+  const t = useFreshTrack(item);
+  // The track the dialog opened for, even if the music moves on while it's open.
+  const [adding, setAdding] = useState<ItemSummary | null>(null);
+  const rating = <Rating key={t.id} itemId={t.id} value={t.userRating} label={ratingText} testId="bar-rating" />;
+  return (
+    <>
+      <div className="hidden items-center lg:flex" data-testid="bar-actions">
+        <button onClick={() => setAdding(t)} className="rounded-full p-2 hover:bg-surface-2" aria-label={`Add ${t.title} to a playlist`} title="Add to playlist">
+          <Plus className="size-5" />
+        </button>
+        <FavoriteButton key={t.id} item={t} />
+        <BarPopover
+          label={t.userRating ? `Your rating: ${t.userRating / 2} stars` : "Rate this track"}
+          trigger={
+            <>
+              <Star className={clsx("size-5", t.userRating && "fill-accent text-accent")} aria-hidden />
+              {!!t.userRating && <span className="text-xs tabular-nums">{t.userRating / 2}</span>}
+            </>
+          }
+        >
+          {rating}
+        </BarPopover>
+      </div>
+      <BarPopover label="Add to playlist, favourite or rate" trigger={<MoreHorizontal className="size-5" />} className="lg:hidden">
+        <div className="w-56 space-y-1" data-testid="bar-actions-tucked">
+          <div className="flex items-center justify-between gap-2 px-2 py-1">
+            <span className="text-sm">Your rating</span>
+            {rating}
+          </div>
+          <div className="flex items-center justify-between gap-2 px-2 py-1">
+            <span className="text-sm">Favourite</span>
+            <FavoriteButton key={t.id} item={t} />
+          </div>
+          <button onClick={() => setAdding(t)} className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface-2">
+            Add to playlist
+            <Plus className="size-5" aria-hidden />
+          </button>
+        </div>
+      </BarPopover>
+      {adding && <AddToPlaylistDialog item={adding} onClose={() => setAdding(null)} />}
+    </>
+  );
+});
 
 /** The track's audio quality, and what's streamed when it isn't the original (MUSIC-23). */
 function QualityBadge({ item }: { item: ItemSummary }) {
@@ -407,7 +501,7 @@ export function QueueList({ dark }: { dark?: boolean }) {
           </div>
         </div>
       </button>
-      <RowFavorite item={e.item} />
+      {isCurrent ? <FreshRowFavorite item={e.item} /> : <RowFavorite item={e.item} />}
       {!isCurrent && (
         <button
           onClick={() => m.remove(e.key)}
@@ -594,7 +688,7 @@ export function NowPlaying() {
           </div>
           <Controls large />
           <div className="flex flex-wrap items-center justify-center gap-6">
-            <Rating key={t.id} itemId={t.id} value={t.userRating} />
+            <NowPlayingRating key={t.id} item={t} />
             <NowPlayingFavorite key={`fav-${t.id}`} item={t} />
             <Volume className="flex" />
             <CrossfadeSelect />
@@ -613,10 +707,14 @@ export function NowPlaying() {
   );
 }
 
-/** The playing track's heart, from the track's current state (the queue holds a snapshot). */
+/** The playing track's stars, from the track's current state. */
+function NowPlayingRating({ item }: { item: ItemSummary }) {
+  return <Rating itemId={item.id} value={useFreshTrack(item).userRating} />;
+}
+
+/** The playing track's heart, from the track's current state. */
 function NowPlayingFavorite({ item }: { item: ItemSummary }) {
-  const fresh = useQuery(itemQuery(item.id)).data;
-  return <FavoriteButton item={{ ...item, favorite: fresh?.favorite ?? item.favorite }} className="hover:bg-white/10" />;
+  return <FavoriteButton item={useFreshTrack(item)} className="hover:bg-white/10" />;
 }
 
 /** Synced lyrics follow the music (the current line is highlighted and kept in view); plain lyrics just scroll. */

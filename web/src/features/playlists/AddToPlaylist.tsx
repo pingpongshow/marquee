@@ -15,6 +15,8 @@ export function AddToPlaylistDialog({ item, onClose }: { item: Pick<ItemSummary,
   const kind = playlistKindFor(item);
   const qc = useQueryClient();
   const lists = useQuery(playlistsQuery(kind));
+  // A playlist someone shared with you can't be changed, so it's no target.
+  const own = lists.data?.filter((p) => !p.readOnly);
   const [title, setTitle] = useState("");
   const [done, setDone] = useState<string | null>(null);
   const add = useMutation({
@@ -45,7 +47,7 @@ export function AddToPlaylistDialog({ item, onClose }: { item: Pick<ItemSummary,
         </form>
         {lists.isPending && <Spinner />}
         <ul className="max-h-80 space-y-1 overflow-y-auto">
-          {lists.data?.map((p) => (
+          {own?.map((p) => (
             <li key={p.id}>
               <button
                 onClick={() => add.mutate({ id: p.id })}
@@ -62,7 +64,7 @@ export function AddToPlaylistDialog({ item, onClose }: { item: Pick<ItemSummary,
             </li>
           ))}
         </ul>
-        {lists.data?.length === 0 && <p className="text-center text-sm text-muted">No {kind === "audio" ? "music" : "video"} playlists yet. Create one above.</p>}
+        {own?.length === 0 && <p className="text-center text-sm text-muted">No {kind === "audio" ? "music" : "video"} playlists yet. Create one above.</p>}
       </div>
     </Dialog>
   );

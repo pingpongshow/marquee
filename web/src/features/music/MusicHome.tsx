@@ -27,6 +27,7 @@ import { subtitleFor } from "../browse/format";
 import { fetchHubs, hubsKey } from "../browse/watched";
 import { useMusicActions } from "../player/MusicPlayer";
 import { PlaylistMosaic } from "../playlists/PlaylistMosaic";
+import { SharedIcon, sharedByText } from "../playlists/Sharing";
 import {
   AnalysisNote,
   BrowseMoodsAndStyles,
@@ -264,8 +265,11 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
             <li key={p.id} className="w-36 shrink-0">
               <Link to="/playlist/$playlistId" params={{ playlistId: String(p.id) }} className="group block">
                 <PlaylistMosaic playlist={p} size={180} className="group-hover:ring-2 group-hover:ring-accent" />
-                <div className="mt-2 truncate text-sm font-medium">{p.title}</div>
-                <div className="truncate text-xs text-muted">{p.itemCount} tracks</div>
+                <div className="mt-2 flex items-center gap-1.5">
+                  <span className="truncate text-sm font-medium">{p.title}</span>
+                  <SharedIcon playlist={p} />
+                </div>
+                <div className="truncate text-xs text-muted">{p.readOnly ? sharedByText(p) : `${p.itemCount} tracks`}</div>
               </Link>
             </li>
           ))}

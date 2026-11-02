@@ -13,7 +13,9 @@ import { useMusicState } from "../player/MusicPlayer";
 import { ItemActions } from "./ItemActions";
 import { DownloadOriginal, DownloadZip, EpisodeDownloadLink } from "./Download";
 import { ItemMenu } from "./ItemMenu";
+import { TrackRadioButton } from "../music/RadioButtons";
 import { RowRating } from "../music/Rating";
+import { TopSongs } from "../music/TopSongs";
 import { FavoriteButton, favoriteTypes, RowFavorite } from "./Favorite";
 import { ItemRatings, Reviews } from "./Reviews";
 import { PlayButtons } from "./PlayButtons";
@@ -215,7 +217,7 @@ function Children({ item }: { item: ItemDetail }) {
   if (item.type === "artist")
     return (
       <>
-        <PopularTracks artist={item} />
+        <TopSongs artist={item} />
         <ArtistReleases list={list} />
       </>
     );
@@ -256,13 +258,14 @@ function Children({ item }: { item: ItemDetail }) {
                   {c.type === "track" && c.artistCredit && c.artistCredit !== item.artistCredit && <span className="block truncate text-xs text-muted">{c.artistCredit}</span>}
                 </span>
                 {(c.type === "track" || c.type === "episode") && <RowFavorite item={c} />}
-                {c.type === "track" && <RowRating item={c} />}
+                {c.type === "track" && <RowRating item={c} className="max-sm:hidden" />}
+                {c.type === "track" && <TrackRadioButton item={c} />}
                 {showQuality && c.audioFormat && (
                   <span className="hidden shrink-0 text-[11px] text-faint sm:inline" data-testid="track-quality">
                     {audioQualityShort(c.audioFormat)}
                   </span>
                 )}
-                <span className="shrink-0 text-sm text-muted tabular-nums">{c.type === "track" ? formatTrackTime(c.durationMs) : formatDuration(c.durationMs)}</span>
+                <span className={clsx("shrink-0 text-sm text-muted tabular-nums", c.type === "track" && "max-sm:hidden")}>{c.type === "track" ? formatTrackTime(c.durationMs) : formatDuration(c.durationMs)}</span>
                 {c.type === "episode" && <EpisodeWatchState episode={c} />}
               </Link>
               {/* Outside the link: clicks in the menu's dialogs would otherwise play or open the row. */}
@@ -316,49 +319,6 @@ function CardGrid({ list }: { list: ItemSummary[] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-/** The artist's most-listened tracks in the library (ListenBrainz, MUSIC-15). */
-function PopularTracks({ artist }: { artist: ItemDetail }) {
-  const music = useMusicState();
-  const [all, setAll] = useState(false);
-  const popular = useQuery({
-    queryKey: ["items", artist.id, "popular"],
-    queryFn: () => unwrap(api.GET("/items/{itemId}/popular", { params: { path: { itemId: artist.id } } })),
-  });
-  const tracks = popular.data?.items ?? [];
-  if (!tracks.length) return null;
-  const shown = all ? tracks : tracks.slice(0, 5);
-  return (
-    <section className="mt-10">
-      <h2 className="mb-4 text-lg font-semibold">Popular</h2>
-      <ol className="divide-y divide-border rounded-lg border border-border bg-surface">
-        {shown.map((t, i) => (
-          <li key={t.id} className={clsx("group flex items-center gap-4 pr-4 hover:bg-surface-2", music.current?.item.id === t.id && "text-accent")}>
-            <button
-              type="button"
-              onClick={() => music.play(tracks, i, { source: `${artist.title} – Popular` })}
-              className="flex min-w-0 flex-1 items-center gap-4 py-3 pl-4 text-left"
-            >
-              <span className="w-6 shrink-0 text-right text-sm text-faint tabular-nums">{i + 1}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate">{t.title}</span>
-                <span className="block truncate text-xs text-muted">{t.parentTitle}</span>
-              </span>
-            </button>
-            <RowFavorite item={t} />
-            <RowRating item={t} />
-            <span className="shrink-0 text-sm text-muted tabular-nums">{formatTrackTime(t.durationMs)}</span>
-          </li>
-        ))}
-      </ol>
-      {tracks.length > 5 && (
-        <button type="button" className="mt-2 text-sm text-muted hover:text-text" onClick={() => setAll((v) => !v)}>
-          {all ? "Show fewer" : `Show all ${tracks.length}`}
-        </button>
-      )}
-    </section>
   );
 }
 

@@ -10,7 +10,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { meQuery } from "@/api/queries";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
 import { formatTrackTime } from "@/features/browse/format";
@@ -329,20 +329,12 @@ function Guide({
   onPick: (id: number) => void;
   canRecord: boolean;
 }) {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(t);
-  }, []);
+  const now = useClock();
   const [dayOffset, setDayOffset] = useState(0);
   const [shift, setShift] = useState(0); // half-hours from the default start
-  const start = useMemo(() => {
-    const base = startOfHalfHour(now);
-    base.setMinutes(base.getMinutes() - 30 + shift * 30);
-    if (dayOffset) base.setDate(base.getDate() + dayOffset);
-    return base;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayOffset, shift, Math.floor(now.getTime() / 1_800_000)]);
+  const start = startOfHalfHour(now);
+  start.setMinutes(start.getMinutes() - 30 + shift * 30);
+  if (dayOffset) start.setDate(start.getDate() + dayOffset);
   const end = new Date(start.getTime() + WINDOW_HOURS * 3_600_000);
   const guide = useQuery(liveGuideQuery(filter, start, end));
   const rows = new Map(guide.data?.map((r) => [r.channelId, r.programmes]));
@@ -609,6 +601,16 @@ function Guide({
   );
 }
 
+/** The time, updated every 30 seconds. */
+function useClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
+
 function WhatsOn({
   channels,
   onPick,
@@ -616,7 +618,7 @@ function WhatsOn({
   channels: LiveChannel[];
   onPick: (id: number) => void;
 }) {
-  const now = Date.now();
+  const now = useClock().getTime();
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
       {channels.map((c) => {

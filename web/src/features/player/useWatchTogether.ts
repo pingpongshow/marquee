@@ -20,7 +20,7 @@ const DRIFT = 1500;
  * by applying the group's state aren't echoed back.
  */
 export function useWatchTogether(
-  video: RefObject<HTMLVideoElement | null>,
+  videoRef: RefObject<HTMLVideoElement | null>,
   itemId: number,
   meId: number | undefined,
   initialGroup?: string,
@@ -36,7 +36,7 @@ export function useWatchTogether(
       groupRef.current = g;
       setGroup(g);
       offset.current = new Date(g.serverTime).getTime() - Date.now();
-      const v = video.current;
+      const v = videoRef.current;
       if (!v || v.readyState < 1) return;
       const serverNow = Date.now() + offset.current;
       const target = g.playing
@@ -55,12 +55,12 @@ export function useWatchTogether(
         v.pause();
       }
     },
-    [video],
+    [videoRef],
   );
 
   const send = useCallback(async (action: Action) => {
     const g = groupRef.current;
-    const v = video.current;
+    const v = videoRef.current;
     if (!g || !v) return;
     try {
       const next = await unwrap(
@@ -138,16 +138,16 @@ export function useWatchTogether(
 
   // A joiner gets the group's state before the video has loaded; apply it once it can be.
   useEffect(() => {
-    const v = video.current;
+    const v = videoRef.current;
     if (!v) return;
     const onMeta = () => groupRef.current && apply(groupRef.current);
     v.addEventListener("loadedmetadata", onMeta);
     return () => v.removeEventListener("loadedmetadata", onMeta);
-  }, [video, apply]);
+  }, [videoRef, apply]);
 
   // Send what the viewer does.
   useEffect(() => {
-    const v = video.current;
+    const v = videoRef.current;
     if (!v || !id) return;
     const mine = () => Date.now() > applying.current;
     const onPlay = () => mine() && void send("play");
@@ -175,7 +175,7 @@ export function useWatchTogether(
       v.removeEventListener("playing", onPlaying);
       v.removeEventListener("canplay", onPlaying);
     };
-  }, [id, video, send, meId]);
+  }, [id, videoRef, send, meId]);
 
   // Leave when the player closes.
   useEffect(
@@ -190,7 +190,7 @@ export function useWatchTogether(
   );
 
   const start = useCallback(async () => {
-    const v = video.current;
+    const v = videoRef.current;
     try {
       const g = await unwrap(
         api.POST("/syncplay/groups", {
@@ -205,7 +205,7 @@ export function useWatchTogether(
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [itemId, video, apply]);
+  }, [itemId, videoRef, apply]);
 
   const leave = useCallback(() => {
     const g = groupRef.current;

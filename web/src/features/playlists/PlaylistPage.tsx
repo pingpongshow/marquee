@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { clsx } from "clsx";
-import { GripVertical, Pencil, Play, Shuffle, Trash2, X } from "lucide-react";
+import { GripVertical, Pencil, Play, Share2, Shuffle, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { api, imageUrl, unwrap } from "@/api/client";
 import { playlistItemsQuery, playlistQuery } from "@/api/queries";
@@ -9,6 +9,7 @@ import type { ItemSummary, PlaylistEntry } from "@/api/types";
 import { Alert, Button, Dialog, Input, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "../browse/format";
 import { ItemMenu } from "../browse/ItemMenu";
+import { TrackRadioButton } from "../music/RadioButtons";
 import { RowRating } from "../music/Rating";
 import { favoriteTypes, RowFavorite } from "../browse/Favorite";
 import { useMusicState } from "../player/MusicPlayer";
@@ -16,6 +17,7 @@ import { PlaylistMosaic } from "./PlaylistMosaic";
 import { newShuffleSeed, seededShuffle } from "./order";
 import { PinToHomeButton } from "../home/EditHome";
 import { RulesEditor, rulesValid } from "./RulesEditor";
+import { RemoveSharedDialog, ShareDialog, SharedIcon, sharedByText, sharedText } from "./Sharing";
 import type { SmartRules } from "@/api/types";
 import { Sparkles } from "lucide-react";
 
@@ -35,6 +37,8 @@ export function PlaylistPage() {
   const entries = useQuery(playlistItemsQuery(id));
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
   const [editingRules, setEditingRules] = useState<SmartRules | null>(null);
   const saveRules = useMutation({
@@ -87,6 +91,9 @@ export function PlaylistPage() {
   const p = pl.data;
   const list: PlaylistEntry[] = entries.data?.items ?? [];
   const items = list.map((e) => e.item);
+  // Someone else's playlist (shared with you) can be played but not changed; a smart one's tracks
+  // come from its rules.
+  const fixedTracks = !!p.rules || !!p.readOnly;
 
   const play = (start: number, shuffle = false) => {
     if (p.kind === "audio") {
@@ -121,9 +128,11 @@ export function PlaylistPage() {
           {renaming === null ? (
             <h1 className="mt-1 flex items-center gap-2 text-3xl font-bold">
               <span className="truncate">{p.title}</span>
-              <button onClick={() => setRenaming(p.title)} className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text" aria-label="Rename playlist">
-                <Pencil className="size-4" />
-              </button>
+              {!p.readOnly && (
+                <button onClick={() => setRenaming(p.title)} className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text" aria-label="Rename playlist">
+                  <Pencil className="size-4" />
+                </button>
+              )}
             </h1>
           ) : (
             <form
@@ -145,6 +154,12 @@ export function PlaylistPage() {
           <div className="mt-2 text-sm text-muted">
             {p.itemCount} {p.kind === "audio" ? "tracks" : "items"} · {formatDuration(p.durationMs)}
           </div>
+          {(p.readOnly || sharedText(p)) && (
+            <div className="mt-1 flex items-center gap-1.5 text-sm text-muted" data-testid="playlist-sharing-note">
+              <SharedIcon playlist={p} />
+              {p.readOnly ? sharedByText(p) : sharedText(p)}
+            </div>
+          )}
           <div className="mt-5 flex flex-wrap gap-3">
             <Button variant="primary" disabled={!items.length} onClick={() => play(0)}>
               <Play className="size-4 fill-current" /> Play
@@ -152,15 +167,26 @@ export function PlaylistPage() {
             <Button disabled={!items.length} onClick={() => play(0, true)}>
               <Shuffle className="size-4" /> Shuffle
             </Button>
-            {p.rules && (
+            {p.rules && !p.readOnly && (
               <Button variant="ghost" onClick={() => setEditingRules(p.rules!)}>
                 <Sparkles className="size-4" /> Edit rules
               </Button>
             )}
             <PinToHomeButton kind="playlist" id={id} />
-            <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
-              <Trash2 className="size-4" /> Delete
-            </Button>
+            {!p.readOnly && (
+              <Button variant="ghost" onClick={() => setSharing(true)}>
+                <Share2 className="size-4" /> Share
+              </Button>
+            )}
+            {p.readOnly ? (
+              <Button variant="ghost" onClick={() => setRemoving(true)}>
+                <Trash2 className="size-4" /> Remove
+              </Button>
+            ) : (
+              <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="size-4" /> Delete
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -168,7 +194,7 @@ export function PlaylistPage() {
       {entries.isPending && <Spinner />}
       {list.length === 0 && entries.isSuccess && (
         <p className="text-muted">
-          {p.rules ? "No tracks match these rules yet. Try loosening them with “Edit rules”." : "This playlist is empty. Use “Add to playlist” on tracks, albums, movies or episodes."}
+          {p.readOnly ? "This playlist is empty." : p.rules ? "No tracks match these rules yet. Try loosening them with “Edit rules”." : "This playlist is empty. Use “Add to playlist” on tracks, albums, movies or episodes."}
         </p>
       )}
       <ol className="empty:hidden divide-y divide-border rounded-lg border border-border bg-surface">
@@ -178,7 +204,7 @@ export function PlaylistPage() {
           return (
             <li
               key={e.entryId}
-              draggable={!p.rules}
+              draggable={!fixedTracks}
               onDragStart={() => setDrag(e.entryId)}
               onDragOver={(ev) => {
                 ev.preventDefault();
@@ -201,8 +227,8 @@ export function PlaylistPage() {
                 over === i && drag !== null && drag !== e.entryId && "border-t-2 border-t-accent",
               )}
             >
-              {!p.rules && <GripVertical className="size-4 shrink-0 cursor-grab text-faint" aria-hidden />}
-              <span className="w-6 shrink-0 text-right text-sm text-faint tabular-nums">{i + 1}</span>
+              {!fixedTracks && <GripVertical className="size-4 shrink-0 cursor-grab text-faint max-sm:hidden" aria-hidden />}
+              <span className="w-6 shrink-0 text-right text-sm text-faint tabular-nums max-sm:hidden">{i + 1}</span>
               <button onClick={() => play(i)} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={!it.available}>
                 <span className={clsx("shrink-0 overflow-hidden rounded bg-surface-3", it.type === "track" ? "size-10" : "aspect-video w-20")}>
                   {art && <img src={imageUrl(art, it.type === "track" ? 40 : 80)} alt="" loading="lazy" className="size-full object-cover" />}
@@ -216,10 +242,11 @@ export function PlaylistPage() {
                 {it.type === "track" ? "Album" : "Details"}
               </Link>
               {favoriteTypes.has(it.type) && <RowFavorite item={it} />}
-              {it.type === "track" && <RowRating item={it} />}
-              <span className="w-14 shrink-0 text-right text-sm text-muted tabular-nums">{it.type === "track" ? formatTrackTime(it.durationMs) : formatDuration(it.durationMs)}</span>
+              {it.type === "track" && <RowRating item={it} className="max-sm:hidden" />}
+              {it.type === "track" && <TrackRadioButton item={it} />}
+              <span className={clsx("w-14 shrink-0 text-right text-sm text-muted tabular-nums", it.type === "track" && "max-sm:hidden")}>{it.type === "track" ? formatTrackTime(it.durationMs) : formatDuration(it.durationMs)}</span>
               <ItemMenu item={it} />
-              <button hidden={!!p.rules} onClick={() => remove.mutate(e.entryId)} className="rounded p-1 text-muted opacity-0 group-hover:opacity-100 hover:text-text focus:opacity-100" aria-label={`Remove ${it.title}`}>
+              <button hidden={fixedTracks} onClick={() => remove.mutate(e.entryId)} className="rounded p-1 text-muted opacity-0 group-hover:opacity-100 hover:text-text focus:opacity-100" aria-label={`Remove ${it.title}`}>
                 <X className="size-4" />
               </button>
             </li>
@@ -262,6 +289,8 @@ export function PlaylistPage() {
       >
         <p className="text-sm text-muted">“{p.title}” will be deleted. The media in it isn’t affected.</p>
       </Dialog>
+      {sharing && <ShareDialog playlist={p} onClose={() => setSharing(false)} />}
+      {removing && <RemoveSharedDialog playlist={p} onClose={() => setRemoving(false)} onRemoved={() => navigate({ to: "/playlists" })} />}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   departure,
   emptyQueue,
   followingIndex,
+  jump,
   load,
   move,
   playContext,
@@ -14,7 +15,9 @@ import {
   remove,
   replaceUpcoming,
   skipIndex,
+  stationExclude,
   toggleShuffle,
+  topUp,
 } from "./queue";
 
 const track = (id: number) =>
@@ -114,5 +117,62 @@ describe("stations (MUSIC-17)", () => {
     expect(departure(90, 240)).toBeNull();
     expect(departure(25, 30)).toBe("finished"); // 80% of a short track
     expect(departure(10, 30)).toBe("skipped"); // before half way
+  });
+});
+
+describe("endless stations (MUSIC-24)", () => {
+  const station = (...list: number[]) => load(emptyQueue, list.map(track), 0, false, Math.random, "radio:item");
+
+  it("queues tracks that come round again, each as its own entry", () => {
+    let q = station(1, 2, 3);
+    q = { ...q, index: 2 };
+    q = topUp(q, [track(1), track(2)], "radio:item");
+    expect(ids(q)).toEqual([1, 2, 3, 1, 2]);
+    expect(new Set(q.entries.map((e) => e.key)).size).toBe(5);
+    expect(followingIndex(q)).toBe(3);
+    expect(q.entries.at(-1)?.ctx).toBe("radio:item");
+    // The repeat is its own entry: jumping to it or removing it leaves the first one alone.
+    const repeat = q.entries[3]!;
+    expect(jump(q, repeat.key).index).toBe(3);
+    expect(ids(remove(q, repeat.key))).toEqual([1, 2, 3, 2]);
+  });
+
+  it("keeps repeats when a steered top-up replaces what's coming", () => {
+    let q = station(1, 2, 3, 4);
+    q = { ...q, index: 1 };
+    q = topUp(q, [track(1), track(2)], "radio:item", { replace: true });
+    expect(ids(q)).toEqual([1, 2, 1, 2]);
+    expect(current(q)?.item.id).toBe(2);
+    expect(new Set(q.entries.map((e) => e.key)).size).toBe(4);
+  });
+
+  it("an empty top-up changes nothing, so the next track can ask again", () => {
+    const q = { ...station(1, 2, 3), index: 1 };
+    expect(topUp(q, [], "radio:item")).toBe(q);
+    expect(topUp(q, [], "radio:item", { replace: true })).toBe(q);
+    expect(topUp(q, [], "radio:item", { resume: true })).toBe(q);
+  });
+
+  it("carries on with the first new track when the queue had run out", () => {
+    let q = { ...station(1, 2), index: 1 };
+    expect(followingIndex(q)).toBe(-1);
+    q = topUp(q, [track(1), track(2)], "radio:item", { resume: true });
+    expect(q.index).toBe(2);
+    expect(current(q)?.item.id).toBe(1);
+  });
+
+  it("leaves out each track once, oldest first, by where it last came", () => {
+    let q = station(1, 2, 3);
+    q = topUp(q, [track(1), track(4)], "radio:item");
+    expect(stationExclude(q)).toEqual([2, 3, 1, 4]);
+  });
+
+  it("caps what it leaves out to the most recent tracks", () => {
+    const list = Array.from({ length: 2500 }, (_, i) => i + 1);
+    const out = stationExclude(station(...list));
+    expect(out).toHaveLength(2000);
+    expect(out[0]).toBe(501);
+    expect(out.at(-1)).toBe(2500);
+    expect(stationExclude(station(1, 2, 3, 2), 2)).toEqual([3, 2]);
   });
 });

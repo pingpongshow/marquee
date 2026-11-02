@@ -11,6 +11,7 @@ import { formatTrackTime, subtitleFor } from "../browse/format";
 import { useMusicState } from "../player/MusicPlayer";
 import { RowFavorite } from "../browse/Favorite";
 import { type FavoriteKind, type FavoriteSource, favoritesQuery, SectionHeader } from "./MusicHome";
+import { TrackRadioButton } from "./RadioButtons";
 import { CommunityScore, RatingStars, RowRating } from "./Rating";
 
 const tabs: { kind: FavoriteKind; label: string }[] = [
@@ -111,8 +112,9 @@ export function FavoritesPage({ libraryId, name }: { libraryId: number; name: st
               </button>
               <CommunityScore rating={t.communityRating} className="hidden sm:inline-flex" />
               <RowFavorite item={t} />
-              <RowRating item={t} />
-              <span className="w-12 shrink-0 text-right text-sm text-muted tabular-nums">{formatTrackTime(t.durationMs)}</span>
+              <RowRating item={t} className="max-sm:hidden" />
+              <TrackRadioButton item={t} />
+              <span className="w-12 shrink-0 text-right text-sm text-muted tabular-nums max-sm:hidden">{formatTrackTime(t.durationMs)}</span>
               <ItemMenu item={t} />
             </li>
           ))}

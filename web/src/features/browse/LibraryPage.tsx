@@ -13,6 +13,7 @@ import { ItemMenu, useTileMenu } from "./ItemMenu";
 import { isMusicSection, MusicHome, MusicSectionPage, musicSectionTitles } from "../music/MusicHome";
 import { useMusicActions } from "../player/MusicPlayer";
 import { MuseButton } from "../search/MuseVideo";
+import { TrackRadioButton } from "../music/RadioButtons";
 import { RowRating } from "../music/Rating";
 import { favoriteTypes, RowFavorite } from "./Favorite";
 import { FavoritesPage } from "../music/Favorites";
@@ -162,6 +163,7 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
     if (grid.parentElement) for (const el of Array.from(grid.parentElement.children)) if (el !== grid) ro.observe(el);
     return () => ro.disconnect();
   }, [gridRef, scrollEl, filtersOpen, filtered, total]);
+  // eslint-disable-next-line react-hooks/incompatible-library -- the compiler isn't in this build, and the warning is only about what it would memoize
   const virt = useVirtualizer({ count: rows, getScrollElement: () => scrollEl, estimateSize: () => rowHeight, overscan: 4, scrollMargin });
   useEffect(() => virt.measure(), [rowHeight, virt]);
   const visible = virt.getVirtualItems();
@@ -428,7 +430,8 @@ function ListRow({ item, shape, onPlay }: { item?: ItemSummary; shape: "poster" 
         </span>
       </Link>
       {favoriteTypes.has(item.type) && <RowFavorite item={item} />}
-      {item.type === "track" && <RowRating item={item} />}
+      {item.type === "track" && <RowRating item={item} className="max-sm:hidden" />}
+      {item.type === "track" && <TrackRadioButton item={item} />}
       <span className="hidden w-16 text-sm text-muted sm:block">{item.year ?? ""}</span>
       <span className="hidden w-20 text-right text-sm text-muted tabular-nums md:block">{item.type === "movie" || item.type === "video" ? formatDuration(item.durationMs) : item.type === "show" ? `${item.childCount} seasons` : ""}</span>
       <span className={clsx("hidden w-20 text-right text-xs md:block", watched ? "text-success" : "text-faint")}>{item.type === "artist" ? "" : watched ? "Watched" : ""}</span>

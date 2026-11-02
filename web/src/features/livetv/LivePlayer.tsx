@@ -49,7 +49,6 @@ export function LivePlayer({
           params: { path: { sessionId: id } },
         })
         .catch(() => {});
-    setLoading(true);
     onError?.(null);
     (async () => {
       // The player code loads while tuning; if it fails to load, the session is ended.
@@ -89,7 +88,10 @@ export function LivePlayer({
               if (cancelled) return;
               if (reason !== null) {
                 session = null; // already gone
-                if (!reason.startsWith("Stopped:") && attempt < 3) setAttempt((a) => a + 1);
+                if (!reason.startsWith("Stopped:") && attempt < 3) {
+                  setLoading(true);
+                  setAttempt((a) => a + 1);
+                }
                 else {
                   onError?.(reason || "The stream stopped.");
                   if (reason.startsWith("Stopped:")) void checkTimeUp(); // a kid's time limit?

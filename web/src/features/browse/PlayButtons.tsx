@@ -7,6 +7,7 @@ import { fetchLeaves } from "@/api/queries";
 import type { ItemDetail } from "@/api/types";
 import { Button, Select } from "@/components/ui";
 import { toast } from "@/components/Toast";
+import { ArtistRadioButton } from "../music/RadioButtons";
 import { useMusicActions } from "../player/MusicPlayer";
 import { formatTrackTime, versionLabel } from "./format";
 import { TrailerButton } from "./Trailer";
@@ -82,6 +83,7 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
           <Button loading={busy} onClick={() => run(async () => music.play(await fetchLeaves(item.id), 0, { shuffle: true, source: item.title }))}>
             <Shuffle className="size-4" /> Shuffle
           </Button>
+          {item.type === "artist" && <ArtistRadioButton itemId={item.id} />}
         </>
       )}
       {item.type === "track" && (

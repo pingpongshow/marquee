@@ -10,6 +10,7 @@ import { Alert, Button, Dialog, Field, Input, Select, Spinner, Toggle } from "@/
 import { formatDuration } from "../browse/format";
 import { PlaylistMosaic } from "./PlaylistMosaic";
 import { defaultRules, RulesEditor, rulesValid } from "./RulesEditor";
+import { PlaylistInvites, SharedIcon, sharedByText } from "./Sharing";
 import type { SmartRules } from "@/api/types";
 
 function NewPlaylistDialog({ onClose }: { onClose: () => void }) {
@@ -90,6 +91,7 @@ export function PlaylistsPage() {
           <Plus className="size-4" /> New playlist
         </Button>
       </div>
+      <PlaylistInvites />
       {lists.isPending && <Spinner />}
       {lists.isError && <Alert tone="error">{lists.error.message}</Alert>}
       {lists.data?.length === 0 && (
@@ -103,11 +105,15 @@ export function PlaylistsPage() {
           <li key={p.id}>
             <Link to="/playlist/$playlistId" params={{ playlistId: String(p.id) }} className="group block">
               <PlaylistMosaic playlist={p} size={240} className="aspect-square w-full shadow-md group-hover:ring-2 group-hover:ring-accent" />
-              <div className="mt-2 truncate text-sm font-medium">{p.title}</div>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className="truncate text-sm font-medium">{p.title}</span>
+                <SharedIcon playlist={p} />
+              </div>
               <div className="truncate text-xs text-muted">
                 {p.itemCount} {p.kind === "audio" ? "tracks" : "items"}
                 {p.durationMs ? ` · ${formatDuration(p.durationMs)}` : ""}
               </div>
+              {p.readOnly && <div className="truncate text-xs text-muted">{sharedByText(p)}</div>}
             </Link>
           </li>
         ))}

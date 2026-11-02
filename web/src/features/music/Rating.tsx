@@ -55,6 +55,9 @@ export function Rating({
       void qc.invalidateQueries({ queryKey: ["items"] });
       // Library grids and lists (Songs, My rating sort, Rated 4★+) show it too.
       void qc.invalidateQueries({ queryKey: ["libraries"] });
+      // So do playlists and search results, whose rows a rating from the player bar can change.
+      void qc.invalidateQueries({ queryKey: ["playlists"] });
+      void qc.invalidateQueries({ queryKey: ["search"] });
     },
   });
   const set = (next: number | null) => {

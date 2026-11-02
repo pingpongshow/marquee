@@ -136,6 +136,7 @@ function glide(ctx: AudioContext, p: AudioParam, value: number) {
 
 const PRELOAD_SECONDS = 15;
 const DJ_EVERY = 3; // a DJ pick after this many of your own tracks
+const STALLED_RETRY_MS = 15_000; // how often a station out of tracks asks for more
 
 function stored<T extends string | number>(
   key: string,
@@ -474,16 +475,29 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // A station out of tracks with its last one over: top-ups keep being asked for (they can
+  // fail, or come back empty), and the first that brings something carries straight on.
+  const stalled = useRef(false);
+  const stalledRetry = useRef<number | undefined>(undefined);
+  const [topUpTries, setTopUpTries] = useState(0);
+  const onRadio = useRef(false);
+  useEffect(() => {
+    onRadio.current = !!source?.radio;
+  }, [source]);
+  const stall = useCallback(() => {
+    stalled.current = true;
+    setTopUpTries((n) => n + 1);
+  }, []);
+
   /** Moves past a track that can't be played (unless it's the only one left). */
-  const skipFailed = useCallback(
-    () =>
-      setQueue((q) =>
-        Q.skipIndex(q) >= 0 && Q.skipIndex(q) !== q.index
-          ? { ...q, index: Q.skipIndex(q) }
-          : q,
-      ),
-    [],
-  );
+  const skipFailed = useCallback(() => {
+    if (onRadio.current && Q.skipIndex(queueRef.current) < 0) stall();
+    setQueue((q) =>
+      Q.skipIndex(q) >= 0 && Q.skipIndex(q) !== q.index
+        ? { ...q, index: Q.skipIndex(q) }
+        : q,
+    );
+  }, [stall]);
 
   // Start the current entry unless it's already loaded in the active element (after a
   // gapless switch) or waiting in the idle one (preloaded).
@@ -534,21 +548,35 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   // row top it up early, replacing what was coming.
   const refilling = useRef(false);
   const steer = useRef({ skipped: [] as number[], finished: [] as number[], inARow: 0 });
-  const resetSteer = () => (steer.current = { skipped: [], finished: [], inARow: 0 });
+  // Bumped when another station (or none) takes over, so a top-up still on its way is dropped.
+  const stationGen = useRef(0);
+  const resetSteer = () => {
+    steer.current = { skipped: [], finished: [], inARow: 0 };
+    stationGen.current++;
+    refilling.current = false;
+    stalled.current = false;
+    window.clearTimeout(stalledRetry.current);
+  };
   const refill = useCallback(
     (replace: boolean) => {
       const radio = source?.radio;
       if (!radio || refilling.current) return;
       refilling.current = true;
-      const q = queueRef.current;
-      const exclude = q.entries.map((e) => e.item.id);
+      const gen = stationGen.current;
       const { skipped, finished } = steer.current;
       const ctx = source?.context ?? "";
+      // Nothing to carry on with yet: the next track asks again, or a while from now if the
+      // last one has already ended.
+      const tryAgain = () => {
+        if (!stalled.current) return;
+        window.clearTimeout(stalledRetry.current);
+        stalledRetry.current = window.setTimeout(() => setTopUpTries((n) => n + 1), STALLED_RETRY_MS);
+      };
       unwrap(
         api.POST("/music/radio", {
           body: {
             ...radio,
-            exclude,
+            exclude: Q.stationExclude(queueRef.current),
             limit: 25,
             skipped: skipped.slice(-100),
             finished: finished.slice(-100),
@@ -556,22 +584,28 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         }),
       )
         .then((st) => {
-          const fresh = st.items.filter((t) => !exclude.includes(t.id));
-          if (replace) {
-            unload(1 - active.current); // the preloaded next track is being replaced
-            setQueue((cq) => Q.replaceUpcoming(cq, fresh, ctx));
-          } else setQueue((cq) => Q.append(cq, fresh, ctx || undefined));
+          if (gen !== stationGen.current) return;
+          if (!st.items.length) return tryAgain();
+          const resume = stalled.current;
+          stalled.current = false;
+          if (replace) unload(1 - active.current); // the preloaded next track is being replaced
+          setQueue((cq) => Q.topUp(cq, st.items, ctx, { replace, resume }));
         })
-        .catch(() => {})
-        .finally(() => (refilling.current = false));
+        .catch(() => {
+          if (gen === stationGen.current) tryAgain();
+        })
+        .finally(() => {
+          if (gen === stationGen.current) refilling.current = false;
+        });
     },
     [source, unload],
   );
-  // Stations keep going: fetch more when the end of the queue gets close.
+  // Stations keep going: fetch more when the end of the queue gets close. One that failed or
+  // came back empty left the queue as it was, so moving to the next track asks again.
   useEffect(() => {
     if (!source?.radio || queue.entries.length - queue.index > 5) return;
     refill(false);
-  }, [queue, source, refill]);
+  }, [queue, source, refill, topUpTries]);
   // How the last station track went, read when the listener moves on from it. Declared
   // before the progress effect below, so it still sees the previous track's progress.
   const progress = useRef<{ entry?: Q.Entry; time: number; duration: number }>({ time: 0, duration: 0 });
@@ -610,7 +644,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const following = q.entries[q.index + 1];
     if (djCount.current < DJ_EVERY || following?.dj) return;
     djBusy.current = true;
-    const exclude = q.entries.map((e) => e.item.id);
+    const exclude = Q.stationExclude(q);
     unwrap(
       api.POST("/music/dj", {
         body: { trackId: entry.item.id, mode: dj, exclude },
@@ -822,6 +856,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const fi = Q.followingIndex(q);
     if (fi < 0) {
       setPlaying(false);
+      if (source?.radio) stall();
       return;
     }
     if (fi === q.index) {
@@ -1021,6 +1056,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               }}
               onPlay={() => {
                 if (i !== active.current) return;
+                stalled.current = false; // playing again: a top-up mustn't cut it short
                 resumeCtx();
                 setPlaying(true);
                 report("playing");

@@ -49,15 +49,16 @@ export function Menu({
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
+  // Closed, it forgets where it last opened.
+  if (!open && (side !== align || shift !== 0 || pos !== null)) {
+    setSide(align);
+    setShift(0);
+    setPos(null);
+  }
   // Open on the other side when the preferred one would run off the screen; when neither fits,
   // nudge it back on screen. Measured once per open from the anchor, so it can't oscillate.
   useLayoutEffect(() => {
-    if (!open) {
-      setSide(align);
-      setShift(0);
-      setPos(null);
-      return;
-    }
+    if (!open) return;
     const a = ref.current?.getBoundingClientRect();
     const w = menu.current?.offsetWidth;
     if (!a || !w) return;

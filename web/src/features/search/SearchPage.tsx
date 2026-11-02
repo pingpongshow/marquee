@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { searchQuery } from "@/api/queries";
 import { Spinner } from "@/components/ui";
 import { Poster } from "../browse/Poster";
+import { TrackRadioButton } from "../music/RadioButtons";
 import { RowRating } from "../music/Rating";
 import { RowFavorite } from "../browse/Favorite";
 import { MuseVideo } from "./MuseVideo";
@@ -94,6 +95,7 @@ function TextSearch({ q, tabs }: { q: string; tabs: ReactNode }) {
                     <div className="mt-0.5 flex items-center gap-1">
                       <RowFavorite item={it} />
                       <RowRating item={it} />
+                      <TrackRadioButton item={it} />
                     </div>
                   )}
                 </Link>

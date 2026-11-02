@@ -26,6 +26,7 @@ import { HomeRowPage } from "@/features/home/HomeRowPage";
 import { HomePage } from "@/features/home/HomePage";
 import { MusicProvider } from "@/features/player/MusicPlayer";
 import { PlayerPage } from "@/features/player/PlayerPage";
+import { TopSongsPage } from "@/features/music/TopSongs";
 import { PlaylistPage } from "@/features/playlists/PlaylistPage";
 import { PlaylistsPage } from "@/features/playlists/PlaylistsPage";
 import { MoodStylePage } from "@/features/music/MoodStylePage";
@@ -144,6 +145,12 @@ const itemRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/item/$itemId",
   component: ItemPage,
+});
+
+const topSongsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/item/$itemId/top-songs",
+  component: TopSongsPage,
 });
 
 const searchRoute = createRoute({
@@ -376,6 +383,7 @@ const routeTree = rootRoute.addChildren([
   libraryRoute,
   librarySectionRoute,
   itemRoute,
+  topSongsRoute,
   searchRoute,
   accountRoute,
   recapRoute,
