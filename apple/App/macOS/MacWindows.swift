@@ -39,6 +39,7 @@ final class MacWindows: NSObject {
         NSWindow.allowsAutomaticWindowTabbing = false
         installSpaceKey()
         MacPlayback.shared.startTestDriver()
+        MacUpdates.shared.start()
     }
 
     /// The main window, each time SwiftUI makes one.

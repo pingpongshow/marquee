@@ -172,6 +172,7 @@ private struct MacSettingsMenuItems: View {
         if playback.app.me?.isAdmin == true, !playback.app.isOffline {
             Button("Administration…") { MacWindows.openAdministration() }
         }
+        Button("Check for Updates…") { Task { await MacUpdates.shared.checkFromMenu() } }
     }
 }
 

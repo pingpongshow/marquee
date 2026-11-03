@@ -38,7 +38,7 @@ struct SignInView: View {
             .task { await load() }
             .sheet(item: $chosen) { p in
                 PinEntry(profile: p) { pin in await pinSignIn(p, pin: pin) }
-                    .macSheetFrame(420, 460)
+                    .macSheetFrame(420, 640)
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -112,7 +112,8 @@ struct SignInView: View {
 }
 
 
-private struct PinEntry: View {
+struct PinEntry: View {
+    @Environment(\.dismiss) private var dismiss
     let profile: Schemas.Profile
     let submit: (String) async -> Void
     @State private var busy = false
@@ -124,6 +125,11 @@ private struct PinEntry: View {
                 busy = true
                 Task { await submit(pin); busy = false }
             }
+            #if os(macOS)
+            // A Mac's sheet has no swipe to close it.
+            Button("Cancel", role: .cancel) { dismiss() }
+                .keyboardShortcut(.cancelAction)
+            #endif
         }
         .padding(32)
         .presentationDetents([.medium, .large])

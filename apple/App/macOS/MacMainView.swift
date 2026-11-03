@@ -181,6 +181,19 @@ struct MainView: View {
             }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom) {
+            if let update = MacUpdates.shared.available {
+                Button { MacUpdates.shared.openRelease() } label: {
+                    Label("Marquee \(update.version) is available", systemImage: "arrow.down.circle.fill")
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("sidebar.update")
+            }
+        }
         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
         .accessibilityIdentifier("sidebar")
     }

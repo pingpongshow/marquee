@@ -604,6 +604,27 @@ struct PinPad: View {
     @State private var digits = ""
 
     var body: some View {
+        pad
+            #if os(macOS)
+            // A Mac has number keys.
+            .focusable()
+            .focusEffectDisabled()
+            .focused($typing)
+            .onAppear { typing = true }
+            .onKeyPress(characters: .decimalDigits, phases: .down) { key in
+                guard !disabled else { return .ignored }
+                press(key.characters)
+                return .handled
+            }
+            .onKeyPress(.delete) { press("⌫"); return .handled }
+            #endif
+    }
+
+    #if os(macOS)
+    @FocusState private var typing: Bool
+    #endif
+
+    private var pad: some View {
         VStack(spacing: 20) {
             HStack(spacing: 14) {
                 ForEach(0..<4, id: \.self) { i in

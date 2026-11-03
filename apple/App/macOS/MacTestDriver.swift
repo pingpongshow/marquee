@@ -6,6 +6,7 @@ import MarqueeKit
 import MediaPlayer
 import Security
 import SwiftUI
+import UserNotifications
 
 /// Debug builds only, with `-marquee-test-driver <folder>`: reads a command from <folder>/cmd and
 /// writes the answer to <folder>/out, so the app can be driven and looked at without taking the
@@ -42,6 +43,27 @@ enum MacTestDriver {
                 try await p.app.signIn(username: w[2], password: w[3])
                 return "signed in"
             case "signout": await p.app.signOut(); return "ok"
+            case "pinsize": // Whether the PIN sheet's content fits the sheet.
+                let profile = Schemas.Profile(id: 1, displayName: "stephen", isManaged: false, requires: .pin)
+                let host = NSHostingView(rootView: PinEntry(profile: profile) { _ in }.macEnvironment().frame(width: 420, height: 640).preferredColorScheme(.dark))
+                host.frame = NSRect(x: 0, y: 0, width: 420, height: 640)
+                let fit = NSHostingView(rootView: PinEntry(profile: profile) { _ in }.macEnvironment()).fittingSize
+                host.layoutSubtreeIfNeeded()
+                if w.count > 1, let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                    host.cacheDisplay(in: host.bounds, to: rep)
+                    try rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: w[1]))
+                }
+                return "fitting \(fit)"
+            case "notifystate": // What macOS says about notifications for this app.
+                let c = UNUserNotificationCenter.current()
+                let before = await c.notificationSettings()
+                var outcome = ""
+                do { outcome = "granted=\(try await c.requestAuthorization(options: [.alert, .sound]))" } catch { outcome = "error=\(error)" }
+                let after = await c.notificationSettings()
+                return "before=\(before.authorizationStatus.rawValue) \(outcome) after=\(after.authorizationStatus.rawValue) alert=\(after.alertSetting.rawValue) style=\(after.alertStyle.rawValue)"
+            case "updatecheck": // As if this were the given version.
+                let found = await MacUpdates.shared.check(current: w[1], askedByPerson: true)
+                return "found \(found?.version ?? "nothing") status=\(MacUpdates.shared.status ?? "-")"
             case "select": MacNavigation.shared.select(w[1]); return "ok"
             case "item": MacNavigation.shared.push(.item(Int64(w[1])!)); return "ok"
             case "route":

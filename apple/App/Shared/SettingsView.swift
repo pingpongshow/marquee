@@ -143,6 +143,9 @@ struct SettingsView: View {
             } footer: {
                 Text("Audio quality shows each track's format, such as FLAC · 24-bit/96 kHz, in Now Playing and track lists.")
             }
+            #if os(macOS)
+            MacUpdateSection()
+            #endif
             #if !os(tvOS)
             Section {
                 NavigationLink(value: Route.downloads) {
