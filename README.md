@@ -2,7 +2,7 @@
 
 # Marquee
 
-**A self-hosted media server for movies, TV, anime, music and live TV, with apps for the web, iPhone, iPad, Apple TV, Android and Android TV.**
+**A self-hosted media server for movies, TV, anime, music and live TV, with apps for the web, Mac, iPhone, iPad, Apple TV, Android and Android TV.**
 
 [![Release](https://img.shields.io/github/v/release/pingpongshow/marquee?sort=semver)](https://github.com/pingpongshow/marquee/releases)
 ![Server](https://img.shields.io/badge/server-Go%20%2B%20Docker-00ADD8)
@@ -13,7 +13,7 @@
 
 Marquee organises the films, shows, music and recordings already on your disks and streams them to your devices, at home and away. It runs on your own hardware, needs no cloud account, and keeps your viewing private: accounts are local, metadata comes from public sources, and the heavy lifting (transcoding, music analysis, natural-language search) happens on your server.
 
-- **One server, every screen:** a web app built into the server, plus native apps for iPhone, iPad, Apple TV, Android phones, tablets and Android TV.
+- **One server, every screen:** a web app built into the server, plus native apps for Mac, iPhone, iPad, Apple TV, Android phones, tablets and Android TV.
 - **Plays anything:** direct play when the device can, otherwise a remux or a hardware-accelerated transcode (NVIDIA, Intel Quick Sync or CPU) sized to the connection.
 - **A music player worth using:** gapless playback, loudness levelling, crossfade, synced lyrics, radios and mixes built from how your music actually sounds.
 - **Live TV, DVR and on-demand films and shows** from any M3U/XMLTV source or Dispatcharr, with commercials cut from recordings and films on demand saved straight into your library.
@@ -71,6 +71,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 
 ### Music
 - **Soundprint:** every track is analysed on your server, powering radios, "sounds like this", **Muse** (describe a playlist in words), **Sound Journey** (a path from one track to another), a DJ, and mood and style pages.
+- **Sonos:** play to a room from the Mac app; the server sends the music straight to the speakers. The server needs to be on the same network as the speakers (`network_mode: host` in Docker, as in the compose files). To limit it to certain players, set `MARQUEE_SONOS_HOSTS` to their addresses, comma-separated.
 - **Artist Radio and Track Radio:** endless stations from an artist or any song, with similar artists and tracks.
 - **Thumbs down:** a song you flag stays out of your radios and generated playlists.
 - Artist pages lead with your top songs: favourites, songs you rated 3.5 stars or more, and what's popular.
@@ -104,6 +105,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 | Platform | Highlights |
 |---|---|
 | **Web** | Everything, including settings and administration. Built into the server: open `http://<server>:32500`. |
+| **Mac** | A sidebar like Apple Music, a slim floating mini player and floating video, a menu bar icon, media keys and downloads. Play to any Mac output for Marquee alone, AirPlay or Sonos. |
 | **iPhone and iPad** | Downloads, AirPlay and Chromecast, lock-screen controls. |
 | **Apple TV** | Top Shelf, Quick Connect sign-in, remote-controllable. |
 | **Android phone and tablet** | Downloads, Android Auto, Chromecast. |
@@ -148,7 +150,7 @@ The screenshots show a demo library of made-up titles with generated artwork.
 - **Hardware transcoding (optional):** an NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), or an Intel CPU with Quick Sync (`/dev/dri`). Without either, Marquee transcodes on the CPU, and still direct-plays whatever your devices support.
 - **Music analysis (optional):** Soundprint runs on the CPU, or much faster on an NVIDIA GPU. It needs about 1.5 GB of disk for its models.
 - **A free [TMDB API key](https://www.themoviedb.org/settings/api)** for movie and TV metadata.
-- **Apps:** iOS/iPadOS/tvOS 18 or later; Android 8.0 or later.
+- **Apps:** macOS 15 or later; iOS/iPadOS/tvOS 18 or later; Android 8.0 or later.
 
 ## Install the server
 
@@ -259,6 +261,7 @@ Download the apps from the [latest release](https://github.com/pingpongshow/marq
 | **Android / Android TV** | Download `Marquee-<version>.apk` and open it (allow installing from your browser or file manager). On Android TV, sideload it with a file manager or `adb install`. |
 | **iPhone / iPad** | `Marquee-iOS-<version>-unsigned.ipa` is unsigned. Install it with a sideloading tool such as [AltStore](https://altstore.io) or [Sideloadly](https://sideloadly.io), signed with your Apple ID, or build it yourself in Xcode ([see below](#building-from-source)). |
 | **Apple TV** | `Marquee-tvOS-<version>-unsigned.ipa`: install with Sideloadly, or build in Xcode. |
+| **Mac** | `Marquee-macOS-<version>.dmg`: signed and notarised, so open it and drag Marquee to Applications. |
 
 The apps find the server on your network automatically, or you can type its address (for example `192.168.1.20:32500`). On a TV, sign in with **Quick Connect**: the TV shows a code that you approve from your phone or the web.
 

@@ -58,6 +58,8 @@ extension Components {
         public typealias Offset = Swift.Int
         /// - Remark: Generated from `#/components/parameters/Limit`.
         public typealias Limit = Swift.Int
+        /// - Remark: Generated from `#/components/parameters/SpeakerId`.
+        public typealias SpeakerId = Swift.String
         /// - Remark: Generated from `#/components/parameters/PlaylistId`.
         public typealias PlaylistId = Swift.Int64
         /// - Remark: Generated from `#/components/parameters/BackupName`.

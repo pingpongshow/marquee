@@ -12,6 +12,7 @@ import (
 	"marquee/internal/api"
 	"marquee/internal/auth"
 	"marquee/internal/netclass"
+	"marquee/internal/speakers"
 	"marquee/internal/vod"
 	"marquee/internal/web"
 )
@@ -22,6 +23,7 @@ type Deps struct {
 	Downloads  http.Handler // offline download files under /api/v1/download/
 	Live       http.Handler // live TV streams under /api/v1/live/
 	VOD        http.Handler // movies on demand under /api/v1/vod-stream/ (LIVE-6)
+	Speakers   http.Handler // what Sonos rooms fetch, under /api/v1/speakers/stream/ and art/ (MUSIC-26)
 	Auth       *auth.Service
 	Classifier *netclass.Classifier
 	WebDir     string
@@ -55,6 +57,10 @@ func New(d Deps) http.Handler {
 	}
 	if d.VOD != nil {
 		mux.Handle(vod.StreamPrefix, d.VOD)
+	}
+	if d.Speakers != nil {
+		mux.Handle(speakers.StreamRoute, d.Speakers)
+		mux.Handle(speakers.ArtRoute, d.Speakers)
 	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "unknown API endpoint")

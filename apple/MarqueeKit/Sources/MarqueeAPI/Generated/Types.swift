@@ -592,6 +592,31 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /remote/state`.
     /// - Remark: Generated from `#/paths//remote/state/put(reportRemoteState)`.
     func reportRemoteState(_ input: Operations.ReportRemoteState.Input) async throws -> Operations.ReportRemoteState.Output
+    /// Sonos rooms found on the server's network (MUSIC-26): the server plays to them itself, so whatever asks can close. A home theatre or stereo pair is one room. At home only; empty when there are none, or when the server's container isn't on the host network.
+    ///
+    /// - Remark: HTTP `GET /speakers`.
+    /// - Remark: Generated from `#/paths//speakers/get(listSpeakers)`.
+    func listSpeakers(_ input: Operations.ListSpeakers.Input) async throws -> Operations.ListSpeakers.Output
+    /// What a room is doing.
+    ///
+    /// - Remark: HTTP `GET /speakers/{speakerId}`.
+    /// - Remark: Generated from `#/paths//speakers/{speakerId}/get(getSpeaker)`.
+    func getSpeaker(_ input: Operations.GetSpeaker.Input) async throws -> Operations.GetSpeaker.Output
+    /// Play songs in a room, replacing what it was playing. The server sends them in order, converting what the speaker can't play, and counts them as your plays. The equaliser, crossfade and levelling don't apply.
+    ///
+    /// - Remark: HTTP `POST /speakers/{speakerId}/play`.
+    /// - Remark: Generated from `#/paths//speakers/{speakerId}/play/post(playOnSpeaker)`.
+    func playOnSpeaker(_ input: Operations.PlayOnSpeaker.Input) async throws -> Operations.PlayOnSpeaker.Output
+    /// Add songs to the end of what Marquee is playing in a room, as a radio tops itself up. 409 when Marquee isn't what's playing there.
+    ///
+    /// - Remark: HTTP `POST /speakers/{speakerId}/queue`.
+    /// - Remark: Generated from `#/paths//speakers/{speakerId}/queue/post(addToSpeakerQueue)`.
+    func addToSpeakerQueue(_ input: Operations.AddToSpeakerQueue.Input) async throws -> Operations.AddToSpeakerQueue.Output
+    /// Pause, resume, stop, skip, seek or set a room's volume. next, previous and seek are for what Marquee is playing there (409 otherwise).
+    ///
+    /// - Remark: HTTP `POST /speakers/{speakerId}/control`.
+    /// - Remark: Generated from `#/paths//speakers/{speakerId}/control/post(controlSpeaker)`.
+    func controlSpeaker(_ input: Operations.ControlSpeaker.Input) async throws -> Operations.ControlSpeaker.Output
     /// Devices you can control: your own signed-in apps that are open (admins: everyone's), except the one asking.
     ///
     /// - Remark: HTTP `GET /remote/players`.
@@ -2955,6 +2980,71 @@ extension APIProtocol {
         body: Operations.ReportRemoteState.Input.Body
     ) async throws -> Operations.ReportRemoteState.Output {
         try await reportRemoteState(Operations.ReportRemoteState.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Sonos rooms found on the server's network (MUSIC-26): the server plays to them itself, so whatever asks can close. A home theatre or stereo pair is one room. At home only; empty when there are none, or when the server's container isn't on the host network.
+    ///
+    /// - Remark: HTTP `GET /speakers`.
+    /// - Remark: Generated from `#/paths//speakers/get(listSpeakers)`.
+    public func listSpeakers(headers: Operations.ListSpeakers.Input.Headers = .init()) async throws -> Operations.ListSpeakers.Output {
+        try await listSpeakers(Operations.ListSpeakers.Input(headers: headers))
+    }
+    /// What a room is doing.
+    ///
+    /// - Remark: HTTP `GET /speakers/{speakerId}`.
+    /// - Remark: Generated from `#/paths//speakers/{speakerId}/get(getSpeaker)`.
+    public func getSpeaker(
+        path: Operations.GetSpeaker.Input.Path,
+        headers: Operations.GetSpeaker.Input.Headers = .init()
+    ) async throws -> Operations.GetSpeaker.Output {
+        try await getSpeaker(Operations.GetSpeaker.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Play songs in a room, replacing what it was playing. The server sends them in order, converting what the speaker can't play, and counts them as your plays. The equaliser, crossfade and levelling don't apply.
+    ///
+    /// - Remark: HTTP `POST /speakers/{speakerId}/play`.
+    /// - Remark: Generated from `#/paths//speakers/{speakerId}/play/post(playOnSpeaker)`.
+    public func playOnSpeaker(
+        path: Operations.PlayOnSpeaker.Input.Path,
+        headers: Operations.PlayOnSpeaker.Input.Headers = .init(),
+        body: Operations.PlayOnSpeaker.Input.Body
+    ) async throws -> Operations.PlayOnSpeaker.Output {
+        try await playOnSpeaker(Operations.PlayOnSpeaker.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Add songs to the end of what Marquee is playing in a room, as a radio tops itself up. 409 when Marquee isn't what's playing there.
+    ///
+    /// - Remark: HTTP `POST /speakers/{speakerId}/queue`.
+    /// - Remark: Generated from `#/paths//speakers/{speakerId}/queue/post(addToSpeakerQueue)`.
+    public func addToSpeakerQueue(
+        path: Operations.AddToSpeakerQueue.Input.Path,
+        headers: Operations.AddToSpeakerQueue.Input.Headers = .init(),
+        body: Operations.AddToSpeakerQueue.Input.Body
+    ) async throws -> Operations.AddToSpeakerQueue.Output {
+        try await addToSpeakerQueue(Operations.AddToSpeakerQueue.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Pause, resume, stop, skip, seek or set a room's volume. next, previous and seek are for what Marquee is playing there (409 otherwise).
+    ///
+    /// - Remark: HTTP `POST /speakers/{speakerId}/control`.
+    /// - Remark: Generated from `#/paths//speakers/{speakerId}/control/post(controlSpeaker)`.
+    public func controlSpeaker(
+        path: Operations.ControlSpeaker.Input.Path,
+        headers: Operations.ControlSpeaker.Input.Headers = .init(),
+        body: Operations.ControlSpeaker.Input.Body
+    ) async throws -> Operations.ControlSpeaker.Output {
+        try await controlSpeaker(Operations.ControlSpeaker.Input(
+            path: path,
             headers: headers,
             body: body
         ))

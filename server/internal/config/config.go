@@ -32,7 +32,10 @@ type Config struct {
 	RecordingsDir string
 	// ComskipPath and ComskipINI are the commercial detector and its settings (LIVE-5).
 	ComskipPath, ComskipINI string
-	LogLevel                slog.Level
+	// SonosHosts, when set, are the only Sonos players contacted, with no network search
+	// (MUSIC-26): for a network where multicast doesn't reach them, or to keep to some of them.
+	SonosHosts []string
+	LogLevel   slog.Level
 }
 
 func Load() (Config, error) {
@@ -47,6 +50,11 @@ func Load() (Config, error) {
 		RecordingsDir: env("MARQUEE_RECORDINGS_DIR", "/recordings"),
 		ComskipPath:   env("MARQUEE_COMSKIP", "comskip"),
 		ComskipINI:    env("MARQUEE_COMSKIP_INI", "/usr/local/share/marquee/comskip.ini"),
+	}
+	for _, h := range strings.Split(os.Getenv("MARQUEE_SONOS_HOSTS"), ",") {
+		if h = strings.TrimSpace(h); h != "" {
+			c.SonosHosts = append(c.SonosHosts, h)
+		}
 	}
 	if _, err := strconv.Atoi(strings.TrimPrefix(c.ListenAddr, ":")); err != nil {
 		return c, fmt.Errorf("invalid MARQUEE_PORT: %w", err)

@@ -58,6 +58,7 @@ import (
 	"marquee/internal/server"
 	"marquee/internal/settings"
 	"marquee/internal/soundprint"
+	"marquee/internal/speakers"
 	"marquee/internal/storage"
 	"marquee/internal/subtitles"
 	"marquee/internal/syncplay"
@@ -779,6 +780,14 @@ func run() error {
 	store.Subscribe(advertise)
 	defer bonjour.Stop()
 
+	imageSvc := images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath)
+	// Sonos rooms (MUSIC-26): nothing goes on the network until an app asks for them.
+	sonos := &speakers.Service{DB: database, Dir: filepath.Join(cfg.TranscodeDir, "speakers"), Port: port, Hosts: cfg.SonosHosts, Art: imageSvc.Path,
+		Convert: func(ctx context.Context, userID, itemID, fileID int64, sampleRate int, out string) error {
+			return player.ConvertAudio(ctx, playback.Request{UserID: userID, ItemID: itemID, FileID: fileID, SampleRate: sampleRate}, "high", out, func(float64) {})
+		}}
+	go sonos.Run(ctx)
+
 	apiHandlers := &api.Handlers{
 		DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 		Items: itemStore, Scans: scans, Version: config.Version,
@@ -794,6 +803,7 @@ func run() error {
 		Optimize:    optimizer,
 		SyncPlay:    watchTogether,
 		Remote:      remoteHub,
+		Speakers:    sonos,
 		Embeddings:  embedder,
 		AI:          aiClient,
 		LyricThemes: lyricThemes,
@@ -804,7 +814,7 @@ func run() error {
 		Mail:        mailer,
 		Alerts:      alerts,
 		Avatars:     &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
-		Images:      images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
+		Images:      imageSvc,
 		Logs:        logs,
 		Metadata:    meta,
 		Playback:    player,
@@ -826,6 +836,7 @@ func run() error {
 		Downloads:  apiHandlers.DownloadFiles(),
 		Live:       live.Sessions.Handler(),
 		VOD:        vodSvc.Streams.Handler(),
+		Speakers:   sonos.Handler(),
 		Stream:     player.StreamHandler(filepath.Join(cfg.ConfigDir, "cache", "subtitles")),
 		Auth:       authSvc,
 		Classifier: classifier,

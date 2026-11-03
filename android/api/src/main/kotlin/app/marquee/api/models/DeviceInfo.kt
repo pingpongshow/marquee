@@ -62,7 +62,7 @@ data class DeviceInfo (
     /**
      * 
      *
-     * Values: WEB,IOS,IPADOS,TVOS,ANDROID,ANDROIDTV,OTHER
+     * Values: WEB,IOS,IPADOS,TVOS,MACOS,ANDROID,ANDROIDTV,OTHER
      */
     @Serializable
     enum class Platform(val value: kotlin.String) {
@@ -70,6 +70,7 @@ data class DeviceInfo (
         @SerialName(value = "ios") IOS("ios"),
         @SerialName(value = "ipados") IPADOS("ipados"),
         @SerialName(value = "tvos") TVOS("tvos"),
+        @SerialName(value = "macos") MACOS("macos"),
         @SerialName(value = "android") ANDROID("android"),
         @SerialName(value = "androidtv") ANDROIDTV("androidtv"),
         @SerialName(value = "other") OTHER("other");

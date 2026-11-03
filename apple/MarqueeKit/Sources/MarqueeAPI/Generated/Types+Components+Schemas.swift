@@ -184,6 +184,7 @@ extension Components {
                 case ios = "ios"
                 case ipados = "ipados"
                 case tvos = "tvos"
+                case macos = "macos"
                 case android = "android"
                 case androidtv = "androidtv"
                 case other = "other"
@@ -10384,6 +10385,145 @@ extension Components {
                 case capabilities
                 case state
                 case version
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Speaker`.
+        public struct Speaker: Codable, Hashable, Sendable {
+            /// The room's Sonos id.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Speaker/id`.
+            public var id: Swift.String
+            /// The room, e.g. "Living Room".
+            ///
+            /// - Remark: Generated from `#/components/schemas/Speaker/name`.
+            public var name: Swift.String
+            /// Its main speaker, e.g. "Sonos Arc".
+            ///
+            /// - Remark: Generated from `#/components/schemas/Speaker/model`.
+            public var model: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Speaker/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case playing = "playing"
+                case paused = "paused"
+                case stopped = "stopped"
+                case loading = "loading"
+            }
+            /// - Remark: Generated from `#/components/schemas/Speaker/state`.
+            public var state: Components.Schemas.Speaker.StatePayload
+            /// 0–100.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Speaker/volume`.
+            public var volume: Swift.Int
+            /// Marquee is what's playing there, rather than another app.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Speaker/marquee`.
+            public var marquee: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/Speaker/current`.
+            public var current: Components.Schemas.ItemSummary?
+            /// - Remark: Generated from `#/components/schemas/Speaker/positionMs`.
+            public var positionMs: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/Speaker/durationMs`.
+            public var durationMs: Swift.Int64?
+            /// Which of the queue is playing, from 0.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Speaker/queueIndex`.
+            public var queueIndex: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/Speaker/queueLength`.
+            public var queueLength: Swift.Int?
+            /// Creates a new `Speaker`.
+            ///
+            /// - Parameters:
+            ///   - id: The room's Sonos id.
+            ///   - name: The room, e.g. "Living Room".
+            ///   - model: Its main speaker, e.g. "Sonos Arc".
+            ///   - state:
+            ///   - volume: 0–100.
+            ///   - marquee: Marquee is what's playing there, rather than another app.
+            ///   - current:
+            ///   - positionMs:
+            ///   - durationMs:
+            ///   - queueIndex: Which of the queue is playing, from 0.
+            ///   - queueLength:
+            public init(
+                id: Swift.String,
+                name: Swift.String,
+                model: Swift.String,
+                state: Components.Schemas.Speaker.StatePayload,
+                volume: Swift.Int,
+                marquee: Swift.Bool,
+                current: Components.Schemas.ItemSummary? = nil,
+                positionMs: Swift.Int64? = nil,
+                durationMs: Swift.Int64? = nil,
+                queueIndex: Swift.Int? = nil,
+                queueLength: Swift.Int? = nil
+            ) {
+                self.id = id
+                self.name = name
+                self.model = model
+                self.state = state
+                self.volume = volume
+                self.marquee = marquee
+                self.current = current
+                self.positionMs = positionMs
+                self.durationMs = durationMs
+                self.queueIndex = queueIndex
+                self.queueLength = queueLength
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case model
+                case state
+                case volume
+                case marquee
+                case current
+                case positionMs
+                case durationMs
+                case queueIndex
+                case queueLength
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SpeakerPlay`.
+        public struct SpeakerPlay: Codable, Hashable, Sendable {
+            /// Songs, or an album, artist or playlist item (expanded as its own Play button would). At most 2,000 songs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SpeakerPlay/itemIds`.
+            public var itemIds: [Swift.Int64]
+            /// Start at this entry of itemIds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SpeakerPlay/index`.
+            public var index: Swift.Int?
+            /// Start this far into it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SpeakerPlay/startMs`.
+            public var startMs: Swift.Int64?
+            /// As PlaybackRequest.context: what it's played from, for the music statistics.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SpeakerPlay/context`.
+            public var context: Swift.String?
+            /// Creates a new `SpeakerPlay`.
+            ///
+            /// - Parameters:
+            ///   - itemIds: Songs, or an album, artist or playlist item (expanded as its own Play button would). At most 2,000 songs.
+            ///   - index: Start at this entry of itemIds.
+            ///   - startMs: Start this far into it.
+            ///   - context: As PlaybackRequest.context: what it's played from, for the music statistics.
+            public init(
+                itemIds: [Swift.Int64],
+                index: Swift.Int? = nil,
+                startMs: Swift.Int64? = nil,
+                context: Swift.String? = nil
+            ) {
+                self.itemIds = itemIds
+                self.index = index
+                self.startMs = startMs
+                self.context = context
+            }
+            public enum CodingKeys: String, CodingKey {
+                case itemIds
+                case index
+                case startMs
+                case context
             }
         }
         /// - Remark: Generated from `#/components/schemas/RemoteCommand`.

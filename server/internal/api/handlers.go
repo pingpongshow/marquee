@@ -36,6 +36,7 @@ import (
 	"marquee/internal/scrobble"
 	"marquee/internal/settings"
 	"marquee/internal/soundprint"
+	"marquee/internal/speakers"
 	"marquee/internal/storage"
 	"marquee/internal/subtitles"
 	"marquee/internal/syncplay"
@@ -89,6 +90,8 @@ type Handlers struct {
 	Version string
 	// Remote is remote control (USER-14).
 	Remote *remote.Hub
+	// Speakers plays music on Sonos rooms (MUSIC-26); nil finds none.
+	Speakers *speakers.Service
 	// Embeddings indexes movies and shows for Muse for movies, recommendations and related
 	// items (USER-15, USER-16); nil without the Soundprint sidecar.
 	Embeddings *items.Embedder

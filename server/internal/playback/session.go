@@ -57,6 +57,8 @@ type Request struct {
 	// Context is what the play was started from (a mix, a station…), for the music playlist
 	// statistics; "" when not from one.
 	Context string
+	// SampleRate has ConvertAudio resample a song to this rate; 0 keeps the original's.
+	SampleRate int
 }
 
 // Session is an active playback.

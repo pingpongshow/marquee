@@ -477,6 +477,9 @@ func (h *Handlers) DeleteUser(ctx context.Context, req DeleteUserRequestObject) 
 	if h.Remote != nil {
 		h.Remote.DropUser(req.UserId)
 	}
+	if h.Speakers != nil {
+		h.Speakers.DropUser(ctx, req.UserId)
+	}
 	return DeleteUser204Response{}, nil
 }
 

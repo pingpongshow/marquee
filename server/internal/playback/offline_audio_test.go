@@ -77,3 +77,17 @@ func TestOfflineAudioWithFFmpeg(t *testing.T) {
 		t.Fatalf("output: %v %v", st, err)
 	}
 }
+
+// Naming a rate has AAC small enough to copy encoded instead, which is how surround gets
+// downmixed for a speaker; without one a phone's download is copied as ever.
+func TestOfflineAudioArgsAtEncodes(t *testing.T) {
+	a := offlineAudioArgsAt("in.m4a", &AudioStream{Index: 0, Codec: "aac", Channels: 6}, 128, 256, 48000, "o.m4a")
+	got := strings.Join(a, " ")
+	if strings.Contains(got, "-c:a copy") || !strings.Contains(got, "-c:a aac") || !strings.Contains(got, "-ac 2") || !strings.Contains(got, "-ar 48000") {
+		t.Fatal(got)
+	}
+	got = strings.Join(offlineAudioArgs("in.m4a", &AudioStream{Index: 0, Codec: "aac", Channels: 6}, 128, 256, "o.m4a"), " ")
+	if !strings.Contains(got, "-c:a copy") {
+		t.Fatal(got)
+	}
+}

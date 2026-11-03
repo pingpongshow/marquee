@@ -77,11 +77,16 @@ func (m *Manager) OfflineJob(ctx context.Context, r Request, quality, out string
 // lower, so a download is never larger for no gain. AAC already at or below kbps is copied,
 // since converting it again only loses quality.
 func offlineAudioArgs(input string, a *AudioStream, srcKbps, kbps int, out string) []string {
+	return offlineAudioArgsAt(input, a, srcKbps, kbps, 0, out)
+}
+
+// offlineAudioArgsAt is offlineAudioArgs resampling to hz, unless that's 0.
+func offlineAudioArgsAt(input string, a *AudioStream, srcKbps, kbps, hz int, out string) []string {
 	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-i", input, "-map", "0:" + strconv.Itoa(a.Index), "-map_metadata", "0", "-vn", "-sn", "-dn"}
 	if a.BitrateKbps > 0 {
 		srcKbps = a.BitrateKbps
 	}
-	if a.Codec == "aac" && !heAAC(a) && srcKbps > 0 && srcKbps <= kbps {
+	if a.Codec == "aac" && !heAAC(a) && srcKbps > 0 && srcKbps <= kbps && hz == 0 {
 		args = append(args, "-c:a", "copy")
 	} else {
 		if srcKbps > 0 && srcKbps < kbps {
@@ -92,6 +97,9 @@ func offlineAudioArgs(input string, a *AudioStream, srcKbps, kbps int, out strin
 			channels = "1"
 		}
 		args = append(args, "-c:a", "aac", "-b:a", strconv.Itoa(kbps)+"k", "-ac", channels)
+		if hz > 0 {
+			args = append(args, "-ar", strconv.Itoa(hz))
+		}
 	}
 	return append(args, "-progress", "pipe:1", "-nostats", "-f", "ipod", "-movflags", "+faststart", out)
 }
@@ -109,7 +117,7 @@ func (m *Manager) ConvertAudio(ctx context.Context, r Request, quality, out stri
 	if s.Media.Audio == nil {
 		return errors.New("this song has no audio")
 	}
-	return m.runConversion(ctx, "aac", offlineAudioArgs(s.Path, s.Media.Audio, s.Media.BitrateKbps, kbps, out), s.Media.DurationMS, progress)
+	return m.runConversion(ctx, "aac", offlineAudioArgsAt(s.Path, s.Media.Audio, s.Media.BitrateKbps, kbps, r.SampleRate, out), s.Media.DurationMS, progress)
 }
 
 // RunOffline runs a conversion, reporting progress (0–1). If the hardware encoder fails it

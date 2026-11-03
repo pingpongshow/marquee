@@ -29,6 +29,7 @@ tags:
   - name: plex
   - name: playback
   - name: hubs
+  - name: speakers
   - name: playlists
   - name: music
   - name: syncplay
@@ -2169,6 +2170,124 @@ paths:
       responses:
         "204": { description: Noted. }
         "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /speakers:
+    get:
+      tags: [speakers]
+      operationId: listSpeakers
+      summary: "Sonos rooms found on the server's network (MUSIC-26): the server plays to them itself, so whatever asks can close. A home theatre or stereo pair is one room. At home only; empty when there are none, or when the server's container isn't on the host network."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Speaker" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /speakers/{speakerId}:
+    parameters:
+      - $ref: "#/components/parameters/SpeakerId"
+    get:
+      tags: [speakers]
+      operationId: getSpeaker
+      summary: What a room is doing.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Speaker" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /speakers/{speakerId}/play:
+    parameters:
+      - $ref: "#/components/parameters/SpeakerId"
+    post:
+      tags: [speakers]
+      operationId: playOnSpeaker
+      summary: "Play songs in a room, replacing what it was playing. The server sends them in order, converting what the speaker can't play, and counts them as your plays. The equaliser, crossfade and levelling don't apply."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SpeakerPlay" }
+      responses:
+        "200":
+          description: Playing.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Speaker" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /speakers/{speakerId}/queue:
+    parameters:
+      - $ref: "#/components/parameters/SpeakerId"
+    post:
+      tags: [speakers]
+      operationId: addToSpeakerQueue
+      summary: "Add songs to the end of what Marquee is playing in a room, as a radio tops itself up. 409 when Marquee isn't what's playing there."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemIds]
+              properties:
+                itemIds:
+                  type: array
+                  items: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Speaker" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /speakers/{speakerId}/control:
+    parameters:
+      - $ref: "#/components/parameters/SpeakerId"
+    post:
+      tags: [speakers]
+      operationId: controlSpeaker
+      summary: "Pause, resume, stop, skip, seek or set a room's volume. next, previous and seek are for what Marquee is playing there (409 otherwise)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [pause, resume, stop, next, previous, seek, setVolume] }
+                positionMs: { type: integer, format: int64, description: "seek: where to." }
+                volume: { type: integer, minimum: 0, maximum: 100, description: "setVolume." }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Speaker" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
   /remote/players:
     get:
@@ -5589,6 +5708,11 @@ components:
       name: limit
       in: query
       schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+    SpeakerId:
+      name: speakerId
+      in: path
+      required: true
+      schema: { type: string }
     PlaylistId:
       name: playlistId
       in: path
@@ -5690,7 +5814,7 @@ components:
       properties:
         clientId: { type: string, description: Stable per-install identifier generated by the client. }
         name: { type: string, example: Living Room Apple TV }
-        platform: { type: string, enum: [web, ios, ipados, tvos, android, androidtv, other] }
+        platform: { type: string, enum: [web, ios, ipados, tvos, macos, android, androidtv, other] }
         product: { type: string, example: Marquee for tvOS }
         version: { type: string }
 
@@ -7814,6 +7938,34 @@ components:
           items: { $ref: "#/components/schemas/RemoteCapability" }
         state: { $ref: "#/components/schemas/RemotePlayerState" }
         version: { type: integer, format: int64, description: "Changes whenever the state does; pass it as ?since= to wait for the next change." }
+
+    Speaker:
+      type: object
+      required: [id, name, model, state, volume, marquee]
+      properties:
+        id: { type: string, description: "The room's Sonos id." }
+        name: { type: string, description: 'The room, e.g. "Living Room".' }
+        model: { type: string, description: 'Its main speaker, e.g. "Sonos Arc".' }
+        state: { type: string, enum: [playing, paused, stopped, loading] }
+        volume: { type: integer, description: "0–100." }
+        marquee: { type: boolean, description: "Marquee is what's playing there, rather than another app." }
+        current: { $ref: "#/components/schemas/ItemSummary" }
+        positionMs: { type: integer, format: int64 }
+        durationMs: { type: integer, format: int64 }
+        queueIndex: { type: integer, description: "Which of the queue is playing, from 0." }
+        queueLength: { type: integer }
+
+    SpeakerPlay:
+      type: object
+      required: [itemIds]
+      properties:
+        itemIds:
+          type: array
+          description: Songs, or an album, artist or playlist item (expanded as its own Play button would). At most 2,000 songs.
+          items: { type: integer, format: int64 }
+        index: { type: integer, description: Start at this entry of itemIds. }
+        startMs: { type: integer, format: int64, description: Start this far into it. }
+        context: { type: string, description: "As PlaybackRequest.context: what it's played from, for the music statistics." }
 
     RemoteCommand:
       type: object

@@ -1609,6 +1609,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/speakers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sonos rooms found on the server's network (MUSIC-26): the server plays to them itself, so whatever asks can close. A home theatre or stereo pair is one room. At home only; empty when there are none, or when the server's container isn't on the host network. */
+        get: operations["listSpeakers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/speakers/{speakerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speakerId: components["parameters"]["SpeakerId"];
+            };
+            cookie?: never;
+        };
+        /** What a room is doing. */
+        get: operations["getSpeaker"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/speakers/{speakerId}/play": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speakerId: components["parameters"]["SpeakerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Play songs in a room, replacing what it was playing. The server sends them in order, converting what the speaker can't play, and counts them as your plays. The equaliser, crossfade and levelling don't apply. */
+        post: operations["playOnSpeaker"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/speakers/{speakerId}/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speakerId: components["parameters"]["SpeakerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add songs to the end of what Marquee is playing in a room, as a radio tops itself up. 409 when Marquee isn't what's playing there. */
+        post: operations["addToSpeakerQueue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/speakers/{speakerId}/control": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speakerId: components["parameters"]["SpeakerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause, resume, stop, skip, seek or set a room's volume. next, previous and seek are for what Marquee is playing there (409 otherwise). */
+        post: operations["controlSpeaker"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/remote/players": {
         parameters: {
             query?: never;
@@ -4566,7 +4659,7 @@ export interface components {
             /** @example Living Room Apple TV */
             name: string;
             /** @enum {string} */
-            platform: "web" | "ios" | "ipados" | "tvos" | "android" | "androidtv" | "other";
+            platform: "web" | "ios" | "ipados" | "tvos" | "macos" | "android" | "androidtv" | "other";
             /** @example Marquee for tvOS */
             product?: string;
             version?: string;
@@ -6945,6 +7038,41 @@ export interface components {
              */
             version: number;
         };
+        Speaker: {
+            /** @description The room's Sonos id. */
+            id: string;
+            /** @description The room, e.g. "Living Room". */
+            name: string;
+            /** @description Its main speaker, e.g. "Sonos Arc". */
+            model: string;
+            /** @enum {string} */
+            state: "playing" | "paused" | "stopped" | "loading";
+            /** @description 0–100. */
+            volume: number;
+            /** @description Marquee is what's playing there, rather than another app. */
+            marquee: boolean;
+            current?: components["schemas"]["ItemSummary"];
+            /** Format: int64 */
+            positionMs?: number;
+            /** Format: int64 */
+            durationMs?: number;
+            /** @description Which of the queue is playing, from 0. */
+            queueIndex?: number;
+            queueLength?: number;
+        };
+        SpeakerPlay: {
+            /** @description Songs, or an album, artist or playlist item (expanded as its own Play button would). At most 2,000 songs. */
+            itemIds: number[];
+            /** @description Start at this entry of itemIds. */
+            index?: number;
+            /**
+             * Format: int64
+             * @description Start this far into it.
+             */
+            startMs?: number;
+            /** @description As PlaybackRequest.context: what it's played from, for the music statistics. */
+            context?: string;
+        };
         RemoteCommand: {
             /** @enum {string} */
             type: "play" | "pause" | "resume" | "seek" | "stop" | "next" | "previous" | "setAudio" | "setSubtitle" | "setVolume";
@@ -8289,6 +8417,7 @@ export interface components {
         Sort: "title" | "-title" | "added" | "-added" | "year" | "-year" | "released" | "-released" | "rating" | "-rating" | "duration" | "-duration" | "-viewed" | "random" | "myRating" | "-myRating" | "favorited" | "-favorited";
         Offset: number;
         Limit: number;
+        SpeakerId: string;
         PlaylistId: number;
         BackupName: string;
         LibraryId: number;
@@ -11342,6 +11471,159 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listSpeakers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Speaker"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getSpeaker: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speakerId: components["parameters"]["SpeakerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Speaker"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    playOnSpeaker: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speakerId: components["parameters"]["SpeakerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeakerPlay"];
+            };
+        };
+        responses: {
+            /** @description Playing. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Speaker"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    addToSpeakerQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speakerId: components["parameters"]["SpeakerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    itemIds: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description Added. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Speaker"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    controlSpeaker: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                speakerId: components["parameters"]["SpeakerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "pause" | "resume" | "stop" | "next" | "previous" | "seek" | "setVolume";
+                    /**
+                     * Format: int64
+                     * @description seek: where to.
+                     */
+                    positionMs?: number;
+                    /** @description setVolume. */
+                    volume?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Speaker"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     listRemotePlayers: {
