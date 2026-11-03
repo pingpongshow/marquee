@@ -22,6 +22,12 @@ func invalid(format string, args ...any) error {
 var validEncoders = map[string]bool{"nvenc": true, "qsv": true, "vaapi": true, "software": true}
 
 func (s Settings) Validate() error {
+	if m := s.Appearance.BackgroundMode; m != "tile" && m != "fill" {
+		return invalid("the background must be tiled or fill the page")
+	}
+	if d := s.Appearance.BackgroundDim; d < -90 || d > 90 {
+		return invalid("the background's dim must be between -90 and 90")
+	}
 	for _, src := range s.Integrations.LiveTVSources {
 		if src.Kind != "m3u" && src.Kind != "dispatcharr" {
 			return invalid("a Live TV source must be an M3U playlist or Dispatcharr")

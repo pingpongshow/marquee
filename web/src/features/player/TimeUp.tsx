@@ -96,7 +96,7 @@ export function TimeUpHost() {
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="time-up-title"
-      className="fixed inset-0 z-[100] grid place-items-center bg-black/95 p-6 text-center"
+      className="on-black fixed inset-0 z-[100] grid place-items-center bg-black/95 p-6 text-center"
     >
       <div className="max-w-md space-y-5">
         <Hourglass className="mx-auto size-14 text-accent" aria-hidden />

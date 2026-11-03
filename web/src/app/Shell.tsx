@@ -98,7 +98,7 @@ function UserMenu({
         <Avatar
           name={name}
           url={avatarUrl}
-          className="size-8 !bg-accent text-sm text-black"
+          className="size-8 !bg-accent text-sm text-on-accent"
         />
         <span className="hidden text-sm text-muted sm:inline">{name}</span>
       </button>
@@ -187,7 +187,7 @@ export function Shell({ children }: { children: ReactNode }) {
           className={clsx(navItem, "mb-2")}
           title={me.data.restrictions.friend ? "Account" : "Switch profile"}
         >
-          <Avatar name={me.data.displayName} url={me.data.avatarUrl} className="size-7 shrink-0 !bg-accent text-xs text-black" />
+          <Avatar name={me.data.displayName} url={me.data.avatarUrl} className="size-7 shrink-0 !bg-accent text-xs text-on-accent" />
           <span className="min-w-0 flex-1 truncate text-left">{me.data.displayName}</span>
           {!me.data.restrictions.friend && <Users className="size-4 shrink-0 text-faint" aria-hidden />}
         </button>
@@ -276,7 +276,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <Compass className="size-5" aria-hidden /> Discover
           {requests.data.pendingApprovals > 0 && (
             <span
-              className="ml-auto rounded-full bg-accent px-1.5 text-xs font-semibold text-black"
+              className="ml-auto rounded-full bg-accent px-1.5 text-xs font-semibold text-on-accent"
               title="Requests waiting for approval"
             >
               {requests.data.pendingApprovals}
@@ -359,7 +359,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </aside>
           </div>
         )}
-        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
+        <main ref={mainRef} className="theme-page min-w-0 flex-1 overflow-y-auto">
           {children}
           {music.current && <div className="h-24" aria-hidden />}
         </main>

@@ -474,7 +474,7 @@ function FollowingRow() {
               <div className="mt-2 truncate text-sm font-medium" title={f.title}>
                 {f.title}
               </div>
-              <div className={clsx("truncate text-xs", f.status === "following" ? "text-muted" : "text-amber-500")} title={f.statusText}>
+              <div className={clsx("truncate text-xs", f.status === "following" ? "text-muted" : "text-warning")} title={f.statusText}>
                 {f.statusText || `${f.episodesSaved} saved${f.episodesQueued ? ` · ${f.episodesQueued} saving` : ""}`}
               </div>
             </Link>
@@ -814,7 +814,7 @@ export function VodVideo({
   });
 
   return (
-    <div className="fixed inset-0 z-40 bg-black">
+    <div className="on-black fixed inset-0 z-40 bg-black">
       <video ref={video} className="size-full object-contain" controls playsInline autoPlay aria-label={title ?? "Video"} />
       {loading && !error && <div className="absolute inset-0 grid place-items-center text-sm text-muted">Loading…</div>}
       <div className="absolute inset-x-0 top-0 flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent p-4">

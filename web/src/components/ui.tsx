@@ -20,10 +20,10 @@ export function Button({
       className={clsx(
         "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors [&>svg]:shrink-0 disabled:cursor-not-allowed disabled:opacity-50",
         size === "sm" ? "h-8 px-3 text-sm" : "h-10 px-4 text-sm",
-        variant === "primary" && "bg-accent text-black hover:bg-accent-strong",
+        variant === "primary" && "bg-accent text-on-accent hover:bg-accent-strong",
         variant === "secondary" && "bg-surface-3 text-text hover:bg-border",
         variant === "ghost" && "text-muted hover:bg-surface-2 hover:text-text",
-        variant === "danger" && "bg-danger/90 text-white hover:bg-danger",
+        variant === "danger" && "bg-danger/90 text-on-danger hover:bg-danger",
         className,
       )}
     >

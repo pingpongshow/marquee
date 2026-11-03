@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"marquee/internal/api"
+	"marquee/internal/appearance"
 	"marquee/internal/auth"
 	"marquee/internal/netclass"
 	"marquee/internal/speakers"
@@ -74,12 +75,20 @@ func New(d Deps) http.Handler {
 // client, signed in or not, can't make the server read an endless body into memory.
 const maxBodyBytes = 16 << 20
 
+// bodyLimit is maxBodyBytes, or room for the largest page background (USER-20) on its upload.
+func bodyLimit(r *http.Request) int64 {
+	if r.Method == http.MethodPut && r.URL.Path == "/api/v1/appearance/background" {
+		return appearance.MaxBytes + 1<<20
+	}
+	return maxBodyBytes
+}
+
 // withIdentity classifies the network and resolves the bearer token (if any) into a session.
 // Endpoints decide for themselves whether a session is required.
 func withIdentity(d Deps, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil && strings.HasPrefix(r.URL.Path, "/api/") {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+			r.Body = http.MaxBytesReader(w, r.Body, bodyLimit(r))
 		}
 		ip := netclass.ClientIP(r)
 		ctx := api.WithRequestInfo(r.Context(), api.RequestInfo{ClientIP: ip.String(), Class: d.Classifier.Classify(r)})

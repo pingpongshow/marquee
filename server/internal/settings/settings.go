@@ -42,6 +42,27 @@ type Settings struct {
 	PlexSync PlexSync `json:"plexSync"`
 	// Optimize re-encodes oversized library files to save space (admins only).
 	Optimize Optimize `json:"optimize"`
+	// Appearance is the web app's theme and page background (USER-20). Exposed through
+	// /appearance, not /settings.
+	Appearance Appearance `json:"appearance"`
+}
+
+// Appearance is how the web app looks for everyone (USER-20).
+type Appearance struct {
+	// ThemeID is the chosen theme; empty is the default.
+	ThemeID string `json:"themeId,omitempty"`
+	// AutoHolidays shows the matching holiday's theme around its date.
+	AutoHolidays bool `json:"autoHolidays,omitempty"`
+	// BackgroundVersion changes with each upload, for the image's URL; 0 means none is set.
+	BackgroundVersion int64 `json:"backgroundVersion,omitempty"`
+	// BackgroundFormat is how it's stored: png or jpg.
+	BackgroundFormat string `json:"backgroundFormat,omitempty"`
+	// BackgroundMode is tile (the default) or fill.
+	BackgroundMode string `json:"backgroundMode,omitempty"`
+	// BackgroundDim is how far the image fades towards the theme's own background, in percent,
+	// so it suits whichever theme is showing, light or dark. A negative value, from when this
+	// was a darken or lighten amount, means its size.
+	BackgroundDim int `json:"backgroundDim"`
 }
 
 // PlexSync configures two-way sync with a Plex Media Server through its HTTP API.
@@ -481,6 +502,8 @@ func Defaults() Settings {
 	return Settings{
 		Security: Security{PinSignIn: "local"},
 		General:  General{ServerName: "Marquee", MetadataLanguage: "en-US"},
+		// A new background starts part way to the theme's own, so text on it stays readable.
+		Appearance: Appearance{BackgroundMode: "tile", BackgroundDim: 40},
 		Network: Network{
 			LANSubnets:     []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"},
 			BonjourEnabled: true,

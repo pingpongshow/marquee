@@ -155,7 +155,7 @@ export function BandwidthChart({ samples, uploadKbps }: { samples: Sample[]; upl
               <line key={f} x1={0} x2={W} y1={H * f} y2={H * f} className="stroke-border" strokeWidth={1} vectorEffect="non-scaling-stroke" />
             ))}
             <path d={area((p) => p.localKbps, () => 0)} className="fill-accent/50" />
-            <path d={area(total, (p) => p.localKbps)} className="fill-sky-400/50" />
+            <path d={area(total, (p) => p.localKbps)} className="fill-chart-1/50" />
             <line x1={0} x2={W} y1={y(peak)} y2={y(peak)} className="stroke-muted" strokeDasharray="2 3" strokeWidth={1} vectorEffect="non-scaling-stroke" />
             {uploadKbps ? <line x1={0} x2={W} y1={y(uploadKbps)} y2={y(uploadKbps)} className="stroke-danger" strokeDasharray="4 4" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /> : null}
           </svg>
@@ -180,7 +180,7 @@ export function BandwidthChart({ samples, uploadKbps }: { samples: Sample[]; upl
           <span className="size-2.5 rounded-sm bg-accent/70" /> Local
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm bg-sky-400/70" /> Remote
+          <span className="size-2.5 rounded-sm bg-chart-1/70" /> Remote
         </span>
         {uploadKbps ? (
           <span className="flex items-center gap-1.5">

@@ -15,6 +15,7 @@ import {
   Library,
   MonitorSmartphone,
   Network,
+  Palette,
   Popcorn,
   ScrollText,
   Server,
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { AiSettings } from "./AiSettings";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { CinemaSettings } from "./CinemaSettings";
 import { DashboardSettings } from "./DashboardSettings";
 import { MusicSettings } from "./MusicSettings";
@@ -73,6 +75,15 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           component: GeneralSettings,
           keywords: "server name language restart reboot rating prompt rate stars ask",
           description: "Server identity and defaults.",
+        },
+        {
+          id: "appearance",
+          label: "Appearance",
+          icon: Palette,
+          component: AppearanceSettings,
+          keywords:
+            "theme themes colours colors background image pattern wallpaper dark light holiday holidays season seasons halloween christmas tile fill dim",
+          description: "The web app's theme and page background, for everyone.",
         },
         {
           id: "libraries",

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"marquee/internal/ai"
+	"marquee/internal/appearance"
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
 	"marquee/internal/bazarr"
@@ -59,6 +60,7 @@ type Handlers struct {
 	Items     *items.Store
 	Images    *images.Service
 	Avatars   *avatars.Store
+	Backdrop  *appearance.Store
 	Logs      *logbuf.Buffer
 	Metadata  *metadata.Service
 	Plex      *plex.Importer

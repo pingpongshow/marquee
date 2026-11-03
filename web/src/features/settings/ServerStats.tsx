@@ -97,7 +97,7 @@ export function ResourcesCard({ status }: { status: Status }) {
               format={pct}
               label="CPU use over the last hour"
               series={[
-                { label: "System", className: "stroke-sky-400", dot: "bg-sky-400", value: (r) => r.hostCpu },
+                { label: "System", className: "stroke-chart-1", dot: "bg-chart-1", value: (r) => r.hostCpu },
                 { label: "Marquee", className: "stroke-accent", dot: "bg-accent", value: (r) => r.serverCpu },
               ]}
             />
@@ -110,7 +110,7 @@ export function ResourcesCard({ status }: { status: Status }) {
               format={gb}
               label="Memory use over the last hour"
               series={[
-                { label: "System", className: "stroke-sky-400", dot: "bg-sky-400", value: (r) => r.hostMemBytes },
+                { label: "System", className: "stroke-chart-1", dot: "bg-chart-1", value: (r) => r.hostMemBytes },
                 { label: "Marquee", className: "stroke-accent", dot: "bg-accent", value: (r) => r.serverMemBytes },
               ]}
             />
@@ -124,9 +124,9 @@ export function ResourcesCard({ status }: { status: Status }) {
                 format={pct}
                 label="GPU use over the last hour"
                 series={[
-                  { label: "GPU", className: "stroke-sky-400", dot: "bg-sky-400", value: (r) => r.gpu },
+                  { label: "GPU", className: "stroke-chart-1", dot: "bg-chart-1", value: (r) => r.gpu },
                   { label: "Encoder", className: "stroke-accent", dot: "bg-accent", value: (r) => r.gpuEncoder },
-                  { label: "Decoder", className: "stroke-emerald-400", dot: "bg-emerald-400", value: (r) => r.gpuDecoder },
+                  { label: "Decoder", className: "stroke-chart-2", dot: "bg-chart-2", value: (r) => r.gpuDecoder },
                 ]}
               />
             </div>

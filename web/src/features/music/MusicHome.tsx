@@ -97,7 +97,7 @@ export function favoritesQuery(libraryId: number, type: FavoriteKind, limit = 50
 function QuickAction({ icon, label, onClick, to, busy }: { icon: ReactNode; label: string; onClick?: () => void; to?: { libraryId: number; section: MusicSection }; busy?: boolean }) {
   const inner = (
     <>
-      <span className="flex size-12 items-center justify-center rounded-full bg-surface-2 text-text transition-colors group-hover:bg-accent group-hover:text-black [&>svg]:size-5">
+      <span className="flex size-12 items-center justify-center rounded-full bg-surface-2 text-text transition-colors group-hover:bg-accent group-hover:text-on-accent [&>svg]:size-5">
         {busy ? <Loader2 className="animate-spin" /> : icon}
       </span>
       <span className="text-xs text-muted group-hover:text-text">{label}</span>

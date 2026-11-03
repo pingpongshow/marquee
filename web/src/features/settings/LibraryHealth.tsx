@@ -18,7 +18,7 @@ const PAGE = 50;
 const severityStyle: Record<HealthCheck["severity"], { dot: string; border: string; label: string }> = {
   error: { dot: "bg-danger", border: "border-l-danger", label: "Problem" },
   warning: { dot: "bg-accent", border: "border-l-accent", label: "Warning" },
-  info: { dot: "bg-sky-400", border: "border-l-sky-400", label: "Info" },
+  info: { dot: "bg-chart-1", border: "border-l-chart-1", label: "Info" },
 };
 
 const healthQuery = {

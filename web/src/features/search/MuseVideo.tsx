@@ -83,7 +83,7 @@ export function MuseVideo({ libraryId, initialPrompt = "" }: { libraryId?: numbe
           <button
             type="submit"
             disabled={muse.isPending || prompt.trim().length < 2}
-            className="flex h-11 shrink-0 items-center gap-2 rounded-lg bg-accent px-4 font-medium text-black disabled:opacity-50 sm:px-5"
+            className="flex h-11 shrink-0 items-center gap-2 rounded-lg bg-accent px-4 font-medium text-on-accent disabled:opacity-50 sm:px-5"
           >
             {muse.isPending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Find
           </button>

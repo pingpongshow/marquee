@@ -167,7 +167,7 @@ export function UpNextScreen({
           )}
           {nd?.summary && <p className="line-clamp-4 text-sm leading-relaxed text-white/75">{nd.summary}</p>}
           <div className="flex gap-2 pt-2">
-            <button onClick={onPlay} className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-black hover:brightness-110">
+            <button onClick={onPlay} className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-110">
               Play now
             </button>
             <button onClick={onClose} className="rounded-md bg-white/10 px-4 py-2 text-sm font-medium hover:bg-white/20">

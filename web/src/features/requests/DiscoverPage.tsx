@@ -186,7 +186,7 @@ export function DiscoverPage() {
               className={clsx(
                 "rounded-full px-4 py-1.5 text-sm",
                 category === c.id
-                  ? "bg-accent text-black font-medium"
+                  ? "bg-accent text-on-accent font-medium"
                   : "bg-surface-2 text-muted hover:text-text",
               )}
             >
@@ -316,7 +316,7 @@ function DetailsDialog({
             <Link
               to="/item/$itemId"
               params={{ itemId: String(item.itemId) }}
-              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-black"
+              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-on-accent"
             >
               Open in library
             </Link>
@@ -538,7 +538,7 @@ function Card({
               onClick={onRequest}
               className={clsx(
                 "rounded px-2 py-0.5 text-[11px] font-medium",
-                item.vod ? "bg-surface-3 text-text hover:bg-border" : "bg-accent text-black hover:brightness-110",
+                item.vod ? "bg-surface-3 text-text hover:bg-border" : "bg-accent text-on-accent hover:brightness-110",
               )}
             >
               Request

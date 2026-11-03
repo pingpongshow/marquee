@@ -21,6 +21,7 @@ import (
 
 	"marquee/internal/ai"
 	"marquee/internal/api"
+	"marquee/internal/appearance"
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
 	"marquee/internal/bazarr"
@@ -814,6 +815,7 @@ func run() error {
 		Mail:        mailer,
 		Alerts:      alerts,
 		Avatars:     &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
+		Backdrop:    &appearance.Store{Dir: filepath.Join(cfg.ConfigDir, "appearance")},
 		Images:      imageSvc,
 		Logs:        logs,
 		Metadata:    meta,

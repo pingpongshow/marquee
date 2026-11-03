@@ -92,7 +92,7 @@ export function VodSuggestionTile({
         </Link>
       ) : null}
       {badge && (
-        <span className="pointer-events-none absolute top-1.5 left-1.5 z-10 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-accent shadow ring-1 ring-white/15 backdrop-blur-sm">
+        <span className="pointer-events-none absolute top-1.5 left-1.5 z-10 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-accent-on-black shadow ring-1 ring-white/15 backdrop-blur-sm">
           VOD
         </span>
       )}

@@ -60,13 +60,13 @@ function VolumeBar({ v }: { v: StorageVolume }) {
 // Series colours, in library order.
 const palette = [
   { fill: "fill-accent/60", dot: "bg-accent" },
-  { fill: "fill-sky-400/60", dot: "bg-sky-400" },
-  { fill: "fill-emerald-400/60", dot: "bg-emerald-400" },
-  { fill: "fill-amber-400/60", dot: "bg-amber-400" },
-  { fill: "fill-violet-400/60", dot: "bg-violet-400" },
-  { fill: "fill-rose-400/60", dot: "bg-rose-400" },
-  { fill: "fill-teal-400/60", dot: "bg-teal-400" },
-  { fill: "fill-lime-400/60", dot: "bg-lime-400" },
+  { fill: "fill-chart-1/60", dot: "bg-chart-1" },
+  { fill: "fill-chart-2/60", dot: "bg-chart-2" },
+  { fill: "fill-chart-3/60", dot: "bg-chart-3" },
+  { fill: "fill-chart-4/60", dot: "bg-chart-4" },
+  { fill: "fill-chart-5/60", dot: "bg-chart-5" },
+  { fill: "fill-chart-6/60", dot: "bg-chart-6" },
+  { fill: "fill-chart-7/60", dot: "bg-chart-7" },
 ];
 
 const color = (i: number) => palette[i % palette.length]!;

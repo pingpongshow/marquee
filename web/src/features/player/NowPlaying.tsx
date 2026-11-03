@@ -139,7 +139,7 @@ function Controls({ large }: { large?: boolean }) {
       <button
         onClick={m.toggle}
         className={clsx(
-          "rounded-full bg-accent text-black",
+          "rounded-full bg-accent text-on-accent",
           large ? "p-4" : "p-2.5",
         )}
         aria-label={m.playing ? "Pause" : "Play"}
@@ -219,7 +219,7 @@ export function MiniPlayer() {
   const t = m.current!.item;
   const [queueOpen, setQueueOpen] = useState(false);
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur">
+    <div className="theme-bar fixed inset-x-0 bottom-0 z-40 border-t border-border backdrop-blur">
       {/* Its own row, as tall as the slider's handle (Safari's is ~20 px), so the handle
           never sits on the artwork below. */}
       <div className="px-3 pt-1 sm:px-4">
@@ -252,7 +252,7 @@ export function MiniPlayer() {
         </div>
         <button
           onClick={m.toggle}
-          className="rounded-full bg-accent p-2.5 text-black sm:hidden"
+          className="rounded-full bg-accent p-2.5 text-on-accent sm:hidden"
           aria-label={m.playing ? "Pause" : "Play"}
         >
           {m.playing ? (
@@ -582,9 +582,9 @@ export function NowPlaying() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col text-white transition-[background] duration-700"
+      className="on-black fixed inset-0 z-50 flex flex-col text-white transition-[background] duration-700"
       style={{
-        background: `linear-gradient(160deg, ${color ?? "#3a3a44"} 0%, #0b0b0f 75%)`,
+        background: `linear-gradient(160deg, ${color ?? "var(--color-immersive-start)"} 0%, var(--color-immersive) 75%)`,
       }}
       role="dialog"
       aria-label="Now Playing"

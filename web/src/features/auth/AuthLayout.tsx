@@ -11,7 +11,7 @@ export function AuthLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-full items-center justify-center bg-[radial-gradient(ellipse_at_top,_#2a2418_0%,_#121316_60%)] p-4">
+    <div className="theme-auth-page flex min-h-full items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Clapperboard className="size-12 text-accent" aria-hidden />

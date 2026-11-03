@@ -64,7 +64,7 @@ export function MoodStylePage() {
         <button
           onClick={() => radio.mutate(seed)}
           disabled={radio.isPending}
-          className="ml-auto flex h-11 items-center gap-2 rounded-full bg-accent px-6 font-medium text-black disabled:opacity-50"
+          className="ml-auto flex h-11 items-center gap-2 rounded-full bg-accent px-6 font-medium text-on-accent disabled:opacity-50"
         >
           {radio.isPending ? (
             <Loader2 className="size-4 animate-spin" />

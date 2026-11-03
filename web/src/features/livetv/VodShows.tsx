@@ -243,7 +243,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                         <Tv className="size-8" aria-hidden />
                       </div>
                     )}
-                    <div className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="on-black absolute inset-0 grid place-items-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                       <Play className="size-8 fill-current" />
                     </div>
                     {pct > 0 && (
@@ -339,7 +339,7 @@ export function VodEpisodePlayerPage({ seriesId, episodeId, startMs }: { seriesI
                 {epLabel(next)} · {next.title}
               </div>
               <div className="flex gap-2">
-                <button onClick={playNext} className="flex-1 rounded bg-accent px-3 py-1.5 font-semibold text-black">
+                <button onClick={playNext} className="flex-1 rounded bg-accent px-3 py-1.5 font-semibold text-on-accent">
                   Play now
                 </button>
                 <button onClick={() => setDismissedFor(episodeId)} className="rounded bg-white/10 px-3 py-1.5">

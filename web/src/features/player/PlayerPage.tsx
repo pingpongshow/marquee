@@ -12,7 +12,7 @@ const VideoPlayer = lazy(() =>
 );
 
 const loading = (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black">
+  <div className="on-black fixed inset-0 z-50 flex items-center justify-center bg-black">
     <Spinner label="Loading player" />
   </div>
 );

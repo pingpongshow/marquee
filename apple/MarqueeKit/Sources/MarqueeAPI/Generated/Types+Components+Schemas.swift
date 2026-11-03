@@ -8169,6 +8169,137 @@ extension Components {
                 case errors
             }
         }
+        /// - Remark: Generated from `#/components/schemas/Appearance`.
+        public struct Appearance: Codable, Hashable, Sendable {
+            /// The theme to show now: the holiday's while one applies, otherwise the chosen one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Appearance/activeThemeId`.
+            public var activeThemeId: Swift.String
+            /// The theme the admin chose.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Appearance/themeId`.
+            public var themeId: Swift.String
+            /// Holiday themes replace the chosen one around their dates.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Appearance/autoHolidays`.
+            public var autoHolidays: Swift.Bool
+            /// The holiday showing now; absent when none is.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Appearance/holidayId`.
+            public var holidayId: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Appearance/background`.
+            public var background: Components.Schemas.AppearanceBackground
+            /// Creates a new `Appearance`.
+            ///
+            /// - Parameters:
+            ///   - activeThemeId: The theme to show now: the holiday's while one applies, otherwise the chosen one.
+            ///   - themeId: The theme the admin chose.
+            ///   - autoHolidays: Holiday themes replace the chosen one around their dates.
+            ///   - holidayId: The holiday showing now; absent when none is.
+            ///   - background:
+            public init(
+                activeThemeId: Swift.String,
+                themeId: Swift.String,
+                autoHolidays: Swift.Bool,
+                holidayId: Swift.String? = nil,
+                background: Components.Schemas.AppearanceBackground
+            ) {
+                self.activeThemeId = activeThemeId
+                self.themeId = themeId
+                self.autoHolidays = autoHolidays
+                self.holidayId = holidayId
+                self.background = background
+            }
+            public enum CodingKeys: String, CodingKey {
+                case activeThemeId
+                case themeId
+                case autoHolidays
+                case holidayId
+                case background
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/AppearanceBackground`.
+        public struct AppearanceBackground: Codable, Hashable, Sendable {
+            /// The uploaded image; absent when there is none, and the theme's own background shows. The URL changes with each upload.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppearanceBackground/imageUrl`.
+            public var imageUrl: Swift.String?
+            /// Repeat the image (for patterns) or cover the page with it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppearanceBackground/mode`.
+            @frozen public enum ModePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case tile = "tile"
+                case fill = "fill"
+            }
+            /// Repeat the image (for patterns) or cover the page with it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppearanceBackground/mode`.
+            public var mode: Components.Schemas.AppearanceBackground.ModePayload
+            /// How strongly the theme's own background colour covers the image, so text stays readable: 0–90. A value stored with a sign means its size.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppearanceBackground/dim`.
+            public var dim: Swift.Int
+            /// Creates a new `AppearanceBackground`.
+            ///
+            /// - Parameters:
+            ///   - imageUrl: The uploaded image; absent when there is none, and the theme's own background shows. The URL changes with each upload.
+            ///   - mode: Repeat the image (for patterns) or cover the page with it.
+            ///   - dim: How strongly the theme's own background colour covers the image, so text stays readable: 0–90. A value stored with a sign means its size.
+            public init(
+                imageUrl: Swift.String? = nil,
+                mode: Components.Schemas.AppearanceBackground.ModePayload,
+                dim: Swift.Int
+            ) {
+                self.imageUrl = imageUrl
+                self.mode = mode
+                self.dim = dim
+            }
+            public enum CodingKeys: String, CodingKey {
+                case imageUrl
+                case mode
+                case dim
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/AppearanceUpdate`.
+        public struct AppearanceUpdate: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/AppearanceUpdate/themeId`.
+            public var themeId: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/AppearanceUpdate/autoHolidays`.
+            public var autoHolidays: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/AppearanceUpdate/backgroundMode`.
+            @frozen public enum BackgroundModePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case tile = "tile"
+                case fill = "fill"
+            }
+            /// - Remark: Generated from `#/components/schemas/AppearanceUpdate/backgroundMode`.
+            public var backgroundMode: Components.Schemas.AppearanceUpdate.BackgroundModePayload?
+            /// - Remark: Generated from `#/components/schemas/AppearanceUpdate/backgroundDim`.
+            public var backgroundDim: Swift.Int?
+            /// Creates a new `AppearanceUpdate`.
+            ///
+            /// - Parameters:
+            ///   - themeId:
+            ///   - autoHolidays:
+            ///   - backgroundMode:
+            ///   - backgroundDim:
+            public init(
+                themeId: Swift.String? = nil,
+                autoHolidays: Swift.Bool? = nil,
+                backgroundMode: Components.Schemas.AppearanceUpdate.BackgroundModePayload? = nil,
+                backgroundDim: Swift.Int? = nil
+            ) {
+                self.themeId = themeId
+                self.autoHolidays = autoHolidays
+                self.backgroundMode = backgroundMode
+                self.backgroundDim = backgroundDim
+            }
+            public enum CodingKeys: String, CodingKey {
+                case themeId
+                case autoHolidays
+                case backgroundMode
+                case backgroundDim
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/PlexSyncStatus`.
         public struct PlexSyncStatus: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/settings`.

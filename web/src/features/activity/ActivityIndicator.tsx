@@ -84,7 +84,7 @@ export function ActivityIndicator() {
       >
         <Activity className={clsx("size-5", busy && "animate-pulse")} />
         {busy && (
-          <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-black">
+          <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-on-accent">
             {tasks.length}
           </span>
         )}

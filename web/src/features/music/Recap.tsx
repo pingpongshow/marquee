@@ -170,7 +170,7 @@ function buildPages(r: ListeningRecap, actions: { playTop: () => void; playOne: 
   if (r.topTracks.length)
     pages.push({
       id: "top-songs",
-      bg: "from-amber-400 via-orange-500 to-rose-700",
+      bg: "from-chart-3 via-orange-500 to-rose-700",
       body: (
         <>
           <Kicker>Your top songs</Kicker>
@@ -207,7 +207,7 @@ function buildPages(r: ListeningRecap, actions: { playTop: () => void; playOne: 
   if (r.topGenres.length)
     pages.push({
       id: "genres",
-      bg: "from-lime-400 via-green-600 to-emerald-950",
+      bg: "from-chart-7 via-green-600 to-emerald-950",
       body: (
         <>
           <Kicker>Your sound</Kicker>
@@ -393,7 +393,7 @@ export function RecapPage() {
 
   if (recap.isPending || (wanted === undefined && years.isPending))
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black text-white">
+      <div className="on-black fixed inset-0 z-50 flex items-center justify-center bg-black text-white">
         <Spinner label="Wrapping up your year" />
       </div>
     );
@@ -414,7 +414,7 @@ export function RecapPage() {
   const page = pages[Math.min(index, count - 1)]!;
   return (
     <div
-      className={clsx("fixed inset-0 z-50 flex flex-col overflow-hidden bg-gradient-to-br text-white transition-colors", page.bg)}
+      className={clsx("on-black fixed inset-0 z-50 flex flex-col overflow-hidden bg-gradient-to-br text-white transition-colors", page.bg)}
       role="dialog"
       aria-label={`Your Year in Music ${r.year}`}
       onTouchStart={(e) => (touch.current = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY })}

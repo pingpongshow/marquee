@@ -159,7 +159,7 @@ export function RatingPromptCard({
                   <button
                     type="submit"
                     disabled={!comment.trim() || review.isPending}
-                    className="rounded bg-accent px-2 py-1 font-semibold text-black disabled:opacity-50"
+                    className="rounded bg-accent px-2 py-1 font-semibold text-on-accent disabled:opacity-50"
                   >
                     Post comment
                   </button>

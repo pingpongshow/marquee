@@ -1521,6 +1521,88 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /appearance:
+    get:
+      tags: [settings]
+      operationId: getAppearance
+      summary: "What the web app looks like for everyone (USER-20): the theme to show now, in the server's time zone, and the page background. Used at startup and on the sign-in page, so no sign-in is needed."
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appearance" }
+    put:
+      tags: [settings]
+      operationId: updateAppearance
+      summary: Choose the theme, automatic holidays and how the background is shown (admin only). Fields left out keep their value.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AppearanceUpdate" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appearance" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /appearance/background:
+    get:
+      tags: [settings]
+      operationId: getAppearanceBackground
+      summary: The page background image. Readable without signing in, because the sign-in page shows it.
+      description: Use the `imageUrl` from Appearance; it carries a version, so the response can be cached forever.
+      security: []
+      parameters:
+        - name: v
+          in: query
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Image.
+          headers:
+            Cache-Control: { schema: { type: string } }
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [settings]
+      operationId: setAppearanceBackground
+      summary: Upload the page background (admin only). PNG, JPEG or WebP up to 20 MB, judged by the image's actual bytes; anything else, SVG included, is refused. It shows for everyone at once.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appearance" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    delete:
+      tags: [settings]
+      operationId: deleteAppearanceBackground
+      summary: Remove the page background, returning to the theme's own (admin only).
+      responses:
+        "200":
+          description: Removed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appearance" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /plex-sync:
     get:
       tags: [plex]
@@ -7477,6 +7559,29 @@ components:
         changesTruncated: { type: boolean }
         errors: { type: array, items: { type: string } }
 
+    Appearance:
+      type: object
+      required: [activeThemeId, themeId, autoHolidays, background]
+      properties:
+        activeThemeId: { type: string, description: "The theme to show now: the holiday's while one applies, otherwise the chosen one." }
+        themeId: { type: string, description: The theme the admin chose. }
+        autoHolidays: { type: boolean, description: "Holiday themes replace the chosen one around their dates." }
+        holidayId: { type: string, description: "The holiday showing now; absent when none is." }
+        background: { $ref: "#/components/schemas/AppearanceBackground" }
+    AppearanceBackground:
+      type: object
+      required: [mode, dim]
+      properties:
+        imageUrl: { type: string, description: "The uploaded image; absent when there is none, and the theme's own background shows. The URL changes with each upload." }
+        mode: { type: string, enum: [tile, fill], description: "Repeat the image (for patterns) or cover the page with it." }
+        dim: { type: integer, minimum: -90, maximum: 90, description: "How strongly the theme's own background colour covers the image, so text stays readable: 0–90. A value stored with a sign means its size." }
+    AppearanceUpdate:
+      type: object
+      properties:
+        themeId: { type: string }
+        autoHolidays: { type: boolean }
+        backgroundMode: { type: string, enum: [tile, fill] }
+        backgroundDim: { type: integer, minimum: -90, maximum: 90 }
     PlexSyncStatus:
       type: object
       required: [settings, running, users]

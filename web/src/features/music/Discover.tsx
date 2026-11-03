@@ -150,7 +150,7 @@ export function MusePanel({ libraryId }: { libraryId: number }) {
           <button
             type="submit"
             disabled={muse.isPending || prompt.trim().length < 2}
-            className="flex h-11 shrink-0 items-center gap-2 rounded-lg bg-accent px-4 font-medium text-black disabled:opacity-50 sm:px-5"
+            className="flex h-11 shrink-0 items-center gap-2 rounded-lg bg-accent px-4 font-medium text-on-accent disabled:opacity-50 sm:px-5"
           >
             {muse.isPending ? (
               <Loader2 className="size-4 animate-spin" />
@@ -271,7 +271,7 @@ export function MixCard({ mix }: { mix: Station }) {
             station={mix}
             className="group-hover:ring-2 group-hover:ring-accent"
           />
-          <span className="absolute right-2 bottom-2 rounded-full bg-accent p-2 text-black opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+          <span className="absolute right-2 bottom-2 rounded-full bg-accent p-2 text-on-accent opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
             <Play className="size-4 fill-current" />
           </span>
         </div>

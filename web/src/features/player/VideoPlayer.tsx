@@ -714,7 +714,7 @@ export function VideoPlayer({
     <div
       id="player-root"
       className={clsx(
-        "fixed inset-0 z-50 bg-black select-none",
+        "on-black fixed inset-0 z-50 bg-black select-none",
         !chrome && "cursor-none",
       )}
       onMouseMove={poke}
@@ -803,7 +803,7 @@ export function VideoPlayer({
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center">
           <p className="max-w-md text-white">{error}</p>
           <button
-            className="rounded-md bg-accent px-4 py-2 font-medium text-black"
+            className="rounded-md bg-accent px-4 py-2 font-medium text-on-accent"
             onClick={() => (preroll ? preroll.onDone() : restart({}))}
           >
             {preroll ? "Skip" : "Try again"}
@@ -1027,7 +1027,7 @@ export function VideoPlayer({
             >
               <UsersRound className="size-5" />
               {together.group && (
-                <span className="absolute -top-0.5 -right-0.5 rounded-full bg-accent px-1 text-[10px] font-bold text-black">
+                <span className="absolute -top-0.5 -right-0.5 rounded-full bg-accent px-1 text-[10px] font-bold text-on-accent">
                   {together.group.members.length}
                 </span>
               )}

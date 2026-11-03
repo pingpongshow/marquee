@@ -97,7 +97,7 @@ function Connection() {
           </Button>
           {test.data &&
             (test.data.ok ? (
-              <span className="text-sm text-green-500">
+              <span className="text-sm text-ok">
                 Connected to Seerr {test.data.version}
               </span>
             ) : (

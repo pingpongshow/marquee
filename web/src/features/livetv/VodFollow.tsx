@@ -42,7 +42,7 @@ export function FollowControls({ show }: { show: VodSeriesDetail }) {
           <Button size="sm" variant="ghost" disabled={unfollow.isPending} onClick={() => unfollow.mutate({ seriesId: show.id })}>
             Unfollow
           </Button>
-          {f.statusText && <span className={f.status === "following" ? "text-sm text-muted" : "text-sm text-amber-500"}>{f.statusText}</span>}
+          {f.statusText && <span className={f.status === "following" ? "text-sm text-muted" : "text-sm text-warning"}>{f.statusText}</span>}
         </div>
       ) : (
         <Button

@@ -120,7 +120,7 @@ function DailyChart({ days, period }: { days: Stats["days"]; period: number }) {
       <div className="flex h-36 items-end gap-px" role="img" aria-label={`Plays per day over ${span} days, at most ${max} in a day`}>
         {list.map((d) => (
           <div key={d.date} className="flex h-full min-w-0 flex-1 flex-col justify-end" title={`${d.date}: ${d.video} video, ${d.music} music`}>
-            <div className="bg-sky-400/70" style={{ height: `${(d.music / max) * 100}%` }} />
+            <div className="bg-chart-1/70" style={{ height: `${(d.music / max) * 100}%` }} />
             <div className="bg-accent/80" style={{ height: `${(d.video / max) * 100}%` }} />
           </div>
         ))}
@@ -130,7 +130,7 @@ function DailyChart({ days, period }: { days: Stats["days"]; period: number }) {
           <span className="size-2.5 rounded-sm bg-accent/80" /> Video
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm bg-sky-400/70" /> Music
+          <span className="size-2.5 rounded-sm bg-chart-1/70" /> Music
         </span>
         <span className="ml-auto">busiest day: {max} plays</span>
       </figcaption>
@@ -173,7 +173,7 @@ function TopList({ title, items, link }: { title: string; items: Count[]; link?:
 function Delivery({ s }: { s: Stats }) {
   const rows = [
     { label: "Direct play", n: s.methods.directPlay, cls: "bg-success/70" },
-    { label: "Direct stream", n: s.methods.directStream, cls: "bg-sky-400/70" },
+    { label: "Direct stream", n: s.methods.directStream, cls: "bg-chart-1/70" },
     { label: "Transcode", n: s.methods.transcode, cls: "bg-accent/80" },
   ];
   const total = Math.max(1, rows.reduce((a, r) => a + r.n, 0));

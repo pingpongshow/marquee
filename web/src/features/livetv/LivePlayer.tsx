@@ -127,7 +127,7 @@ export function LivePlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId, attempt]);
   return (
-    <div className={`relative bg-black ${className ?? ""}`}>
+    <div className={`on-black relative bg-black ${className ?? ""}`}>
       <video
         ref={video}
         className="size-full object-contain"

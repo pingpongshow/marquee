@@ -28,6 +28,8 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 
 import app.marquee.api.models.AiStatus
+import app.marquee.api.models.Appearance
+import app.marquee.api.models.AppearanceUpdate
 import app.marquee.api.models.Error
 import app.marquee.api.models.ServerSettings
 import app.marquee.api.models.ServerSettingsUpdate
@@ -125,6 +127,224 @@ open class SettingsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /appearance/background
+     * Remove the page background, returning to the theme&#39;s own (admin only).
+     * 
+     * @return Appearance
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun deleteAppearanceBackground() : Appearance {
+        val localVarResponse = deleteAppearanceBackgroundWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Appearance
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /appearance/background
+     * Remove the page background, returning to the theme&#39;s own (admin only).
+     * 
+     * @return ApiResponse<Appearance?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun deleteAppearanceBackgroundWithHttpInfo() : ApiResponse<Appearance?> {
+        val localVariableConfig = deleteAppearanceBackgroundRequestConfig()
+
+        return request<Unit, Appearance>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation deleteAppearanceBackground
+     *
+     * @return RequestConfig
+     */
+    fun deleteAppearanceBackgroundRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/appearance/background",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /appearance
+     * What the web app looks like for everyone (USER-20): the theme to show now, in the server&#39;s time zone, and the page background. Used at startup and on the sign-in page, so no sign-in is needed.
+     * 
+     * @return Appearance
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getAppearance() : Appearance {
+        val localVarResponse = getAppearanceWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Appearance
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /appearance
+     * What the web app looks like for everyone (USER-20): the theme to show now, in the server&#39;s time zone, and the page background. Used at startup and on the sign-in page, so no sign-in is needed.
+     * 
+     * @return ApiResponse<Appearance?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getAppearanceWithHttpInfo() : ApiResponse<Appearance?> {
+        val localVariableConfig = getAppearanceRequestConfig()
+
+        return request<Unit, Appearance>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getAppearance
+     *
+     * @return RequestConfig
+     */
+    fun getAppearanceRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/appearance",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /appearance/background
+     * The page background image. Readable without signing in, because the sign-in page shows it.
+     * Use the &#x60;imageUrl&#x60; from Appearance; it carries a version, so the response can be cached forever.
+     * @param v  (optional)
+     * @return java.io.File
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getAppearanceBackground(v: kotlin.Long? = null) : java.io.File {
+        val localVarResponse = getAppearanceBackgroundWithHttpInfo(v = v)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as java.io.File
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /appearance/background
+     * The page background image. Readable without signing in, because the sign-in page shows it.
+     * Use the &#x60;imageUrl&#x60; from Appearance; it carries a version, so the response can be cached forever.
+     * @param v  (optional)
+     * @return ApiResponse<java.io.File?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getAppearanceBackgroundWithHttpInfo(v: kotlin.Long?) : ApiResponse<java.io.File?> {
+        val localVariableConfig = getAppearanceBackgroundRequestConfig(v = v)
+
+        return request<Unit, java.io.File>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getAppearanceBackground
+     *
+     * @param v  (optional)
+     * @return RequestConfig
+     */
+    fun getAppearanceBackgroundRequestConfig(v: kotlin.Long?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (v != null) {
+                    put("v", listOf(v.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/appearance/background",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
             body = localVariableBody
         )
     }
@@ -268,6 +488,80 @@ open class SettingsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
     }
 
     /**
+     * PUT /appearance/background
+     * Upload the page background (admin only). PNG, JPEG or WebP up to 20 MB, judged by the image&#39;s actual bytes; anything else, SVG included, is refused. It shows for everyone at once.
+     * 
+     * @param body 
+     * @return Appearance
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun setAppearanceBackground(body: java.io.File) : Appearance {
+        val localVarResponse = setAppearanceBackgroundWithHttpInfo(body = body)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Appearance
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /appearance/background
+     * Upload the page background (admin only). PNG, JPEG or WebP up to 20 MB, judged by the image&#39;s actual bytes; anything else, SVG included, is refused. It shows for everyone at once.
+     * 
+     * @param body 
+     * @return ApiResponse<Appearance?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun setAppearanceBackgroundWithHttpInfo(body: java.io.File) : ApiResponse<Appearance?> {
+        val localVariableConfig = setAppearanceBackgroundRequestConfig(body = body)
+
+        return request<java.io.File, Appearance>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setAppearanceBackground
+     *
+     * @param body 
+     * @return RequestConfig
+     */
+    fun setAppearanceBackgroundRequestConfig(body: java.io.File) : RequestConfig<java.io.File> {
+        val localVariableBody = body
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/octet-stream"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/appearance/background",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /ai/test
      * Check an Ollama address and models before saving (admin only). Omitted fields use the saved settings. Loads no model.
      * 
@@ -334,6 +628,80 @@ open class SettingsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/ai/test",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /appearance
+     * Choose the theme, automatic holidays and how the background is shown (admin only). Fields left out keep their value.
+     * 
+     * @param appearanceUpdate 
+     * @return Appearance
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun updateAppearance(appearanceUpdate: AppearanceUpdate) : Appearance {
+        val localVarResponse = updateAppearanceWithHttpInfo(appearanceUpdate = appearanceUpdate)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Appearance
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /appearance
+     * Choose the theme, automatic holidays and how the background is shown (admin only). Fields left out keep their value.
+     * 
+     * @param appearanceUpdate 
+     * @return ApiResponse<Appearance?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun updateAppearanceWithHttpInfo(appearanceUpdate: AppearanceUpdate) : ApiResponse<Appearance?> {
+        val localVariableConfig = updateAppearanceRequestConfig(appearanceUpdate = appearanceUpdate)
+
+        return request<AppearanceUpdate, Appearance>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation updateAppearance
+     *
+     * @param appearanceUpdate 
+     * @return RequestConfig
+     */
+    fun updateAppearanceRequestConfig(appearanceUpdate: AppearanceUpdate) : RequestConfig<AppearanceUpdate> {
+        val localVariableBody = appearanceUpdate
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/appearance",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

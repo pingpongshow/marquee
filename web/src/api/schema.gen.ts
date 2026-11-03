@@ -1086,6 +1086,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/appearance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the web app looks like for everyone (USER-20): the theme to show now, in the server's time zone, and the page background. Used at startup and on the sign-in page, so no sign-in is needed. */
+        get: operations["getAppearance"];
+        /** Choose the theme, automatic holidays and how the background is shown (admin only). Fields left out keep their value. */
+        put: operations["updateAppearance"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/appearance/background": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The page background image. Readable without signing in, because the sign-in page shows it.
+         * @description Use the `imageUrl` from Appearance; it carries a version, so the response can be cached forever.
+         */
+        get: operations["getAppearanceBackground"];
+        /** Upload the page background (admin only). PNG, JPEG or WebP up to 20 MB, judged by the image's actual bytes; anything else, SVG included, is refused. It shows for everyone at once. */
+        put: operations["setAppearanceBackground"];
+        post?: never;
+        /** Remove the page background, returning to the theme's own (admin only). */
+        delete: operations["deleteAppearanceBackground"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/plex-sync": {
         parameters: {
             query?: never;
@@ -6501,6 +6541,35 @@ export interface components {
             changesTruncated: boolean;
             errors: string[];
         };
+        Appearance: {
+            /** @description The theme to show now: the holiday's while one applies, otherwise the chosen one. */
+            activeThemeId: string;
+            /** @description The theme the admin chose. */
+            themeId: string;
+            /** @description Holiday themes replace the chosen one around their dates. */
+            autoHolidays: boolean;
+            /** @description The holiday showing now; absent when none is. */
+            holidayId?: string;
+            background: components["schemas"]["AppearanceBackground"];
+        };
+        AppearanceBackground: {
+            /** @description The uploaded image; absent when there is none, and the theme's own background shows. The URL changes with each upload. */
+            imageUrl?: string;
+            /**
+             * @description Repeat the image (for patterns) or cover the page with it.
+             * @enum {string}
+             */
+            mode: "tile" | "fill";
+            /** @description How strongly the theme's own background colour covers the image, so text stays readable: 0–90. A value stored with a sign means its size. */
+            dim: number;
+        };
+        AppearanceUpdate: {
+            themeId?: string;
+            autoHolidays?: boolean;
+            /** @enum {string} */
+            backgroundMode?: "tile" | "fill";
+            backgroundDim?: number;
+        };
         PlexSyncStatus: {
             settings: components["schemas"]["PlexSyncSettings"];
             /** @description A sync or preview is running. */
@@ -10486,6 +10555,127 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getAppearance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Appearance"];
+                };
+            };
+        };
+    };
+    updateAppearance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppearanceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Appearance"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getAppearanceBackground: {
+        parameters: {
+            query?: {
+                v?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image. */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setAppearanceBackground: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Appearance"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteAppearanceBackground: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Appearance"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };

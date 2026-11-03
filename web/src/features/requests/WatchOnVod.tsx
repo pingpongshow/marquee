@@ -8,7 +8,7 @@ export function WatchOnVod({ item, size = "md" }: { item: DiscoverItem; size?: "
   const v = item.vod;
   if (!v) return null;
   const cls = clsx(
-    "inline-flex items-center gap-1.5 bg-accent font-medium text-black hover:brightness-110",
+    "inline-flex items-center gap-1.5 bg-accent font-medium text-on-accent hover:brightness-110",
     size === "xs" ? "justify-center rounded px-2 py-0.5 text-[11px]" : size === "sm" ? "rounded-md px-2 py-1 text-xs" : "rounded-md px-4 py-2 text-sm",
   );
   const label = size === "md" ? "Watch now on VOD" : "VOD";

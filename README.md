@@ -56,6 +56,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - Fix Match, metadata editing with locked fields, and custom artwork.
 - **Library Health:** duplicates (compare every copy's details and move the one you don't want to a recoverable trash), unmatched items, unplayable files, upgrade candidates, playback errors, missing artwork and missing subtitles.
 - **Large files optimizer:** re-encode oversized films and episodes to HEVC (on an NVIDIA GPU end to end), keeping every audio and subtitle track, with an optional size cap per hour of running time.
+- **Themes for the web app:** an admin picks one of 28 looks, from styles to seasons and holidays, with optional automatic holidays, and can upload a tiled or full-page background for everyone. The native apps keep their own look.
 - Two-way sync of watch state with a Plex server.
 - Import watch history, ratings, playlists, markers and accounts from an existing Plex server.
 

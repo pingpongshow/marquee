@@ -75,12 +75,12 @@ function WatchBadges({ item }: { item: Parameters<typeof Poster>[0]["item"] }) {
         </div>
       ) : null}
       {leaf && (item.viewCount ?? 0) > 0 && !item.viewOffsetMs && (
-        <span className="absolute top-1.5 right-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-black/70 text-[11px] text-accent" title="Watched">
+        <span className="absolute top-1.5 right-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-black/70 text-[11px] text-accent-on-black" title="Watched">
           ✓
         </span>
       )}
       {unwatched > 0 && (
-        <span className="absolute top-1.5 right-1.5 z-10 min-w-5 rounded bg-accent px-1 text-center text-[11px] font-bold text-black" title={`${unwatched} unwatched`}>
+        <span className="absolute top-1.5 right-1.5 z-10 min-w-5 rounded bg-accent px-1 text-center text-[11px] font-bold text-on-accent" title={`${unwatched} unwatched`}>
           {unwatched}
         </span>
       )}

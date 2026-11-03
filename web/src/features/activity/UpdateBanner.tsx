@@ -13,7 +13,7 @@ export function UpdateBanner() {
   if (info.data && loadedVersion === null) setLoadedVersion(info.data.version);
   if (!info.data || loadedVersion === null || info.data.version === loadedVersion) return null;
   return (
-    <div role="status" className="flex items-center justify-center gap-3 bg-accent px-4 py-2 text-sm font-medium text-black">
+    <div role="status" className="flex items-center justify-center gap-3 bg-accent px-4 py-2 text-sm font-medium text-on-accent">
       Marquee was updated to {info.data.version}.
       <button onClick={() => window.location.reload()} className="rounded bg-black/15 px-3 py-1 font-semibold hover:bg-black/25">
         Reload

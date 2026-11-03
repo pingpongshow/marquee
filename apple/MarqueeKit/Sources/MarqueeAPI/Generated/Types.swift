@@ -411,6 +411,33 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /plex-import/preview`.
     /// - Remark: Generated from `#/paths//plex-import/preview/post(previewPlexImport)`.
     func previewPlexImport(_ input: Operations.PreviewPlexImport.Input) async throws -> Operations.PreviewPlexImport.Output
+    /// What the web app looks like for everyone (USER-20): the theme to show now, in the server's time zone, and the page background. Used at startup and on the sign-in page, so no sign-in is needed.
+    ///
+    /// - Remark: HTTP `GET /appearance`.
+    /// - Remark: Generated from `#/paths//appearance/get(getAppearance)`.
+    func getAppearance(_ input: Operations.GetAppearance.Input) async throws -> Operations.GetAppearance.Output
+    /// Choose the theme, automatic holidays and how the background is shown (admin only). Fields left out keep their value.
+    ///
+    /// - Remark: HTTP `PUT /appearance`.
+    /// - Remark: Generated from `#/paths//appearance/put(updateAppearance)`.
+    func updateAppearance(_ input: Operations.UpdateAppearance.Input) async throws -> Operations.UpdateAppearance.Output
+    /// The page background image. Readable without signing in, because the sign-in page shows it.
+    ///
+    /// Use the `imageUrl` from Appearance; it carries a version, so the response can be cached forever.
+    ///
+    /// - Remark: HTTP `GET /appearance/background`.
+    /// - Remark: Generated from `#/paths//appearance/background/get(getAppearanceBackground)`.
+    func getAppearanceBackground(_ input: Operations.GetAppearanceBackground.Input) async throws -> Operations.GetAppearanceBackground.Output
+    /// Upload the page background (admin only). PNG, JPEG or WebP up to 20 MB, judged by the image's actual bytes; anything else, SVG included, is refused. It shows for everyone at once.
+    ///
+    /// - Remark: HTTP `PUT /appearance/background`.
+    /// - Remark: Generated from `#/paths//appearance/background/put(setAppearanceBackground)`.
+    func setAppearanceBackground(_ input: Operations.SetAppearanceBackground.Input) async throws -> Operations.SetAppearanceBackground.Output
+    /// Remove the page background, returning to the theme's own (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /appearance/background`.
+    /// - Remark: Generated from `#/paths//appearance/background/delete(deleteAppearanceBackground)`.
+    func deleteAppearanceBackground(_ input: Operations.DeleteAppearanceBackground.Input) async throws -> Operations.DeleteAppearanceBackground.Output
     /// Two-way Plex sync settings, status, Plex accounts and the last run (admin only).
     ///
     /// - Remark: HTTP `GET /plex-sync`.
@@ -2506,6 +2533,61 @@ extension APIProtocol {
             headers: headers,
             body: body
         ))
+    }
+    /// What the web app looks like for everyone (USER-20): the theme to show now, in the server's time zone, and the page background. Used at startup and on the sign-in page, so no sign-in is needed.
+    ///
+    /// - Remark: HTTP `GET /appearance`.
+    /// - Remark: Generated from `#/paths//appearance/get(getAppearance)`.
+    public func getAppearance(headers: Operations.GetAppearance.Input.Headers = .init()) async throws -> Operations.GetAppearance.Output {
+        try await getAppearance(Operations.GetAppearance.Input(headers: headers))
+    }
+    /// Choose the theme, automatic holidays and how the background is shown (admin only). Fields left out keep their value.
+    ///
+    /// - Remark: HTTP `PUT /appearance`.
+    /// - Remark: Generated from `#/paths//appearance/put(updateAppearance)`.
+    public func updateAppearance(
+        headers: Operations.UpdateAppearance.Input.Headers = .init(),
+        body: Operations.UpdateAppearance.Input.Body
+    ) async throws -> Operations.UpdateAppearance.Output {
+        try await updateAppearance(Operations.UpdateAppearance.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// The page background image. Readable without signing in, because the sign-in page shows it.
+    ///
+    /// Use the `imageUrl` from Appearance; it carries a version, so the response can be cached forever.
+    ///
+    /// - Remark: HTTP `GET /appearance/background`.
+    /// - Remark: Generated from `#/paths//appearance/background/get(getAppearanceBackground)`.
+    public func getAppearanceBackground(
+        query: Operations.GetAppearanceBackground.Input.Query = .init(),
+        headers: Operations.GetAppearanceBackground.Input.Headers = .init()
+    ) async throws -> Operations.GetAppearanceBackground.Output {
+        try await getAppearanceBackground(Operations.GetAppearanceBackground.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Upload the page background (admin only). PNG, JPEG or WebP up to 20 MB, judged by the image's actual bytes; anything else, SVG included, is refused. It shows for everyone at once.
+    ///
+    /// - Remark: HTTP `PUT /appearance/background`.
+    /// - Remark: Generated from `#/paths//appearance/background/put(setAppearanceBackground)`.
+    public func setAppearanceBackground(
+        headers: Operations.SetAppearanceBackground.Input.Headers = .init(),
+        body: Operations.SetAppearanceBackground.Input.Body
+    ) async throws -> Operations.SetAppearanceBackground.Output {
+        try await setAppearanceBackground(Operations.SetAppearanceBackground.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Remove the page background, returning to the theme's own (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /appearance/background`.
+    /// - Remark: Generated from `#/paths//appearance/background/delete(deleteAppearanceBackground)`.
+    public func deleteAppearanceBackground(headers: Operations.DeleteAppearanceBackground.Input.Headers = .init()) async throws -> Operations.DeleteAppearanceBackground.Output {
+        try await deleteAppearanceBackground(Operations.DeleteAppearanceBackground.Input(headers: headers))
     }
     /// Two-way Plex sync settings, status, Plex accounts and the last run (admin only).
     ///

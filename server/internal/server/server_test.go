@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"marquee/internal/api"
+	"marquee/internal/appearance"
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
 	"marquee/internal/bazarr"
@@ -69,12 +70,13 @@ func newHarness(t *testing.T) *harness {
 	authSvc := auth.NewService(database)
 	handlers := &api.Handlers{DB: database, Auth: authSvc, Settings: store,
 		Libraries: library.NewStore(database), Items: items.NewStore(database), Version: "test",
-		Avatars: &avatars.Store{DB: database, Dir: filepath.Join(dir, "avatars")},
-		Tasks:   &tasks.Scheduler{DB: database, Settings: store},
-		Backups: &tasks.Backups{DB: database, Dir: filepath.Join(dir, "backups"), ConfigDir: dir, Retention: func() int { return 3 }},
-		Remote:  &remote.Hub{},
-		Mail:    &notify.Mailer{Settings: store},
-		Alerts:  &notify.Alerts{DB: database, Settings: store, Mail: &notify.Mailer{Settings: store}, Sync: true},
+		Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(dir, "avatars")},
+		Backdrop: &appearance.Store{Dir: filepath.Join(dir, "appearance")},
+		Tasks:    &tasks.Scheduler{DB: database, Settings: store},
+		Backups:  &tasks.Backups{DB: database, Dir: filepath.Join(dir, "backups"), ConfigDir: dir, Retention: func() int { return 3 }},
+		Remote:   &remote.Hub{},
+		Mail:     &notify.Mailer{Settings: store},
+		Alerts:   &notify.Alerts{DB: database, Settings: store, Mail: &notify.Mailer{Settings: store}, Sync: true},
 		Bazarr: &bazarr.Service{DB: database, Config: func() (string, string) {
 			return store.Get().Integrations.BazarrURL, store.Get().Integrations.BazarrAPIKey
 		}}}

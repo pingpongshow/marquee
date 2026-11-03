@@ -80,7 +80,7 @@ export function LargeFilesEntry({ onOpen }: { onOpen: () => void }) {
   return (
     <button
       onClick={onOpen}
-      className="flex w-full items-center gap-4 rounded-lg border border-l-4 border-border border-l-sky-400 bg-surface px-4 py-3 text-left hover:bg-surface-2"
+      className="flex w-full items-center gap-4 rounded-lg border border-l-4 border-border border-l-chart-1 bg-surface px-4 py-3 text-left hover:bg-surface-2"
       data-testid="large-files-entry"
     >
       <span className="min-w-0 flex-1">

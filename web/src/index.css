@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
-/* Marquee design tokens. Dark-first, warm "marquee light" accent. */
-@theme {
+/* Marquee design tokens. Dark-first, warm "marquee light" accent. These are the default
+   theme's values; the others set the same variables on <html> (features/appearance, USER-20). */
+@theme static {
   --color-bg: #121316;
   --color-surface: #1b1d22;
   --color-surface-2: #23262d;
@@ -12,9 +13,35 @@
   --color-faint: #6b7280;
   --color-accent: #f2b134;
   --color-accent-strong: #ffc451;
+  --color-on-accent: #000;
+  /* The accent where it sits on black: a player's controls, a badge on a poster. */
+  --color-accent-on-black: #f2b134;
+  --color-accent-strong-on-black: #ffc451;
+  --color-on-accent-on-black: #000;
   --color-danger: #ef5b5b;
+  --color-on-danger: #fff;
   --color-success: #46c287;
+  --color-warning: oklch(76.9% 0.188 70.08);
+  --color-ok: oklch(72.3% 0.219 149.579);
+  /* Chart series. */
+  --color-chart-1: oklch(74.6% 0.16 232.661);
+  --color-chart-2: oklch(76.5% 0.177 163.223);
+  --color-chart-3: oklch(82.8% 0.189 84.429);
+  --color-chart-4: oklch(70.2% 0.183 293.541);
+  --color-chart-5: oklch(71.2% 0.194 13.428);
+  --color-chart-6: oklch(77.7% 0.152 181.912);
+  --color-chart-7: oklch(84.1% 0.238 128.85);
+  /* Now Playing's gradient, always dark, and the sign-in page's glow. */
+  --color-immersive: #0b0b0f;
+  --color-immersive-start: #3a3a44;
+  --color-auth-glow: #2a2418;
+  --radius: 0.25rem;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html {
+  color-scheme: var(--theme-scheme, normal);
+  scrollbar-color: var(--theme-scrollbar, auto);
 }
 
 html,
@@ -33,6 +60,59 @@ body {
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+/* The page behind the main content: the uploaded background, or the theme's pattern. The
+   sidebar, top bar and now-playing bar stay solid (USER-20). */
+.theme-page {
+  background-color: var(--color-bg);
+  background-image: var(--page-layers, none);
+  background-repeat: var(--page-repeat, repeat);
+  background-size: var(--page-size, auto);
+  background-position: var(--page-position, 0 0);
+}
+.theme-auth-page {
+  background-color: var(--color-bg);
+  background-image: var(--page-layers, none), radial-gradient(ellipse at top, var(--color-auth-glow) 0%, var(--color-bg) 60%);
+  background-repeat: var(--page-repeat, repeat);
+  background-size: var(--page-size, auto);
+  background-position: var(--page-position, 0 0);
+}
+.theme-bar {
+  background-color: var(--color-surface);
+  background-color: color-mix(in oklab, var(--color-surface) var(--bar-opacity, 95%), transparent);
+}
+.theme-settings-nav {
+  background-color: var(--color-surface);
+  background-color: color-mix(in oklab, var(--color-surface) var(--panel-opacity, 50%), transparent);
+}
+
+/* Screens and controls that stay dark in every theme: video and whatever sits on it, Now
+   Playing, the Year in Music. Everything inside gets the default theme's dark colours, with an
+   accent that shows up on black, so a light theme can't put dark text on a dark screen. In the
+   base layer, so that a text colour on the same element still wins. */
+@layer base {
+  .on-black {
+    --color-bg: #121316;
+    --color-surface: #1b1d22;
+    --color-surface-2: #23262d;
+    --color-surface-3: #2c3038;
+    --color-border: #343843;
+    --color-text: #eceef2;
+    --color-muted: #9aa1ad;
+    --color-faint: #6b7280;
+    --color-accent: var(--color-accent-on-black);
+    --color-accent-strong: var(--color-accent-strong-on-black);
+    --color-on-accent: var(--color-on-accent-on-black);
+    --color-danger: #ef5b5b;
+    --color-on-danger: #fff;
+    --color-success: #46c287;
+    --color-warning: oklch(76.9% 0.188 70.08);
+    --color-ok: oklch(72.3% 0.219 149.579);
+    color: var(--color-text);
+    color-scheme: var(--on-black-scheme, normal);
+    scrollbar-color: auto;
+  }
 }
 
 /* Year in Music story pages (MUSIC-22): each page rises in as it appears. */

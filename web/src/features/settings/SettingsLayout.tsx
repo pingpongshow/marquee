@@ -29,7 +29,7 @@ export function SettingsLayout() {
     );
   return (
     <div className="flex min-h-full flex-col md:flex-row">
-      <nav aria-label="Settings" className="shrink-0 border-b border-border bg-surface/50 p-3 md:sticky md:top-0 md:h-[calc(100vh-3.5rem)] md:w-56 md:overflow-y-auto md:border-r md:border-b-0">
+      <nav aria-label="Settings" className="shrink-0 theme-settings-nav border-b border-border p-3 md:sticky md:top-0 md:h-[calc(100vh-3.5rem)] md:w-56 md:overflow-y-auto md:border-r md:border-b-0">
         <div className="relative mb-4">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-faint" aria-hidden />
           <input

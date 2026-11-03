@@ -178,7 +178,7 @@ export function LiveTvPage() {
       {liveOn && canViewRecordings && <RecordingNow />}
 
       {current && tab !== "recordings" && (
-        <div className="relative mx-auto aspect-video max-h-[42vh] overflow-hidden rounded-lg bg-black">
+        <div className="on-black relative mx-auto aspect-video max-h-[42vh] overflow-hidden rounded-lg bg-black">
           {current.available === false ? (
             <div className="grid size-full place-items-center p-6 text-center text-sm text-muted">
               {current.unavailableReason ?? "This channel isn't available right now."}
@@ -719,7 +719,7 @@ export function LiveWatchPage({ channelId }: { channelId: number }) {
     return () => window.removeEventListener("keydown", onKey);
   });
   return (
-    <div className="fixed inset-0 z-40 bg-black">
+    <div className="on-black fixed inset-0 z-40 bg-black">
       <LivePlayer
         key={channelId}
         channelId={channelId}
@@ -957,7 +957,7 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
           to="/play/$itemId"
           params={{ itemId: String(r.itemId) }}
           search={{}}
-          className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-black hover:bg-accent-strong"
+          className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:bg-accent-strong"
         >
           {(r.viewOffsetMs ?? 0) > 0 ? "Resume" : "Play"}
         </Link>
@@ -1267,7 +1267,7 @@ function UsageMeter({
           <div
             className={clsx(
               "h-full rounded-full",
-              over ? "bg-danger" : pct > 85 ? "bg-amber-500" : "bg-accent",
+              over ? "bg-danger" : pct > 85 ? "bg-warning" : "bg-accent",
             )}
             style={{ width: `${pct}%` }}
           />
