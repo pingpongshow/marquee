@@ -47,6 +47,7 @@ import { describeTimeLimits } from "./timeLimits";
 
 function describe(r: UserRestrictions, libraryNames: Map<number, string>) {
   const parts: string[] = [];
+  if (r.isKid) parts.push("Kid");
   if (r.libraryIds)
     parts.push(
       r.libraryIds.length
@@ -331,6 +332,22 @@ function RestrictionsEditor({
           </div>
         )}
       </div>
+      <Toggle
+        label="Kid's profile"
+        help="For a child. Kids don't get In Town."
+        checked={!!value.isKid}
+        onChange={(v) => onChange({ ...value, isKid: v })}
+      />
+      {value.isKid && !value.maxContentRating && (
+        <Alert tone="info">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>This profile can watch anything until it has a maximum content rating.</span>
+            <Button size="sm" onClick={() => onChange({ ...value, maxContentRating: "PG" })}>
+              Use PG / TV-PG
+            </Button>
+          </div>
+        </Alert>
+      )}
       <Field
         label="Maximum content rating"
         help="Movies and shows rated higher, and unrated ones, are hidden. Music isn't affected."
@@ -430,7 +447,7 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
                   pin: pin || undefined,
                   isManaged: managed,
                   isAdmin: !managed && isAdmin,
-                  restrictions,
+                  restrictions: !managed && isAdmin ? { ...restrictions, isKid: false } : restrictions,
                 },
                 { onSuccess: onClose },
               )
@@ -616,7 +633,8 @@ function EditUserDialog({
                     password: password || undefined,
                     pin: pin ?? undefined,
                     isAdmin: user.isManaged ? undefined : isAdmin,
-                    restrictions,
+                    // An administrator isn't a kid; the switch is hidden for them.
+                    restrictions: isAdmin ? { ...restrictions, isKid: false } : restrictions,
                   },
                 },
                 { onSuccess: onClose },

@@ -80,7 +80,7 @@ func toAPIRestrictions(r auth.Restrictions) UserRestrictions {
 		CanRequest: ptr(r.CanRequest), CanRecord: ptr(r.DVRRecordAllowed()), SeerrUserId: r.SeerrUserID,
 		AutoApproveRequests: ptr(r.AutoApproveRequests), CanDownloadVod: ptr(r.VODDownloads),
 		CanRecordDVR: ptr(r.DVRRecordAllowed()), CanViewDVR: ptr(r.DVRViewAllowed()), DvrQuotaGb: r.DVRQuotaGB,
-		LiveTv: ptr(r.LiveTVAllowed()), Friend: ptr(r.Friend),
+		LiveTv: ptr(r.LiveTVAllowed()), Friend: ptr(r.Friend), IsKid: ptr(r.IsKid),
 		DailyLimitMinutes: r.DailyLimitMinutes, WeekendLimitMinutes: r.WeekendLimitMinutes,
 		AllowedFrom: nz(r.AllowedFrom), AllowedUntil: nz(r.AllowedUntil)}
 	if r.MaxContentRating != nil {
@@ -136,6 +136,7 @@ func fromAPIRestrictions(r *UserRestrictions) (auth.Restrictions, error) {
 	// liveTvGroups is deprecated and ignored: channel groups no longer limit anyone.
 	out.SeerrUserID = r.SeerrUserId
 	set(&out.Friend, r.Friend)
+	set(&out.IsKid, r.IsKid)
 	if err := timeLimitsFromAPI(r, &out); err != nil {
 		return out, err
 	}
@@ -303,6 +304,9 @@ func (h *Handlers) UpdateMe(ctx context.Context, req UpdateMeRequestObject) (Upd
 		if err != nil {
 			return UpdateMe400JSONResponse{BadRequestJSONResponse(apiErr("invalid", err.Error()))}, nil
 		}
+		// A location has a route of its own (MUSIC-27), so apps sending the preferences they
+		// know about don't wipe it.
+		p.Location = s.User.Preferences.Location
 		upd.Preferences = &p
 	}
 	if b.Email != nil {
@@ -346,6 +350,8 @@ func (h *Handlers) ListUsers(ctx context.Context, _ ListUsersRequestObject) (Lis
 	return out, nil
 }
 
+const errAdminKid = "an administrator can't be a kid's profile"
+
 func (h *Handlers) CreateUser(ctx context.Context, req CreateUserRequestObject) (CreateUserResponseObject, error) {
 	switch authed, admin := adminCheck(ctx); {
 	case !authed:
@@ -383,6 +389,9 @@ func (h *Handlers) CreateUser(ctx context.Context, req CreateUserRequestObject) 
 	r, err := fromAPIRestrictions(b.Restrictions)
 	if err != nil {
 		return bad(err.Error())
+	}
+	if n.IsAdmin && r.IsKid {
+		return bad(errAdminKid)
 	}
 	n.Restrictions = r
 	u, err := h.Auth.Create(ctx, n)
@@ -429,13 +438,34 @@ func (h *Handlers) UpdateUser(ctx context.Context, req UpdateUserRequestObject) 
 		if err != nil {
 			return bad(err.Error())
 		}
-		// A friend stays a friend unless the editor says otherwise (older apps don't send it).
-		if b.Restrictions.Friend == nil {
+		// A friend stays a friend, and a kid a kid, unless the editor says otherwise (older apps
+		// don't send them).
+		if b.Restrictions.Friend == nil || b.Restrictions.IsKid == nil {
 			if cur, err := h.Auth.GetUser(ctx, req.UserId); err == nil {
-				r.Friend = cur.Restrictions.Friend
+				if b.Restrictions.Friend == nil {
+					r.Friend = cur.Restrictions.Friend
+				}
+				if b.Restrictions.IsKid == nil {
+					r.IsKid = cur.Restrictions.IsKid
+				}
 			}
 		}
 		upd.Restrictions = &r
+	}
+	// However the two came to be asked for together, an administrator isn't a kid.
+	if b.IsAdmin != nil || upd.Restrictions != nil {
+		if cur, err := h.Auth.GetUser(ctx, req.UserId); err == nil {
+			admin, kid := cur.IsAdmin, cur.Restrictions.IsKid
+			if b.IsAdmin != nil {
+				admin = *b.IsAdmin
+			}
+			if upd.Restrictions != nil {
+				kid = upd.Restrictions.IsKid
+			}
+			if admin && kid {
+				return bad(errAdminKid)
+			}
+		}
 	}
 	u, err := h.Auth.Update(ctx, req.UserId, upd)
 	switch {

@@ -1526,6 +1526,40 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /music/mixes`.
     /// - Remark: Generated from `#/paths//music/mixes/get(musicMixes)`.
     func musicMixes(_ input: Operations.MusicMixes.Input) async throws -> Operations.MusicMixes.Output
+    /// In Town (MUSIC-27): concerts for you. Artists in your libraries with upcoming shows anywhere, then shows near your location with why each is there.
+    ///
+    /// With In Town off, or for a kid's profile, enabled is false and the lists are empty. Without a location, needsLocation is true and near is empty. Opening this may ask the provider for shows near you (cached for a few hours), sending only your location, so it can take a few seconds the first time.
+    ///
+    /// - Remark: HTTP `GET /music/in-town`.
+    /// - Remark: Generated from `#/paths//music/in-town/get(getInTown)`.
+    func getInTown(_ input: Operations.GetInTown.Input) async throws -> Operations.GetInTown.Output
+    /// How In Town's background lookups are going (admins only).
+    ///
+    /// - Remark: HTTP `GET /music/in-town/status`.
+    /// - Remark: Generated from `#/paths//music/in-town/status/get(getInTownStatus)`.
+    func getInTownStatus(_ input: Operations.GetInTownStatus.Input) async throws -> Operations.GetInTownStatus.Output
+    /// An artist's upcoming shows (MUSIC-27), soonest first, and how many are near you. Answers from what's stored, so it never holds up the artist page; a stale artist is refreshed in the background.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/shows`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/shows/get(getItemShows)`.
+    func getItemShows(_ input: Operations.GetItemShows.Input) async throws -> Operations.GetItemShows.Output
+    /// Your location for In Town (MUSIC-27), if you've set one. Only you can see it. Refused for a kid's profile.
+    ///
+    /// - Remark: HTTP `GET /me/location`.
+    /// - Remark: Generated from `#/paths//me/location/get(getMyLocation)`.
+    func getMyLocation(_ input: Operations.GetMyLocation.Input) async throws -> Operations.GetMyLocation.Output
+    /// Set your location for In Town (MUSIC-27): a postcode or a city, not both, plus country, and how far you'd go. Never GPS. It's sent to the provider, without your name, to find shows.
+    ///
+    /// In the UK, Ireland, Canada and the Netherlands only the first part of a postcode is kept (and in the US the first five digits), so the answer can differ from what was sent. Changes are limited per day: past that it's a 400 with code too_many_changes. Refused for a kid's profile.
+    ///
+    /// - Remark: HTTP `PUT /me/location`.
+    /// - Remark: Generated from `#/paths//me/location/put(setMyLocation)`.
+    func setMyLocation(_ input: Operations.SetMyLocation.Input) async throws -> Operations.SetMyLocation.Output
+    /// Remove your location for In Town.
+    ///
+    /// - Remark: HTTP `DELETE /me/location`.
+    /// - Remark: Generated from `#/paths//me/location/delete(deleteMyLocation)`.
+    func deleteMyLocation(_ input: Operations.DeleteMyLocation.Input) async throws -> Operations.DeleteMyLocation.Output
     /// Not interested (USER-16): stop suggesting this movie or show to you. It leaves every suggestion row (Home, Because you watched, Muse…) and counts as something you turned away from, steering suggestions away from titles like it.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/not-interested`.
@@ -5256,6 +5290,64 @@ extension APIProtocol {
             query: query,
             headers: headers
         ))
+    }
+    /// In Town (MUSIC-27): concerts for you. Artists in your libraries with upcoming shows anywhere, then shows near your location with why each is there.
+    ///
+    /// With In Town off, or for a kid's profile, enabled is false and the lists are empty. Without a location, needsLocation is true and near is empty. Opening this may ask the provider for shows near you (cached for a few hours), sending only your location, so it can take a few seconds the first time.
+    ///
+    /// - Remark: HTTP `GET /music/in-town`.
+    /// - Remark: Generated from `#/paths//music/in-town/get(getInTown)`.
+    public func getInTown(headers: Operations.GetInTown.Input.Headers = .init()) async throws -> Operations.GetInTown.Output {
+        try await getInTown(Operations.GetInTown.Input(headers: headers))
+    }
+    /// How In Town's background lookups are going (admins only).
+    ///
+    /// - Remark: HTTP `GET /music/in-town/status`.
+    /// - Remark: Generated from `#/paths//music/in-town/status/get(getInTownStatus)`.
+    public func getInTownStatus(headers: Operations.GetInTownStatus.Input.Headers = .init()) async throws -> Operations.GetInTownStatus.Output {
+        try await getInTownStatus(Operations.GetInTownStatus.Input(headers: headers))
+    }
+    /// An artist's upcoming shows (MUSIC-27), soonest first, and how many are near you. Answers from what's stored, so it never holds up the artist page; a stale artist is refreshed in the background.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/shows`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/shows/get(getItemShows)`.
+    public func getItemShows(
+        path: Operations.GetItemShows.Input.Path,
+        headers: Operations.GetItemShows.Input.Headers = .init()
+    ) async throws -> Operations.GetItemShows.Output {
+        try await getItemShows(Operations.GetItemShows.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Your location for In Town (MUSIC-27), if you've set one. Only you can see it. Refused for a kid's profile.
+    ///
+    /// - Remark: HTTP `GET /me/location`.
+    /// - Remark: Generated from `#/paths//me/location/get(getMyLocation)`.
+    public func getMyLocation(headers: Operations.GetMyLocation.Input.Headers = .init()) async throws -> Operations.GetMyLocation.Output {
+        try await getMyLocation(Operations.GetMyLocation.Input(headers: headers))
+    }
+    /// Set your location for In Town (MUSIC-27): a postcode or a city, not both, plus country, and how far you'd go. Never GPS. It's sent to the provider, without your name, to find shows.
+    ///
+    /// In the UK, Ireland, Canada and the Netherlands only the first part of a postcode is kept (and in the US the first five digits), so the answer can differ from what was sent. Changes are limited per day: past that it's a 400 with code too_many_changes. Refused for a kid's profile.
+    ///
+    /// - Remark: HTTP `PUT /me/location`.
+    /// - Remark: Generated from `#/paths//me/location/put(setMyLocation)`.
+    public func setMyLocation(
+        headers: Operations.SetMyLocation.Input.Headers = .init(),
+        body: Operations.SetMyLocation.Input.Body
+    ) async throws -> Operations.SetMyLocation.Output {
+        try await setMyLocation(Operations.SetMyLocation.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Remove your location for In Town.
+    ///
+    /// - Remark: HTTP `DELETE /me/location`.
+    /// - Remark: Generated from `#/paths//me/location/delete(deleteMyLocation)`.
+    public func deleteMyLocation(headers: Operations.DeleteMyLocation.Input.Headers = .init()) async throws -> Operations.DeleteMyLocation.Output {
+        try await deleteMyLocation(Operations.DeleteMyLocation.Input(headers: headers))
     }
     /// Not interested (USER-16): stop suggesting this movie or show to you. It leaves every suggestion row (Home, Because you watched, Muse…) and counts as something you turned away from, steering suggestions away from titles like it.
     ///

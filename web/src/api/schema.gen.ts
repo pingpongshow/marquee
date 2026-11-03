@@ -4500,6 +4500,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/music/in-town": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * In Town (MUSIC-27): concerts for you. Artists in your libraries with upcoming shows anywhere, then shows near your location with why each is there.
+         * @description With In Town off, or for a kid's profile, enabled is false and the lists are empty. Without a location, needsLocation is true and near is empty. Opening this may ask the provider for shows near you (cached for a few hours), sending only your location, so it can take a few seconds the first time.
+         */
+        get: operations["getInTown"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/music/in-town/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How In Town's background lookups are going (admins only). */
+        get: operations["getInTownStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/shows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** An artist's upcoming shows (MUSIC-27), soonest first, and how many are near you. Answers from what's stored, so it never holds up the artist page; a stale artist is refreshed in the background. */
+        get: operations["getItemShows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your location for In Town (MUSIC-27), if you've set one. Only you can see it. Refused for a kid's profile. */
+        get: operations["getMyLocation"];
+        /**
+         * Set your location for In Town (MUSIC-27): a postcode or a city, not both, plus country, and how far you'd go. Never GPS. It's sent to the provider, without your name, to find shows.
+         * @description In the UK, Ireland, Canada and the Netherlands only the first part of a postcode is kept (and in the US the first five digits), so the answer can differ from what was sent. Changes are limited per day: past that it's a 400 with code too_many_changes. Refused for a kid's profile.
+         */
+        put: operations["setMyLocation"];
+        post?: never;
+        /** Remove your location for In Town. */
+        delete: operations["deleteMyLocation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{itemId}/not-interested": {
         parameters: {
             query?: never;
@@ -4685,6 +4763,8 @@ export interface components {
             remoteUrl?: string;
             /** @description The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference. */
             ratingPrompt?: boolean;
+            /** @description An admin turned In Town on (MUSIC-27). It's for the whole server, as this needs no sign-in: apps show its button and artist banners only when the signed-in user's restrictions.isKid isn't true too. */
+            inTown?: boolean;
         };
         Health: {
             /** @enum {string} */
@@ -4754,6 +4834,8 @@ export interface components {
              * @enum {string|null}
              */
             maxContentRating?: "G" | "PG" | "PG-13" | "R" | "NC-17" | "TV-Y" | "TV-Y7" | "TV-G" | "TV-PG" | "TV-14" | "TV-MA" | null;
+            /** @description A kid's profile, set by an admin; an admin can't be one. Kids don't get In Town (MUSIC-27). Default false, and left as it is when an update doesn't send it. */
+            isKid?: boolean;
             /** @description May stream from outside the home network. Default true. */
             allowRemote?: boolean;
             /** @description Cap for remote streams. 0 = server default. */
@@ -4908,6 +4990,7 @@ export interface components {
             metadata: components["schemas"]["MetadataSettings"];
             tasks: components["schemas"]["TaskSettings"];
             music?: components["schemas"]["MusicSettings"];
+            inTown?: components["schemas"]["InTownSettings"];
             integrations?: components["schemas"]["IntegrationSettings"];
             cinema?: components["schemas"]["CinemaSettings"];
             ai?: components["schemas"]["AiSettings"];
@@ -4926,6 +5009,7 @@ export interface components {
             metadata?: components["schemas"]["MetadataSettingsUpdate"];
             tasks?: components["schemas"]["TaskSettings"];
             music?: components["schemas"]["MusicSettings"];
+            inTown?: components["schemas"]["InTownSettingsUpdate"];
             integrations?: components["schemas"]["IntegrationSettingsUpdate"];
             cinema?: components["schemas"]["CinemaSettings"];
             ai?: components["schemas"]["AiSettings"];
@@ -5136,6 +5220,181 @@ export interface components {
             /** Format: int64 */
             itemId: number;
             reason: string;
+        };
+        /** @description In Town (MUSIC-27): concerts near people, from the admin's own free Ticketmaster key. Off by default. */
+        InTownSettings: {
+            /** @description Sends artist names and ids, and people's locations, to Ticketmaster. Needs a key. */
+            enabled?: boolean;
+            readonly ticketmasterKeySet?: boolean;
+            /** @description Calls a day the background lookups may use (a free key allows 5,000 a day, so this leaves room for what people do). Default 2000. */
+            dailyBudget?: number;
+        };
+        InTownSettingsUpdate: {
+            /** @description Turning it off deletes the stored shows. */
+            enabled?: boolean;
+            /** @description The Ticketmaster Consumer Key. Write-only; empty clears it, which needs In Town off. */
+            ticketmasterKey?: string;
+            dailyBudget?: number;
+        };
+        /** @description Coarse on purpose: a postcode or a city, never coordinates. */
+        InTownLocation: {
+            /** @description Postcode or ZIP. Exactly one of this and city is needed. */
+            postalCode?: string;
+            /** @description Exactly one of this and postalCode is needed. */
+            city?: string;
+            /** @description ISO 3166-1 alpha-2, e.g. GB, US. */
+            countryCode: string;
+            /** @description How far you'd go. Default 50 miles, or 80 km. */
+            distance?: number;
+            /**
+             * @description Defaults to miles in the UK and US and km elsewhere.
+             * @enum {string}
+             */
+            unit?: "miles" | "km";
+        };
+        InTownLocationState: {
+            location?: components["schemas"]["InTownLocation"];
+        };
+        /** @description Who the show data is from. Show it wherever shows appear. */
+        InTownAttribution: {
+            /** @example Ticketmaster */
+            name: string;
+            url: string;
+            /** @example Show data from Ticketmaster */
+            text: string;
+        };
+        /**
+         * @description Why a show is suggested: favourite, rated and played are artists you like; similar is what listeners consider alike; soundsLike is Soundprint; library is an artist in your libraries; genre is your top genres; nearby is just close by.
+         * @enum {string}
+         */
+        InTownReasonKind: "favourite" | "rated" | "played" | "similar" | "soundsLike" | "library" | "genre" | "nearby";
+        InTownShow: {
+            /** @description The provider's id for the event. */
+            id: string;
+            /** @description The event's name, which may be a tour's or a festival's. */
+            title: string;
+            /** @description The act this entry is about. Not always the headliner. */
+            artistName: string;
+            /** @description Everyone on the bill, headliner first. */
+            lineup: string[];
+            /** @description artistName is on the bill but isn't the headliner. */
+            support: boolean;
+            /**
+             * Format: int64
+             * @description The act's artist page, when they're in a library you can see.
+             */
+            artistItemId?: number;
+            artist?: components["schemas"]["ItemSummary"];
+            /**
+             * Format: date-time
+             * @description The start in UTC. Absent when the time isn't announced.
+             */
+            startsAt?: string;
+            /**
+             * @description The date at the venue, YYYY-MM-DD.
+             * @example 2026-11-20
+             */
+            localDate: string;
+            /**
+             * @description The time at the venue, 24-hour HH:mm. Absent when it isn't announced.
+             * @example 19:30
+             */
+            localTime?: string;
+            /**
+             * @description The venue's IANA time zone, when known.
+             * @example Europe/London
+             */
+            timeZone?: string;
+            venueName: string;
+            city: string;
+            /** @description State or province code, when the provider gives one. */
+            region?: string;
+            countryCode: string;
+            /**
+             * Format: double
+             * @description From your location, in distanceUnit. Absent when it isn't known.
+             */
+            distance?: number;
+            /** @enum {string} */
+            distanceUnit?: "miles" | "km";
+            /** @description Within the distance you set. */
+            near?: boolean;
+            genre?: string;
+            /** @enum {string} */
+            status: "scheduled" | "postponed" | "rescheduled";
+            /** @description The provider's page for the event. Open it in a browser. */
+            ticketsUrl: string;
+            /**
+             * @description Where it came from.
+             * @example ticketmaster
+             */
+            source: string;
+            /**
+             * @description Why it's suggested, in a few words, for the near list.
+             * @example You rated them highly
+             */
+            reason?: string;
+            reasonKind?: components["schemas"]["InTownReasonKind"];
+        };
+        InTownArtist: {
+            artist: components["schemas"]["ItemSummary"];
+            /** @description All their upcoming shows. shows holds the next few; /items/{itemId}/shows has the rest. */
+            showCount: number;
+            nearCount: number;
+            shows: components["schemas"]["InTownShow"][];
+            reason?: string;
+            reasonKind?: components["schemas"]["InTownReasonKind"];
+        };
+        InTownPage: {
+            /** @description False when an admin hasn't turned In Town on. */
+            enabled: boolean;
+            needsLocation: boolean;
+            location?: components["schemas"]["InTownLocation"];
+            /** @description False when the provider knows nothing at your postcode or city, so distances aren't known. Suggest trying a nearby city. */
+            locationFound?: boolean;
+            /** @description Artists in your libraries with upcoming shows anywhere: those you like most first, then the next date. */
+            artists: components["schemas"]["InTownArtist"][];
+            /** @description Shows near you: artists you like first, then similar taste, then what's left nearby. Each has a reason. */
+            near: components["schemas"]["InTownShow"][];
+            /** @description Why shows near you may be out of date or missing, in words to show. */
+            nearError?: string;
+            attribution: components["schemas"]["InTownAttribution"];
+        };
+        ItemShows: {
+            enabled: boolean;
+            needsLocation: boolean;
+            shows: components["schemas"]["InTownShow"][];
+            nearCount: number;
+            attribution: components["schemas"]["InTownAttribution"];
+        };
+        InTownStatus: {
+            enabled: boolean;
+            keySet: boolean;
+            running: boolean;
+            /** Format: date-time */
+            lastSyncAt?: string;
+            /** @description Artists in music libraries. */
+            artistsTotal: number;
+            /** @description How many have been looked up. */
+            artistsChecked: number;
+            /** @description How many were matched to the provider's artists. */
+            artistsMatched: number;
+            showsCached: number;
+            /** @description Calls so far today (UTC), by the background lookups and by people. */
+            callsToday: number;
+            /** @description What the background lookups may use. */
+            dailyBudget: number;
+            /** @description The key's daily quota, as last reported. */
+            quotaLimit?: number;
+            /** @description What's left of it, as last reported. */
+            quotaRemaining?: number;
+            /**
+             * Format: date-time
+             * @description No calls until then: the provider said to wait.
+             */
+            backoffUntil?: string;
+            /** @description The last problem, e.g. an invalid key. Empty once it's working. */
+            lastError?: string;
         };
         MusicSettings: {
             /** @description Soundprint: analyse how tracks sound (on this server's GPU) for radios, similar music and Muse. */
@@ -16509,6 +16768,142 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getInTown: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InTownPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getInTownStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InTownStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getItemShows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemShows"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getMyLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InTownLocationState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setMyLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InTownLocation"];
+            };
+        };
+        responses: {
+            /** @description Saved, with the distance and unit filled in. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InTownLocation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteMyLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     markNotInterested: {

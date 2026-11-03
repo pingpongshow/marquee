@@ -28,6 +28,9 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 
 import app.marquee.api.models.Error
+import app.marquee.api.models.InTownPage
+import app.marquee.api.models.InTownStatus
+import app.marquee.api.models.ItemShows
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.ListeningRecap
 import app.marquee.api.models.Lyrics
@@ -131,6 +134,219 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/music/sound-model",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /music/in-town
+     * In Town (MUSIC-27): concerts for you. Artists in your libraries with upcoming shows anywhere, then shows near your location with why each is there.
+     * With In Town off, or for a kid&#39;s profile, enabled is false and the lists are empty. Without a location, needsLocation is true and near is empty. Opening this may ask the provider for shows near you (cached for a few hours), sending only your location, so it can take a few seconds the first time.
+     * @return InTownPage
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getInTown() : InTownPage {
+        val localVarResponse = getInTownWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as InTownPage
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /music/in-town
+     * In Town (MUSIC-27): concerts for you. Artists in your libraries with upcoming shows anywhere, then shows near your location with why each is there.
+     * With In Town off, or for a kid&#39;s profile, enabled is false and the lists are empty. Without a location, needsLocation is true and near is empty. Opening this may ask the provider for shows near you (cached for a few hours), sending only your location, so it can take a few seconds the first time.
+     * @return ApiResponse<InTownPage?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getInTownWithHttpInfo() : ApiResponse<InTownPage?> {
+        val localVariableConfig = getInTownRequestConfig()
+
+        return request<Unit, InTownPage>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getInTown
+     *
+     * @return RequestConfig
+     */
+    fun getInTownRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/music/in-town",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /music/in-town/status
+     * How In Town&#39;s background lookups are going (admins only).
+     * 
+     * @return InTownStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getInTownStatus() : InTownStatus {
+        val localVarResponse = getInTownStatusWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as InTownStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /music/in-town/status
+     * How In Town&#39;s background lookups are going (admins only).
+     * 
+     * @return ApiResponse<InTownStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getInTownStatusWithHttpInfo() : ApiResponse<InTownStatus?> {
+        val localVariableConfig = getInTownStatusRequestConfig()
+
+        return request<Unit, InTownStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getInTownStatus
+     *
+     * @return RequestConfig
+     */
+    fun getInTownStatusRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/music/in-town/status",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /items/{itemId}/shows
+     * An artist&#39;s upcoming shows (MUSIC-27), soonest first, and how many are near you. Answers from what&#39;s stored, so it never holds up the artist page; a stale artist is refreshed in the background.
+     * 
+     * @param itemId 
+     * @return ItemShows
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getItemShows(itemId: kotlin.Long) : ItemShows {
+        val localVarResponse = getItemShowsWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemShows
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/shows
+     * An artist&#39;s upcoming shows (MUSIC-27), soonest first, and how many are near you. Answers from what&#39;s stored, so it never holds up the artist page; a stale artist is refreshed in the background.
+     * 
+     * @param itemId 
+     * @return ApiResponse<ItemShows?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getItemShowsWithHttpInfo(itemId: kotlin.Long) : ApiResponse<ItemShows?> {
+        val localVariableConfig = getItemShowsRequestConfig(itemId = itemId)
+
+        return request<Unit, ItemShows>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getItemShows
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun getItemShowsRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/shows".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

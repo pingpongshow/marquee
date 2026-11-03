@@ -31,6 +31,8 @@ import app.marquee.api.models.AuthResult
 import app.marquee.api.models.ConnectListenBrainzRequest
 import app.marquee.api.models.Device
 import app.marquee.api.models.Error
+import app.marquee.api.models.InTownLocation
+import app.marquee.api.models.InTownLocationState
 import app.marquee.api.models.Invite
 import app.marquee.api.models.InviteCreate
 import app.marquee.api.models.InviteCreated
@@ -512,6 +514,74 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * DELETE /me/location
+     * Remove your location for In Town.
+     * 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun deleteMyLocation() : Unit {
+        val localVarResponse = deleteMyLocationWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /me/location
+     * Remove your location for In Town.
+     * 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun deleteMyLocationWithHttpInfo() : ApiResponse<Unit?> {
+        val localVariableConfig = deleteMyLocationRequestConfig()
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation deleteMyLocation
+     *
+     * @return RequestConfig
+     */
+    fun deleteMyLocationRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/me/location",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * DELETE /users/{userId}
      * Delete a user and their devices, watch history and playlists (admin only). The last admin cannot be deleted.
      * 
@@ -795,6 +865,76 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /me/location
+     * Your location for In Town (MUSIC-27), if you&#39;ve set one. Only you can see it. Refused for a kid&#39;s profile.
+     * 
+     * @return InTownLocationState
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getMyLocation() : InTownLocationState {
+        val localVarResponse = getMyLocationWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as InTownLocationState
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /me/location
+     * Your location for In Town (MUSIC-27), if you&#39;ve set one. Only you can see it. Refused for a kid&#39;s profile.
+     * 
+     * @return ApiResponse<InTownLocationState?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getMyLocationWithHttpInfo() : ApiResponse<InTownLocationState?> {
+        val localVariableConfig = getMyLocationRequestConfig()
+
+        return request<Unit, InTownLocationState>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getMyLocation
+     *
+     * @return RequestConfig
+     */
+    fun getMyLocationRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/me/location",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
             body = localVariableBody
         )
     }
@@ -1504,6 +1644,80 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/users/{userId}/avatar".replace("{"+"userId"+"}", encodeURIComponent(userId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /me/location
+     * Set your location for In Town (MUSIC-27): a postcode or a city, not both, plus country, and how far you&#39;d go. Never GPS. It&#39;s sent to the provider, without your name, to find shows.
+     * In the UK, Ireland, Canada and the Netherlands only the first part of a postcode is kept (and in the US the first five digits), so the answer can differ from what was sent. Changes are limited per day: past that it&#39;s a 400 with code too_many_changes. Refused for a kid&#39;s profile.
+     * @param inTownLocation 
+     * @return InTownLocation
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun setMyLocation(inTownLocation: InTownLocation) : InTownLocation {
+        val localVarResponse = setMyLocationWithHttpInfo(inTownLocation = inTownLocation)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as InTownLocation
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /me/location
+     * Set your location for In Town (MUSIC-27): a postcode or a city, not both, plus country, and how far you&#39;d go. Never GPS. It&#39;s sent to the provider, without your name, to find shows.
+     * In the UK, Ireland, Canada and the Netherlands only the first part of a postcode is kept (and in the US the first five digits), so the answer can differ from what was sent. Changes are limited per day: past that it&#39;s a 400 with code too_many_changes. Refused for a kid&#39;s profile.
+     * @param inTownLocation 
+     * @return ApiResponse<InTownLocation?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun setMyLocationWithHttpInfo(inTownLocation: InTownLocation) : ApiResponse<InTownLocation?> {
+        val localVariableConfig = setMyLocationRequestConfig(inTownLocation = inTownLocation)
+
+        return request<InTownLocation, InTownLocation>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setMyLocation
+     *
+     * @param inTownLocation 
+     * @return RequestConfig
+     */
+    fun setMyLocationRequestConfig(inTownLocation: InTownLocation) : RequestConfig<InTownLocation> {
+        val localVariableBody = inTownLocation
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/me/location",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

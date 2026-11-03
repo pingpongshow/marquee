@@ -35,6 +35,7 @@ import (
 	"marquee/internal/filecheck"
 	"marquee/internal/frametiming"
 	"marquee/internal/images"
+	"marquee/internal/intown"
 	"marquee/internal/introdetect"
 	"marquee/internal/items"
 	"marquee/internal/library"
@@ -767,6 +768,30 @@ func run() error {
 	vodSvc.OnMatched = vodBackfill.AfterRefresh
 	go vodSvc.Run(ctx, vodWake)
 	go vodSaves.Run(ctx)
+	// In Town (MUSIC-27): concerts, from the admin's own Ticketmaster key. Off by default; shows
+	// are kept in a cache file of their own, which turning it off deletes.
+	inTown := &intown.Service{Path: filepath.Join(cfg.ConfigDir, "cache", "in-town.db"), Items: itemStore,
+		Settings: func() settings.InTown { return store.Get().InTown }, Base: os.Getenv("MARQUEE_TICKETMASTER_URL")}
+	scheduler.Register(tasks.Task{ID: "in-town", Name: "In Town: artists' shows", Every: time.Hour,
+		Description: "With In Town on, asks Ticketmaster about the shows of artists in music libraries, a little at a time, two calls a second at most and inside a daily budget. Artists whose pages people open, or that someone favourited, rated or played, come first. Sends only artist names and ids.",
+		Run:         inTown.Sync, Progress: inTown.Progress})
+	scheduler.Register(tasks.Task{ID: "in-town-prune", Name: "In Town: remove past shows", Window: true,
+		Description: "Deletes shows whose date has passed, and compacts the file from time to time. They're also removed at startup.",
+		Run:         inTown.Prune})
+	go inTown.Start(ctx)
+	lastInTown := store.Get().InTown
+	store.Subscribe(func(s settings.Settings) {
+		was := lastInTown
+		lastInTown = s.InTown
+		if s.InTown.Active() == was.Active() && s.InTown.TicketmasterKey == was.TicketmasterKey {
+			return
+		}
+		inTown.Changed(s.InTown, s.InTown.TicketmasterKey != was.TicketmasterKey)
+		// Turned on, or with a new key: start looking artists up straight away.
+		if s.InTown.Active() {
+			scheduler.Trigger(ctx, "in-town")
+		}
+	})
 	live.DVR = dvr // recordings in progress hold source connections (tuners.go)
 	go dvr.Run(ctx)
 	go scheduler.Run(ctx)
@@ -805,6 +830,7 @@ func run() error {
 		SyncPlay:    watchTogether,
 		Remote:      remoteHub,
 		Speakers:    sonos,
+		InTown:      inTown,
 		Embeddings:  embedder,
 		AI:          aiClient,
 		LyricThemes: lyricThemes,

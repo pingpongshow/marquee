@@ -20,6 +20,9 @@ var (
 
 // Restrictions limit what a user can see and how they can stream (USER-2, WAN-4).
 type Restrictions struct {
+	// IsKid: a kid's profile, set by an admin. Kids don't get In Town (MUSIC-27). What they
+	// can watch is MaxContentRating's business.
+	IsKid             bool     `json:"isKid,omitempty"`
 	LibraryIDs        *[]int64 `json:"libraryIds,omitempty"` // nil = all libraries
 	MaxContentRating  *string  `json:"maxContentRating,omitempty"`
 	AllowRemote       *bool    `json:"allowRemote,omitempty"` // nil = allowed
@@ -56,6 +59,9 @@ type Restrictions struct {
 	AllowedUntil        string `json:"allowedUntil,omitempty"`
 }
 
+// IsKid reports a kid's profile. An admin is never one, whatever's stored.
+func (u User) IsKid() bool { return !u.IsAdmin && u.Restrictions.IsKid }
+
 // LiveTVAllowed reports whether the user may watch Live TV at all.
 func (r Restrictions) LiveTVAllowed() bool { return r.LiveTV == nil || *r.LiveTV }
 
@@ -80,6 +86,18 @@ type Preferences struct {
 	NightMode         bool   `json:"nightMode,omitempty"`      // night mode (dialogue boost) by default
 	// SubtitleStyle is how text subtitles look (PLAY-20); nil = the defaults.
 	SubtitleStyle *SubtitleStyle `json:"subtitleStyle,omitempty"`
+	// Location is where they want to hear about concerts (MUSIC-27); nil = not set. Only they
+	// can see it, so it isn't part of the preferences the API returns.
+	Location *Location `json:"location,omitempty"`
+}
+
+// Location is coarse on purpose: a postcode or a city, plus country and how far they'd go.
+type Location struct {
+	PostalCode  string `json:"postalCode,omitempty"`
+	City        string `json:"city,omitempty"`
+	CountryCode string `json:"countryCode"`
+	Distance    int    `json:"distance"`
+	Unit        string `json:"unit"`
 }
 
 // SubtitleStyle holds a person's subtitle look; empty fields mean the default.

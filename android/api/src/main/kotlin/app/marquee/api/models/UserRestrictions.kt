@@ -33,6 +33,7 @@ import kotlinx.serialization.Contextual
  *
  * @param libraryIds Libraries this user can see. Null or absent = all libraries.
  * @param maxContentRating Highest allowed rating, e.g. PG-13 or TV-14. Unrated items are hidden when set.
+ * @param isKid A kid's profile, set by an admin; an admin can't be one. Kids don't get In Town (MUSIC-27). Default false, and left as it is when an update doesn't send it.
  * @param allowRemote May stream from outside the home network. Default true.
  * @param remoteQualityKbps Cap for remote streams. 0 = server default.
  * @param canRequest May request titles through Seerr (REQ-1). Default false; admins always may.
@@ -62,6 +63,10 @@ data class UserRestrictions (
     /* Highest allowed rating, e.g. PG-13 or TV-14. Unrated items are hidden when set. */
     @SerialName(value = "maxContentRating")
     val maxContentRating: UserRestrictions.MaxContentRating? = null,
+
+    /* A kid's profile, set by an admin; an admin can't be one. Kids don't get In Town (MUSIC-27). Default false, and left as it is when an update doesn't send it. */
+    @SerialName(value = "isKid")
+    val isKid: kotlin.Boolean? = null,
 
     /* May stream from outside the home network. Default true. */
     @SerialName(value = "allowRemote")

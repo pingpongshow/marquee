@@ -26,6 +26,7 @@ package app.marquee.api.models
 import app.marquee.api.models.AiSettings
 import app.marquee.api.models.CinemaSettings
 import app.marquee.api.models.GeneralSettings
+import app.marquee.api.models.InTownSettings
 import app.marquee.api.models.IntegrationSettings
 import app.marquee.api.models.LibraryGlobalSettings
 import app.marquee.api.models.MetadataSettings
@@ -55,6 +56,7 @@ import kotlinx.serialization.Contextual
  * @param metadata 
  * @param tasks 
  * @param music 
+ * @param inTown 
  * @param integrations 
  * @param cinema 
  * @param ai 
@@ -92,6 +94,9 @@ data class ServerSettings (
 
     @SerialName(value = "music")
     val music: MusicSettings? = null,
+
+    @SerialName(value = "inTown")
+    val inTown: InTownSettings? = null,
 
     @SerialName(value = "integrations")
     val integrations: IntegrationSettings? = null,

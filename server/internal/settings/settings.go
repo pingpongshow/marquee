@@ -45,7 +45,22 @@ type Settings struct {
 	// Appearance is the web app's theme and page background (USER-20). Exposed through
 	// /appearance, not /settings.
 	Appearance Appearance `json:"appearance"`
+	// InTown shows people concerts, from the admin's own Ticketmaster key (MUSIC-27).
+	InTown InTown `json:"inTown"`
 }
+
+// InTown is concerts near people (MUSIC-27). Off by default.
+type InTown struct {
+	Enabled bool `json:"enabled"`
+	// TicketmasterKey is the admin's Consumer Key. A secret: the API only says whether it's
+	// set, and it's never logged.
+	TicketmasterKey string `json:"ticketmasterKey"`
+	// DailyBudget is the calls a day the background lookups may use.
+	DailyBudget int `json:"dailyBudget"`
+}
+
+// Active reports whether In Town is on and can run.
+func (t InTown) Active() bool { return t.Enabled && t.TicketmasterKey != "" }
 
 // Appearance is how the web app looks for everyone (USER-20).
 type Appearance struct {
@@ -549,6 +564,7 @@ func Defaults() Settings {
 			PauseWhileWatching: true, PauseScope: "source", RetryFailed: true},
 		PlexSync: PlexSync{IntervalMinutes: 30, WatchState: true, Ratings: true, ResumePositions: true, PlayHistory: true},
 		Optimize: defaultOptimize(),
+		InTown:   InTown{DailyBudget: 2000},
 		AI: AI{URL: "http://127.0.0.1:11434", ChatModel: "qwen3:8b", EmbedModel: "mxbai-embed-large", UnloadMinutes: 5,
 			UnderstandPrompts: true, RerankMovies: true, LyricsThemes: true, Reasons: true, LearnFromBehaviour: true},
 	}

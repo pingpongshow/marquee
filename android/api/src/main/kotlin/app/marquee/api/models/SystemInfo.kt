@@ -42,6 +42,7 @@ import kotlinx.serialization.Contextual
  * @param lanUrl The server's home-network address (Settings → Network), so apps reached over Tailscale learn it.
  * @param remoteUrl The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away.
  * @param ratingPrompt The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference.
+ * @param inTown An admin turned In Town on (MUSIC-27). It's for the whole server, as this needs no sign-in: apps show its button and artist banners only when the signed-in user's restrictions.isKid isn't true too.
  */
 @Serializable
 
@@ -80,7 +81,11 @@ data class SystemInfo (
 
     /* The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference. */
     @SerialName(value = "ratingPrompt")
-    val ratingPrompt: kotlin.Boolean? = null
+    val ratingPrompt: kotlin.Boolean? = null,
+
+    /* An admin turned In Town on (MUSIC-27). It's for the whole server, as this needs no sign-in: apps show its button and artist banners only when the signed-in user's restrictions.isKid isn't true too. */
+    @SerialName(value = "inTown")
+    val inTown: kotlin.Boolean? = null
 
 ) {
 

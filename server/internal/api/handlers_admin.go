@@ -86,6 +86,11 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			SoundModel:         ptr(MusicSettingsSoundModel(soundModelOr(s.Music.SoundModel))),
 			CommunityData:      ptr(s.Music.CommunityData),
 		},
+		InTown: &InTownSettings{
+			Enabled:            ptr(s.InTown.Enabled),
+			TicketmasterKeySet: ptr(s.InTown.TicketmasterKey != ""),
+			DailyBudget:        ptr(s.InTown.DailyBudget),
+		},
 		Cinema: &CinemaSettings{Trailers: ptr(s.Cinema.Trailers), PrerollItemId: s.Cinema.PrerollItemID},
 		Integrations: &IntegrationSettings{
 			SeerrUrl:          ptr(s.Integrations.SeerrURL),
@@ -207,6 +212,13 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Tasks.BackupRetention, t.BackupRetention)
 		if t.Disabled != nil {
 			s.Tasks.Disabled = append([]string{}, *t.Disabled...)
+		}
+	}
+	if t := u.InTown; t != nil {
+		set(&s.InTown.Enabled, t.Enabled)
+		set(&s.InTown.DailyBudget, t.DailyBudget)
+		if t.TicketmasterKey != nil {
+			s.InTown.TicketmasterKey = strings.TrimSpace(*t.TicketmasterKey)
 		}
 	}
 	if m := u.Music; m != nil {

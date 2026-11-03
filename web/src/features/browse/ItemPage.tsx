@@ -15,6 +15,7 @@ import { DownloadOriginal, DownloadZip, EpisodeDownloadLink } from "./Download";
 import { ItemMenu } from "./ItemMenu";
 import { TrackRadioButton } from "../music/RadioButtons";
 import { RowRating } from "../music/Rating";
+import { ArtistShowsBanner } from "../music/InTown";
 import { TopSongs } from "../music/TopSongs";
 import { FavoriteButton, favoriteTypes, RowFavorite } from "./Favorite";
 import { ItemRatings, Reviews } from "./Reviews";
@@ -518,6 +519,7 @@ export function ItemPage() {
           <Tracks item={d} />
         </div>
       </div>
+      {d.type === "artist" && <ArtistShowsBanner key={d.id} item={d} />}
       <Children item={d} />
       <Extras item={d} />
       <CollectionShelves item={d} />

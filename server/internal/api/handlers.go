@@ -18,6 +18,7 @@ import (
 	"marquee/internal/frametiming"
 	"marquee/internal/health"
 	"marquee/internal/images"
+	"marquee/internal/intown"
 	"marquee/internal/items"
 	"marquee/internal/library"
 	"marquee/internal/livetv"
@@ -131,6 +132,8 @@ type Handlers struct {
 	Storage *storage.Service
 	// Optimize is the library optimizer (Library Health → Large files, admins only); may be nil.
 	Optimize *optimize.Service
+	// InTown shows people concerts (MUSIC-27); nil is off.
+	InTown *intown.Service
 	// TimeLimits counts watching time for kids' time limits; made on first use when nil.
 	TimeLimits *timelimit.Tracker
 }
@@ -197,6 +200,7 @@ func (h *Handlers) GetSystemInfo(ctx context.Context, _ GetSystemInfoRequestObje
 		LanUrl:        nz(h.Settings.Get().Network.LANURL),
 		RemoteUrl:     remoteURL(h.Settings.Get()),
 		RatingPrompt:  ptr(h.Settings.Get().General.RatingPrompt),
+		InTown:        ptr(h.inTownOn()),
 	}, nil
 }
 

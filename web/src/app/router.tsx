@@ -26,6 +26,7 @@ import { HomeRowPage } from "@/features/home/HomeRowPage";
 import { HomePage } from "@/features/home/HomePage";
 import { MusicProvider } from "@/features/player/MusicPlayer";
 import { PlayerPage } from "@/features/player/PlayerPage";
+import { InTownPage } from "@/features/music/InTown";
 import { TopSongsPage } from "@/features/music/TopSongs";
 import { PlaylistPage } from "@/features/playlists/PlaylistPage";
 import { PlaylistsPage } from "@/features/playlists/PlaylistsPage";
@@ -151,6 +152,16 @@ const topSongsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/item/$itemId/top-songs",
   component: TopSongsPage,
+});
+
+// In Town (MUSIC-27): concerts, optionally opened for one artist.
+const inTownRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/in-town",
+  validateSearch: (s: Record<string, unknown>): { artist?: number } => ({
+    artist: typeof s.artist === "number" ? s.artist : undefined,
+  }),
+  component: InTownPage,
 });
 
 const searchRoute = createRoute({
@@ -384,6 +395,7 @@ const routeTree = rootRoute.addChildren([
   librarySectionRoute,
   itemRoute,
   topSongsRoute,
+  inTownRoute,
   searchRoute,
   accountRoute,
   recapRoute,

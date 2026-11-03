@@ -18,6 +18,7 @@ import type { components } from "@/api/schema.gen";
 type SoundModelScore = components["schemas"]["SoundModelScore"];
 const modelName = { general: "general", music: "music" } as const;
 const percent = (v: number | undefined) => (v === undefined ? "—" : `${Math.round(v * 100)}%`);
+import { InTownSettings } from "./InTownSettings";
 import { SaveBar } from "./SaveBar";
 import { useSectionDraft } from "./useSectionDraft";
 
@@ -271,6 +272,7 @@ export function MusicSettings() {
         </Card>
         {run.error && <Alert tone="error">{run.error.message}</Alert>}
         <LastFmSettings />
+        <InTownSettings />
       </div>
       <SaveBar
         dirty={s.dirty}

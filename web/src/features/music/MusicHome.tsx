@@ -16,6 +16,7 @@ import {
   Radio,
   Shuffle,
   Sparkles,
+  Ticket,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { api, unwrap } from "@/api/client";
@@ -38,6 +39,7 @@ import {
   useMixes,
   useMusicStatus,
 } from "./Discover";
+import { useInTownOn } from "./InTown";
 import { RatingStars } from "./Rating";
 import { RecapCard } from "./RecapCard";
 import { useRadio } from "./useRadio";
@@ -94,7 +96,7 @@ export function favoritesQuery(libraryId: number, type: FavoriteKind, limit = 50
 }
 
 /** A round icon button with a small label, Plexamp style. */
-function QuickAction({ icon, label, onClick, to, busy }: { icon: ReactNode; label: string; onClick?: () => void; to?: { libraryId: number; section: MusicSection }; busy?: boolean }) {
+function QuickAction({ icon, label, onClick, to, inTown, busy }: { icon: ReactNode; label: string; onClick?: () => void; to?: { libraryId: number; section: MusicSection }; inTown?: boolean; busy?: boolean }) {
   const inner = (
     <>
       <span className="flex size-12 items-center justify-center rounded-full bg-surface-2 text-text transition-colors group-hover:bg-accent group-hover:text-on-accent [&>svg]:size-5">
@@ -104,6 +106,12 @@ function QuickAction({ icon, label, onClick, to, busy }: { icon: ReactNode; labe
     </>
   );
   const cls = "group flex w-20 flex-col items-center gap-1.5 disabled:opacity-50";
+  if (inTown)
+    return (
+      <Link to="/in-town" search={{}} className={clsx(cls, "ml-auto")}>
+        {inner}
+      </Link>
+    );
   return to ? (
     <Link to="/library/$libraryId/$section" params={{ libraryId: String(to.libraryId), section: to.section }} className={cls}>
       {inner}
@@ -223,6 +231,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
   const favAlbums = useQuery(favoritesQuery(libraryId, "album", 12));
   const favArtists = useQuery(favoritesQuery(libraryId, "artist", 12));
   const error = radio.error ?? shuffle.error;
+  const inTownOn = useInTownOn();
 
   return (
     <div className="space-y-10 p-6 lg:p-8">
@@ -238,6 +247,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
           {ready && <QuickAction icon={<Radio />} label="Library Radio" busy={radio.isPending} onClick={() => radio.mutate({ seed: "library", libraryId })} />}
           <QuickAction icon={<Shuffle />} label="Shuffle All" busy={shuffle.isPending} onClick={() => shuffle.mutate()} />
           {ready && <QuickAction icon={<Sparkles />} label="Muse" to={{ libraryId, section: "muse" }} />}
+          {inTownOn && <QuickAction icon={<Ticket />} label="In Town" inTown />}
         </div>
         {error && <Alert tone="error">{error.message}</Alert>}
         <AnalysisNote />

@@ -72,6 +72,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 
 ### Music
 - **Soundprint:** every track is analysed on your server, powering radios, "sounds like this", **Muse** (describe a playlist in words), **Sound Journey** (a path from one track to another), a DJ, and mood and style pages.
+- **In Town:** concerts by artists you like, near you and on tour, on the web and in the Mac app, with a banner on artist pages. An admin turns it on with their own free Ticketmaster key, and your server does all the looking up; each person sets a city or postcode. It sends artist names and locations to Ticketmaster, and past shows are deleted. Kids' profiles don't get it.
 - **Sonos:** play to a room from the Mac app; the server sends the music straight to the speakers. The server needs to be on the same network as the speakers (`network_mode: host` in Docker, as in the compose files). To limit it to certain players, set `MARQUEE_SONOS_HOSTS` to their addresses, comma-separated.
 - **Artist Radio and Track Radio:** endless stations from an artist or any song, with similar artists and tracks.
 - **Thumbs down:** a song you flag stays out of your radios and generated playlists.

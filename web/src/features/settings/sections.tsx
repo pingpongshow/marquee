@@ -139,7 +139,7 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           icon: AudioLines,
           component: MusicSettings,
           keywords:
-            "soundprint analysis sound journey radio sage mixes lyrics lrclib loudness replaygain volume levelling gpu",
+            "soundprint analysis sound journey radio sage mixes lyrics lrclib loudness replaygain volume levelling gpu in town concerts shows tickets ticketmaster",
           description: "Soundprint analysis, lyrics and volume levelling.",
         },
         {

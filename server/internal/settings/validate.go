@@ -22,6 +22,12 @@ func invalid(format string, args ...any) error {
 var validEncoders = map[string]bool{"nvenc": true, "qsv": true, "vaapi": true, "software": true}
 
 func (s Settings) Validate() error {
+	if s.InTown.Enabled && s.InTown.TicketmasterKey == "" {
+		return invalid("In Town needs a Ticketmaster key")
+	}
+	if b := s.InTown.DailyBudget; b < 100 || b > 4000 {
+		return invalid("In Town's daily calls must be between 100 and 4,000")
+	}
 	if m := s.Appearance.BackgroundMode; m != "tile" && m != "fill" {
 		return invalid("the background must be tiled or fill the page")
 	}

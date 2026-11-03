@@ -19,6 +19,7 @@ import { StatsView } from "../settings/StatsView";
 import { AvatarPicker } from "./Avatar";
 import { LinkDeviceCard } from "./LinkDevice";
 import { SubtitleAppearanceCard } from "./SubtitleAppearance";
+import { LocationCard } from "../music/InTown";
 import { RecapCard } from "../music/RecapCard";
 import {
   languageOptions,
@@ -190,6 +191,7 @@ export function AccountPage() {
       {u.hasPassword && <TwoFactorCard />}
       <LastFmCard />
       <ListenBrainzCard />
+      <LocationCard />
 
       {!u.isManaged && (
         <Card

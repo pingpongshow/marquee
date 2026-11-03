@@ -74,6 +74,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SystemInfo/ratingPrompt`.
             public var ratingPrompt: Swift.Bool?
+            /// An admin turned In Town on (MUSIC-27). It's for the whole server, as this needs no sign-in: apps show its button and artist banners only when the signed-in user's restrictions.isKid isn't true too.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SystemInfo/inTown`.
+            public var inTown: Swift.Bool?
             /// Creates a new `SystemInfo`.
             ///
             /// - Parameters:
@@ -87,6 +91,7 @@ extension Components {
             ///   - lanUrl: The server's home-network address (Settings → Network), so apps reached over Tailscale learn it.
             ///   - remoteUrl: The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away.
             ///   - ratingPrompt: The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference.
+            ///   - inTown: An admin turned In Town on (MUSIC-27). It's for the whole server, as this needs no sign-in: apps show its button and artist banners only when the signed-in user's restrictions.isKid isn't true too.
             public init(
                 serverId: Swift.String,
                 serverName: Swift.String,
@@ -97,7 +102,8 @@ extension Components {
                 pinSignIn: Swift.Bool? = nil,
                 lanUrl: Swift.String? = nil,
                 remoteUrl: Swift.String? = nil,
-                ratingPrompt: Swift.Bool? = nil
+                ratingPrompt: Swift.Bool? = nil,
+                inTown: Swift.Bool? = nil
             ) {
                 self.serverId = serverId
                 self.serverName = serverName
@@ -109,6 +115,7 @@ extension Components {
                 self.lanUrl = lanUrl
                 self.remoteUrl = remoteUrl
                 self.ratingPrompt = ratingPrompt
+                self.inTown = inTown
             }
             public enum CodingKeys: String, CodingKey {
                 case serverId
@@ -121,6 +128,7 @@ extension Components {
                 case lanUrl
                 case remoteUrl
                 case ratingPrompt
+                case inTown
             }
         }
         /// - Remark: Generated from `#/components/schemas/Health`.
@@ -457,6 +465,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/maxContentRating`.
             public var maxContentRating: Components.Schemas.UserRestrictions.MaxContentRatingPayload?
+            /// A kid's profile, set by an admin; an admin can't be one. Kids don't get In Town (MUSIC-27). Default false, and left as it is when an update doesn't send it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/isKid`.
+            public var isKid: Swift.Bool?
             /// May stream from outside the home network. Default true.
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/allowRemote`.
@@ -531,6 +543,7 @@ extension Components {
             /// - Parameters:
             ///   - libraryIds: Libraries this user can see. Null or absent = all libraries.
             ///   - maxContentRating: Highest allowed rating, e.g. PG-13 or TV-14. Unrated items are hidden when set.
+            ///   - isKid: A kid's profile, set by an admin; an admin can't be one. Kids don't get In Town (MUSIC-27). Default false, and left as it is when an update doesn't send it.
             ///   - allowRemote: May stream from outside the home network. Default true.
             ///   - remoteQualityKbps: Cap for remote streams. 0 = server default.
             ///   - canRequest: May request titles through Seerr (REQ-1). Default false; admins always may.
@@ -551,6 +564,7 @@ extension Components {
             public init(
                 libraryIds: [Swift.Int64]? = nil,
                 maxContentRating: Components.Schemas.UserRestrictions.MaxContentRatingPayload? = nil,
+                isKid: Swift.Bool? = nil,
                 allowRemote: Swift.Bool? = nil,
                 remoteQualityKbps: Swift.Int? = nil,
                 canRequest: Swift.Bool? = nil,
@@ -571,6 +585,7 @@ extension Components {
             ) {
                 self.libraryIds = libraryIds
                 self.maxContentRating = maxContentRating
+                self.isKid = isKid
                 self.allowRemote = allowRemote
                 self.remoteQualityKbps = remoteQualityKbps
                 self.canRequest = canRequest
@@ -592,6 +607,7 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case libraryIds
                 case maxContentRating
+                case isKid
                 case allowRemote
                 case remoteQualityKbps
                 case canRequest
@@ -1130,6 +1146,8 @@ extension Components {
             public var tasks: Components.Schemas.TaskSettings
             /// - Remark: Generated from `#/components/schemas/ServerSettings/music`.
             public var music: Components.Schemas.MusicSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettings/inTown`.
+            public var inTown: Components.Schemas.InTownSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettings/integrations`.
             public var integrations: Components.Schemas.IntegrationSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettings/cinema`.
@@ -1156,6 +1174,7 @@ extension Components {
             ///   - metadata:
             ///   - tasks:
             ///   - music:
+            ///   - inTown:
             ///   - integrations:
             ///   - cinema:
             ///   - ai:
@@ -1172,6 +1191,7 @@ extension Components {
                 metadata: Components.Schemas.MetadataSettings,
                 tasks: Components.Schemas.TaskSettings,
                 music: Components.Schemas.MusicSettings? = nil,
+                inTown: Components.Schemas.InTownSettings? = nil,
                 integrations: Components.Schemas.IntegrationSettings? = nil,
                 cinema: Components.Schemas.CinemaSettings? = nil,
                 ai: Components.Schemas.AiSettings? = nil,
@@ -1188,6 +1208,7 @@ extension Components {
                 self.metadata = metadata
                 self.tasks = tasks
                 self.music = music
+                self.inTown = inTown
                 self.integrations = integrations
                 self.cinema = cinema
                 self.ai = ai
@@ -1205,6 +1226,7 @@ extension Components {
                 case metadata
                 case tasks
                 case music
+                case inTown
                 case integrations
                 case cinema
                 case ai
@@ -1233,6 +1255,8 @@ extension Components {
             public var tasks: Components.Schemas.TaskSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/music`.
             public var music: Components.Schemas.MusicSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/inTown`.
+            public var inTown: Components.Schemas.InTownSettingsUpdate?
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/integrations`.
             public var integrations: Components.Schemas.IntegrationSettingsUpdate?
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/cinema`.
@@ -1259,6 +1283,7 @@ extension Components {
             ///   - metadata:
             ///   - tasks:
             ///   - music:
+            ///   - inTown:
             ///   - integrations:
             ///   - cinema:
             ///   - ai:
@@ -1275,6 +1300,7 @@ extension Components {
                 metadata: Components.Schemas.MetadataSettingsUpdate? = nil,
                 tasks: Components.Schemas.TaskSettings? = nil,
                 music: Components.Schemas.MusicSettings? = nil,
+                inTown: Components.Schemas.InTownSettingsUpdate? = nil,
                 integrations: Components.Schemas.IntegrationSettingsUpdate? = nil,
                 cinema: Components.Schemas.CinemaSettings? = nil,
                 ai: Components.Schemas.AiSettings? = nil,
@@ -1291,6 +1317,7 @@ extension Components {
                 self.metadata = metadata
                 self.tasks = tasks
                 self.music = music
+                self.inTown = inTown
                 self.integrations = integrations
                 self.cinema = cinema
                 self.ai = ai
@@ -1308,6 +1335,7 @@ extension Components {
                 case metadata
                 case tasks
                 case music
+                case inTown
                 case integrations
                 case cinema
                 case ai
@@ -2200,6 +2228,663 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case itemId
                 case reason
+            }
+        }
+        /// In Town (MUSIC-27): concerts near people, from the admin's own free Ticketmaster key. Off by default.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InTownSettings`.
+        public struct InTownSettings: Codable, Hashable, Sendable {
+            /// Sends artist names and ids, and people's locations, to Ticketmaster. Needs a key.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownSettings/enabled`.
+            public var enabled: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/InTownSettings/ticketmasterKeySet`.
+            public var ticketmasterKeySet: Swift.Bool?
+            /// Calls a day the background lookups may use (a free key allows 5,000 a day, so this leaves room for what people do). Default 2000.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownSettings/dailyBudget`.
+            public var dailyBudget: Swift.Int?
+            /// Creates a new `InTownSettings`.
+            ///
+            /// - Parameters:
+            ///   - enabled: Sends artist names and ids, and people's locations, to Ticketmaster. Needs a key.
+            ///   - ticketmasterKeySet:
+            ///   - dailyBudget: Calls a day the background lookups may use (a free key allows 5,000 a day, so this leaves room for what people do). Default 2000.
+            public init(
+                enabled: Swift.Bool? = nil,
+                ticketmasterKeySet: Swift.Bool? = nil,
+                dailyBudget: Swift.Int? = nil
+            ) {
+                self.enabled = enabled
+                self.ticketmasterKeySet = ticketmasterKeySet
+                self.dailyBudget = dailyBudget
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case ticketmasterKeySet
+                case dailyBudget
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InTownSettingsUpdate`.
+        public struct InTownSettingsUpdate: Codable, Hashable, Sendable {
+            /// Turning it off deletes the stored shows.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownSettingsUpdate/enabled`.
+            public var enabled: Swift.Bool?
+            /// The Ticketmaster Consumer Key. Write-only; empty clears it, which needs In Town off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownSettingsUpdate/ticketmasterKey`.
+            public var ticketmasterKey: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InTownSettingsUpdate/dailyBudget`.
+            public var dailyBudget: Swift.Int?
+            /// Creates a new `InTownSettingsUpdate`.
+            ///
+            /// - Parameters:
+            ///   - enabled: Turning it off deletes the stored shows.
+            ///   - ticketmasterKey: The Ticketmaster Consumer Key. Write-only; empty clears it, which needs In Town off.
+            ///   - dailyBudget:
+            public init(
+                enabled: Swift.Bool? = nil,
+                ticketmasterKey: Swift.String? = nil,
+                dailyBudget: Swift.Int? = nil
+            ) {
+                self.enabled = enabled
+                self.ticketmasterKey = ticketmasterKey
+                self.dailyBudget = dailyBudget
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case ticketmasterKey
+                case dailyBudget
+            }
+        }
+        /// Coarse on purpose: a postcode or a city, never coordinates.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InTownLocation`.
+        public struct InTownLocation: Codable, Hashable, Sendable {
+            /// Postcode or ZIP. Exactly one of this and city is needed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownLocation/postalCode`.
+            public var postalCode: Swift.String?
+            /// Exactly one of this and postalCode is needed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownLocation/city`.
+            public var city: Swift.String?
+            /// ISO 3166-1 alpha-2, e.g. GB, US.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownLocation/countryCode`.
+            public var countryCode: Swift.String
+            /// How far you'd go. Default 50 miles, or 80 km.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownLocation/distance`.
+            public var distance: Swift.Int?
+            /// Defaults to miles in the UK and US and km elsewhere.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownLocation/unit`.
+            @frozen public enum UnitPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case miles = "miles"
+                case km = "km"
+            }
+            /// Defaults to miles in the UK and US and km elsewhere.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownLocation/unit`.
+            public var unit: Components.Schemas.InTownLocation.UnitPayload?
+            /// Creates a new `InTownLocation`.
+            ///
+            /// - Parameters:
+            ///   - postalCode: Postcode or ZIP. Exactly one of this and city is needed.
+            ///   - city: Exactly one of this and postalCode is needed.
+            ///   - countryCode: ISO 3166-1 alpha-2, e.g. GB, US.
+            ///   - distance: How far you'd go. Default 50 miles, or 80 km.
+            ///   - unit: Defaults to miles in the UK and US and km elsewhere.
+            public init(
+                postalCode: Swift.String? = nil,
+                city: Swift.String? = nil,
+                countryCode: Swift.String,
+                distance: Swift.Int? = nil,
+                unit: Components.Schemas.InTownLocation.UnitPayload? = nil
+            ) {
+                self.postalCode = postalCode
+                self.city = city
+                self.countryCode = countryCode
+                self.distance = distance
+                self.unit = unit
+            }
+            public enum CodingKeys: String, CodingKey {
+                case postalCode
+                case city
+                case countryCode
+                case distance
+                case unit
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InTownLocationState`.
+        public struct InTownLocationState: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InTownLocationState/location`.
+            public var location: Components.Schemas.InTownLocation?
+            /// Creates a new `InTownLocationState`.
+            ///
+            /// - Parameters:
+            ///   - location:
+            public init(location: Components.Schemas.InTownLocation? = nil) {
+                self.location = location
+            }
+            public enum CodingKeys: String, CodingKey {
+                case location
+            }
+        }
+        /// Who the show data is from. Show it wherever shows appear.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InTownAttribution`.
+        public struct InTownAttribution: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InTownAttribution/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InTownAttribution/url`.
+            public var url: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InTownAttribution/text`.
+            public var text: Swift.String
+            /// Creates a new `InTownAttribution`.
+            ///
+            /// - Parameters:
+            ///   - name:
+            ///   - url:
+            ///   - text:
+            public init(
+                name: Swift.String,
+                url: Swift.String,
+                text: Swift.String
+            ) {
+                self.name = name
+                self.url = url
+                self.text = text
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case url
+                case text
+            }
+        }
+        /// Why a show is suggested: favourite, rated and played are artists you like; similar is what listeners consider alike; soundsLike is Soundprint; library is an artist in your libraries; genre is your top genres; nearby is just close by.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InTownReasonKind`.
+        @frozen public enum InTownReasonKind: String, Codable, Hashable, Sendable, CaseIterable {
+            case favourite = "favourite"
+            case rated = "rated"
+            case played = "played"
+            case similar = "similar"
+            case soundsLike = "soundsLike"
+            case library = "library"
+            case genre = "genre"
+            case nearby = "nearby"
+        }
+        /// - Remark: Generated from `#/components/schemas/InTownShow`.
+        public struct InTownShow: Codable, Hashable, Sendable {
+            /// The provider's id for the event.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/id`.
+            public var id: Swift.String
+            /// The event's name, which may be a tour's or a festival's.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/title`.
+            public var title: Swift.String
+            /// The act this entry is about. Not always the headliner.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/artistName`.
+            public var artistName: Swift.String
+            /// Everyone on the bill, headliner first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/lineup`.
+            public var lineup: [Swift.String]
+            /// artistName is on the bill but isn't the headliner.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/support`.
+            public var support: Swift.Bool
+            /// The act's artist page, when they're in a library you can see.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/artistItemId`.
+            public var artistItemId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/InTownShow/artist`.
+            public var artist: Components.Schemas.ItemSummary?
+            /// The start in UTC. Absent when the time isn't announced.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/startsAt`.
+            public var startsAt: Foundation.Date?
+            /// The date at the venue, YYYY-MM-DD.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/localDate`.
+            public var localDate: Swift.String
+            /// The time at the venue, 24-hour HH:mm. Absent when it isn't announced.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/localTime`.
+            public var localTime: Swift.String?
+            /// The venue's IANA time zone, when known.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/timeZone`.
+            public var timeZone: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InTownShow/venueName`.
+            public var venueName: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InTownShow/city`.
+            public var city: Swift.String
+            /// State or province code, when the provider gives one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/region`.
+            public var region: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InTownShow/countryCode`.
+            public var countryCode: Swift.String
+            /// From your location, in distanceUnit. Absent when it isn't known.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/distance`.
+            public var distance: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/InTownShow/distanceUnit`.
+            @frozen public enum DistanceUnitPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case miles = "miles"
+                case km = "km"
+            }
+            /// - Remark: Generated from `#/components/schemas/InTownShow/distanceUnit`.
+            public var distanceUnit: Components.Schemas.InTownShow.DistanceUnitPayload?
+            /// Within the distance you set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/near`.
+            public var near: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/InTownShow/genre`.
+            public var genre: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InTownShow/status`.
+            @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case scheduled = "scheduled"
+                case postponed = "postponed"
+                case rescheduled = "rescheduled"
+            }
+            /// - Remark: Generated from `#/components/schemas/InTownShow/status`.
+            public var status: Components.Schemas.InTownShow.StatusPayload
+            /// The provider's page for the event. Open it in a browser.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/ticketsUrl`.
+            public var ticketsUrl: Swift.String
+            /// Where it came from.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/source`.
+            public var source: Swift.String
+            /// Why it's suggested, in a few words, for the near list.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownShow/reason`.
+            public var reason: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InTownShow/reasonKind`.
+            public var reasonKind: Components.Schemas.InTownReasonKind?
+            /// Creates a new `InTownShow`.
+            ///
+            /// - Parameters:
+            ///   - id: The provider's id for the event.
+            ///   - title: The event's name, which may be a tour's or a festival's.
+            ///   - artistName: The act this entry is about. Not always the headliner.
+            ///   - lineup: Everyone on the bill, headliner first.
+            ///   - support: artistName is on the bill but isn't the headliner.
+            ///   - artistItemId: The act's artist page, when they're in a library you can see.
+            ///   - artist:
+            ///   - startsAt: The start in UTC. Absent when the time isn't announced.
+            ///   - localDate: The date at the venue, YYYY-MM-DD.
+            ///   - localTime: The time at the venue, 24-hour HH:mm. Absent when it isn't announced.
+            ///   - timeZone: The venue's IANA time zone, when known.
+            ///   - venueName:
+            ///   - city:
+            ///   - region: State or province code, when the provider gives one.
+            ///   - countryCode:
+            ///   - distance: From your location, in distanceUnit. Absent when it isn't known.
+            ///   - distanceUnit:
+            ///   - near: Within the distance you set.
+            ///   - genre:
+            ///   - status:
+            ///   - ticketsUrl: The provider's page for the event. Open it in a browser.
+            ///   - source: Where it came from.
+            ///   - reason: Why it's suggested, in a few words, for the near list.
+            ///   - reasonKind:
+            public init(
+                id: Swift.String,
+                title: Swift.String,
+                artistName: Swift.String,
+                lineup: [Swift.String],
+                support: Swift.Bool,
+                artistItemId: Swift.Int64? = nil,
+                artist: Components.Schemas.ItemSummary? = nil,
+                startsAt: Foundation.Date? = nil,
+                localDate: Swift.String,
+                localTime: Swift.String? = nil,
+                timeZone: Swift.String? = nil,
+                venueName: Swift.String,
+                city: Swift.String,
+                region: Swift.String? = nil,
+                countryCode: Swift.String,
+                distance: Swift.Double? = nil,
+                distanceUnit: Components.Schemas.InTownShow.DistanceUnitPayload? = nil,
+                near: Swift.Bool? = nil,
+                genre: Swift.String? = nil,
+                status: Components.Schemas.InTownShow.StatusPayload,
+                ticketsUrl: Swift.String,
+                source: Swift.String,
+                reason: Swift.String? = nil,
+                reasonKind: Components.Schemas.InTownReasonKind? = nil
+            ) {
+                self.id = id
+                self.title = title
+                self.artistName = artistName
+                self.lineup = lineup
+                self.support = support
+                self.artistItemId = artistItemId
+                self.artist = artist
+                self.startsAt = startsAt
+                self.localDate = localDate
+                self.localTime = localTime
+                self.timeZone = timeZone
+                self.venueName = venueName
+                self.city = city
+                self.region = region
+                self.countryCode = countryCode
+                self.distance = distance
+                self.distanceUnit = distanceUnit
+                self.near = near
+                self.genre = genre
+                self.status = status
+                self.ticketsUrl = ticketsUrl
+                self.source = source
+                self.reason = reason
+                self.reasonKind = reasonKind
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
+                case artistName
+                case lineup
+                case support
+                case artistItemId
+                case artist
+                case startsAt
+                case localDate
+                case localTime
+                case timeZone
+                case venueName
+                case city
+                case region
+                case countryCode
+                case distance
+                case distanceUnit
+                case near
+                case genre
+                case status
+                case ticketsUrl
+                case source
+                case reason
+                case reasonKind
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InTownArtist`.
+        public struct InTownArtist: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InTownArtist/artist`.
+            public var artist: Components.Schemas.ItemSummary
+            /// All their upcoming shows. shows holds the next few; /items/{itemId}/shows has the rest.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownArtist/showCount`.
+            public var showCount: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/InTownArtist/nearCount`.
+            public var nearCount: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/InTownArtist/shows`.
+            public var shows: [Components.Schemas.InTownShow]
+            /// - Remark: Generated from `#/components/schemas/InTownArtist/reason`.
+            public var reason: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InTownArtist/reasonKind`.
+            public var reasonKind: Components.Schemas.InTownReasonKind?
+            /// Creates a new `InTownArtist`.
+            ///
+            /// - Parameters:
+            ///   - artist:
+            ///   - showCount: All their upcoming shows. shows holds the next few; /items/{itemId}/shows has the rest.
+            ///   - nearCount:
+            ///   - shows:
+            ///   - reason:
+            ///   - reasonKind:
+            public init(
+                artist: Components.Schemas.ItemSummary,
+                showCount: Swift.Int,
+                nearCount: Swift.Int,
+                shows: [Components.Schemas.InTownShow],
+                reason: Swift.String? = nil,
+                reasonKind: Components.Schemas.InTownReasonKind? = nil
+            ) {
+                self.artist = artist
+                self.showCount = showCount
+                self.nearCount = nearCount
+                self.shows = shows
+                self.reason = reason
+                self.reasonKind = reasonKind
+            }
+            public enum CodingKeys: String, CodingKey {
+                case artist
+                case showCount
+                case nearCount
+                case shows
+                case reason
+                case reasonKind
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InTownPage`.
+        public struct InTownPage: Codable, Hashable, Sendable {
+            /// False when an admin hasn't turned In Town on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownPage/enabled`.
+            public var enabled: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/InTownPage/needsLocation`.
+            public var needsLocation: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/InTownPage/location`.
+            public var location: Components.Schemas.InTownLocation?
+            /// False when the provider knows nothing at your postcode or city, so distances aren't known. Suggest trying a nearby city.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownPage/locationFound`.
+            public var locationFound: Swift.Bool?
+            /// Artists in your libraries with upcoming shows anywhere: those you like most first, then the next date.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownPage/artists`.
+            public var artists: [Components.Schemas.InTownArtist]
+            /// Shows near you: artists you like first, then similar taste, then what's left nearby. Each has a reason.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownPage/near`.
+            public var near: [Components.Schemas.InTownShow]
+            /// Why shows near you may be out of date or missing, in words to show.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownPage/nearError`.
+            public var nearError: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InTownPage/attribution`.
+            public var attribution: Components.Schemas.InTownAttribution
+            /// Creates a new `InTownPage`.
+            ///
+            /// - Parameters:
+            ///   - enabled: False when an admin hasn't turned In Town on.
+            ///   - needsLocation:
+            ///   - location:
+            ///   - locationFound: False when the provider knows nothing at your postcode or city, so distances aren't known. Suggest trying a nearby city.
+            ///   - artists: Artists in your libraries with upcoming shows anywhere: those you like most first, then the next date.
+            ///   - near: Shows near you: artists you like first, then similar taste, then what's left nearby. Each has a reason.
+            ///   - nearError: Why shows near you may be out of date or missing, in words to show.
+            ///   - attribution:
+            public init(
+                enabled: Swift.Bool,
+                needsLocation: Swift.Bool,
+                location: Components.Schemas.InTownLocation? = nil,
+                locationFound: Swift.Bool? = nil,
+                artists: [Components.Schemas.InTownArtist],
+                near: [Components.Schemas.InTownShow],
+                nearError: Swift.String? = nil,
+                attribution: Components.Schemas.InTownAttribution
+            ) {
+                self.enabled = enabled
+                self.needsLocation = needsLocation
+                self.location = location
+                self.locationFound = locationFound
+                self.artists = artists
+                self.near = near
+                self.nearError = nearError
+                self.attribution = attribution
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case needsLocation
+                case location
+                case locationFound
+                case artists
+                case near
+                case nearError
+                case attribution
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ItemShows`.
+        public struct ItemShows: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ItemShows/enabled`.
+            public var enabled: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/ItemShows/needsLocation`.
+            public var needsLocation: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/ItemShows/shows`.
+            public var shows: [Components.Schemas.InTownShow]
+            /// - Remark: Generated from `#/components/schemas/ItemShows/nearCount`.
+            public var nearCount: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/ItemShows/attribution`.
+            public var attribution: Components.Schemas.InTownAttribution
+            /// Creates a new `ItemShows`.
+            ///
+            /// - Parameters:
+            ///   - enabled:
+            ///   - needsLocation:
+            ///   - shows:
+            ///   - nearCount:
+            ///   - attribution:
+            public init(
+                enabled: Swift.Bool,
+                needsLocation: Swift.Bool,
+                shows: [Components.Schemas.InTownShow],
+                nearCount: Swift.Int,
+                attribution: Components.Schemas.InTownAttribution
+            ) {
+                self.enabled = enabled
+                self.needsLocation = needsLocation
+                self.shows = shows
+                self.nearCount = nearCount
+                self.attribution = attribution
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case needsLocation
+                case shows
+                case nearCount
+                case attribution
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InTownStatus`.
+        public struct InTownStatus: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/enabled`.
+            public var enabled: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/keySet`.
+            public var keySet: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/running`.
+            public var running: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/lastSyncAt`.
+            public var lastSyncAt: Foundation.Date?
+            /// Artists in music libraries.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/artistsTotal`.
+            public var artistsTotal: Swift.Int
+            /// How many have been looked up.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/artistsChecked`.
+            public var artistsChecked: Swift.Int
+            /// How many were matched to the provider's artists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/artistsMatched`.
+            public var artistsMatched: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/showsCached`.
+            public var showsCached: Swift.Int
+            /// Calls so far today (UTC), by the background lookups and by people.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/callsToday`.
+            public var callsToday: Swift.Int
+            /// What the background lookups may use.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/dailyBudget`.
+            public var dailyBudget: Swift.Int
+            /// The key's daily quota, as last reported.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/quotaLimit`.
+            public var quotaLimit: Swift.Int?
+            /// What's left of it, as last reported.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/quotaRemaining`.
+            public var quotaRemaining: Swift.Int?
+            /// No calls until then: the provider said to wait.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/backoffUntil`.
+            public var backoffUntil: Foundation.Date?
+            /// The last problem, e.g. an invalid key. Empty once it's working.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InTownStatus/lastError`.
+            public var lastError: Swift.String?
+            /// Creates a new `InTownStatus`.
+            ///
+            /// - Parameters:
+            ///   - enabled:
+            ///   - keySet:
+            ///   - running:
+            ///   - lastSyncAt:
+            ///   - artistsTotal: Artists in music libraries.
+            ///   - artistsChecked: How many have been looked up.
+            ///   - artistsMatched: How many were matched to the provider's artists.
+            ///   - showsCached:
+            ///   - callsToday: Calls so far today (UTC), by the background lookups and by people.
+            ///   - dailyBudget: What the background lookups may use.
+            ///   - quotaLimit: The key's daily quota, as last reported.
+            ///   - quotaRemaining: What's left of it, as last reported.
+            ///   - backoffUntil: No calls until then: the provider said to wait.
+            ///   - lastError: The last problem, e.g. an invalid key. Empty once it's working.
+            public init(
+                enabled: Swift.Bool,
+                keySet: Swift.Bool,
+                running: Swift.Bool,
+                lastSyncAt: Foundation.Date? = nil,
+                artistsTotal: Swift.Int,
+                artistsChecked: Swift.Int,
+                artistsMatched: Swift.Int,
+                showsCached: Swift.Int,
+                callsToday: Swift.Int,
+                dailyBudget: Swift.Int,
+                quotaLimit: Swift.Int? = nil,
+                quotaRemaining: Swift.Int? = nil,
+                backoffUntil: Foundation.Date? = nil,
+                lastError: Swift.String? = nil
+            ) {
+                self.enabled = enabled
+                self.keySet = keySet
+                self.running = running
+                self.lastSyncAt = lastSyncAt
+                self.artistsTotal = artistsTotal
+                self.artistsChecked = artistsChecked
+                self.artistsMatched = artistsMatched
+                self.showsCached = showsCached
+                self.callsToday = callsToday
+                self.dailyBudget = dailyBudget
+                self.quotaLimit = quotaLimit
+                self.quotaRemaining = quotaRemaining
+                self.backoffUntil = backoffUntil
+                self.lastError = lastError
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case keySet
+                case running
+                case lastSyncAt
+                case artistsTotal
+                case artistsChecked
+                case artistsMatched
+                case showsCached
+                case callsToday
+                case dailyBudget
+                case quotaLimit
+                case quotaRemaining
+                case backoffUntil
+                case lastError
             }
         }
         /// - Remark: Generated from `#/components/schemas/MusicSettings`.

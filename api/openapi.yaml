@@ -5571,6 +5571,91 @@ paths:
                 items: { $ref: "#/components/schemas/Station" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /music/in-town:
+    get:
+      tags: [music]
+      operationId: getInTown
+      summary: "In Town (MUSIC-27): concerts for you. Artists in your libraries with upcoming shows anywhere, then shows near your location with why each is there."
+      description: "With In Town off, or for a kid's profile, enabled is false and the lists are empty. Without a location, needsLocation is true and near is empty. Opening this may ask the provider for shows near you (cached for a few hours), sending only your location, so it can take a few seconds the first time."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InTownPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /music/in-town/status:
+    get:
+      tags: [music]
+      operationId: getInTownStatus
+      summary: How In Town's background lookups are going (admins only).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InTownStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /items/{itemId}/shows:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [music]
+      operationId: getItemShows
+      summary: "An artist's upcoming shows (MUSIC-27), soonest first, and how many are near you. Answers from what's stored, so it never holds up the artist page; a stale artist is refreshed in the background."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemShows" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /me/location:
+    get:
+      tags: [users]
+      operationId: getMyLocation
+      summary: Your location for In Town (MUSIC-27), if you've set one. Only you can see it. Refused for a kid's profile.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InTownLocationState" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      tags: [users]
+      operationId: setMyLocation
+      summary: "Set your location for In Town (MUSIC-27): a postcode or a city, not both, plus country, and how far you'd go. Never GPS. It's sent to the provider, without your name, to find shows."
+      description: "In the UK, Ireland, Canada and the Netherlands only the first part of a postcode is kept (and in the US the first five digits), so the answer can differ from what was sent. Changes are limited per day: past that it's a 400 with code too_many_changes. Refused for a kid's profile."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InTownLocation" }
+      responses:
+        "200":
+          description: Saved, with the distance and unit filled in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InTownLocation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    delete:
+      tags: [users]
+      operationId: deleteMyLocation
+      summary: Remove your location for In Town.
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /items/{itemId}/not-interested:
     parameters:
       - $ref: "#/components/parameters/ItemId"
@@ -5880,6 +5965,7 @@ components:
         lanUrl: { type: string, description: "The server's home-network address (Settings → Network), so apps reached over Tailscale learn it." }
         remoteUrl: { type: string, description: "The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away." }
         ratingPrompt: { type: boolean, description: "The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference." }
+        inTown: { type: boolean, description: "An admin turned In Town on (MUSIC-27). It's for the whole server, as this needs no sign-in: apps show its button and artist banners only when the signed-in user's restrictions.isKid isn't true too." }
 
     Health:
       type: object
@@ -5958,6 +6044,7 @@ components:
           nullable: true
           description: Highest allowed rating, e.g. PG-13 or TV-14. Unrated items are hidden when set.
           enum: [G, PG, PG-13, R, NC-17, TV-Y, TV-Y7, TV-G, TV-PG, TV-14, TV-MA, null]
+        isKid: { type: boolean, description: "A kid's profile, set by an admin; an admin can't be one. Kids don't get In Town (MUSIC-27). Default false, and left as it is when an update doesn't send it." }
         allowRemote: { type: boolean, description: May stream from outside the home network. Default true. }
         remoteQualityKbps: { type: integer, minimum: 0, description: Cap for remote streams. 0 = server default. }
         canRequest: { type: boolean, description: "May request titles through Seerr (REQ-1). Default false; admins always may." }
@@ -6104,6 +6191,7 @@ components:
         metadata: { $ref: "#/components/schemas/MetadataSettings" }
         tasks: { $ref: "#/components/schemas/TaskSettings" }
         music: { $ref: "#/components/schemas/MusicSettings" }
+        inTown: { $ref: "#/components/schemas/InTownSettings" }
         integrations: { $ref: "#/components/schemas/IntegrationSettings" }
         cinema: { $ref: "#/components/schemas/CinemaSettings" }
         ai: { $ref: "#/components/schemas/AiSettings" }
@@ -6126,6 +6214,7 @@ components:
         metadata: { $ref: "#/components/schemas/MetadataSettingsUpdate" }
         tasks: { $ref: "#/components/schemas/TaskSettings" }
         music: { $ref: "#/components/schemas/MusicSettings" }
+        inTown: { $ref: "#/components/schemas/InTownSettingsUpdate" }
         integrations: { $ref: "#/components/schemas/IntegrationSettingsUpdate" }
         cinema: { $ref: "#/components/schemas/CinemaSettings" }
         ai: { $ref: "#/components/schemas/AiSettings" }
@@ -6341,6 +6430,133 @@ components:
       properties:
         itemId: { type: integer, format: int64 }
         reason: { type: string }
+
+    InTownSettings:
+      type: object
+      description: "In Town (MUSIC-27): concerts near people, from the admin's own free Ticketmaster key. Off by default."
+      properties:
+        enabled: { type: boolean, description: "Sends artist names and ids, and people's locations, to Ticketmaster. Needs a key." }
+        ticketmasterKeySet: { type: boolean, readOnly: true }
+        dailyBudget: { type: integer, minimum: 100, maximum: 4000, description: "Calls a day the background lookups may use (a free key allows 5,000 a day, so this leaves room for what people do). Default 2000." }
+
+    InTownSettingsUpdate:
+      type: object
+      properties:
+        enabled: { type: boolean, description: "Turning it off deletes the stored shows." }
+        ticketmasterKey: { type: string, description: "The Ticketmaster Consumer Key. Write-only; empty clears it, which needs In Town off." }
+        dailyBudget: { type: integer, minimum: 100, maximum: 4000 }
+
+    InTownLocation:
+      type: object
+      description: "Coarse on purpose: a postcode or a city, never coordinates."
+      required: [countryCode]
+      properties:
+        postalCode: { type: string, maxLength: 12, description: "Postcode or ZIP. Exactly one of this and city is needed." }
+        city: { type: string, maxLength: 80, description: Exactly one of this and postalCode is needed. }
+        countryCode: { type: string, minLength: 2, maxLength: 2, description: "ISO 3166-1 alpha-2, e.g. GB, US." }
+        distance: { type: integer, minimum: 1, maximum: 500, description: "How far you'd go. Default 50 miles, or 80 km." }
+        unit: { type: string, enum: [miles, km], description: Defaults to miles in the UK and US and km elsewhere. }
+
+    InTownLocationState:
+      type: object
+      properties:
+        location: { $ref: "#/components/schemas/InTownLocation" }
+
+    InTownAttribution:
+      type: object
+      required: [name, url, text]
+      description: Who the show data is from. Show it wherever shows appear.
+      properties:
+        name: { type: string, example: Ticketmaster }
+        url: { type: string }
+        text: { type: string, example: Show data from Ticketmaster }
+
+    InTownReasonKind:
+      type: string
+      description: "Why a show is suggested: favourite, rated and played are artists you like; similar is what listeners consider alike; soundsLike is Soundprint; library is an artist in your libraries; genre is your top genres; nearby is just close by."
+      enum: [favourite, rated, played, similar, soundsLike, library, genre, nearby]
+
+    InTownShow:
+      type: object
+      required: [id, title, artistName, lineup, support, localDate, venueName, city, countryCode, status, ticketsUrl, source]
+      properties:
+        id: { type: string, description: "The provider's id for the event." }
+        title: { type: string, description: "The event's name, which may be a tour's or a festival's." }
+        artistName: { type: string, description: The act this entry is about. Not always the headliner. }
+        lineup: { type: array, items: { type: string }, description: "Everyone on the bill, headliner first." }
+        support: { type: boolean, description: "artistName is on the bill but isn't the headliner." }
+        artistItemId: { type: integer, format: int64, description: "The act's artist page, when they're in a library you can see." }
+        artist: { $ref: "#/components/schemas/ItemSummary" }
+        startsAt: { type: string, format: date-time, description: "The start in UTC. Absent when the time isn't announced." }
+        localDate: { type: string, description: "The date at the venue, YYYY-MM-DD.", example: "2026-11-20" }
+        localTime: { type: string, description: "The time at the venue, 24-hour HH:mm. Absent when it isn't announced.", example: "19:30" }
+        timeZone: { type: string, description: "The venue's IANA time zone, when known.", example: Europe/London }
+        venueName: { type: string }
+        city: { type: string }
+        region: { type: string, description: "State or province code, when the provider gives one." }
+        countryCode: { type: string }
+        distance: { type: number, format: double, description: "From your location, in distanceUnit. Absent when it isn't known." }
+        distanceUnit: { type: string, enum: [miles, km] }
+        near: { type: boolean, description: "Within the distance you set." }
+        genre: { type: string }
+        status: { type: string, enum: [scheduled, postponed, rescheduled] }
+        ticketsUrl: { type: string, description: "The provider's page for the event. Open it in a browser." }
+        source: { type: string, description: "Where it came from.", example: ticketmaster }
+        reason: { type: string, description: "Why it's suggested, in a few words, for the near list.", example: You rated them highly }
+        reasonKind: { $ref: "#/components/schemas/InTownReasonKind" }
+
+    InTownArtist:
+      type: object
+      required: [artist, showCount, nearCount, shows]
+      properties:
+        artist: { $ref: "#/components/schemas/ItemSummary" }
+        showCount: { type: integer, description: "All their upcoming shows. shows holds the next few; /items/{itemId}/shows has the rest." }
+        nearCount: { type: integer }
+        shows: { type: array, items: { $ref: "#/components/schemas/InTownShow" } }
+        reason: { type: string }
+        reasonKind: { $ref: "#/components/schemas/InTownReasonKind" }
+
+    InTownPage:
+      type: object
+      required: [enabled, needsLocation, artists, near, attribution]
+      properties:
+        enabled: { type: boolean, description: "False when an admin hasn't turned In Town on." }
+        needsLocation: { type: boolean }
+        location: { $ref: "#/components/schemas/InTownLocation" }
+        locationFound: { type: boolean, description: "False when the provider knows nothing at your postcode or city, so distances aren't known. Suggest trying a nearby city." }
+        artists: { type: array, description: "Artists in your libraries with upcoming shows anywhere: those you like most first, then the next date.", items: { $ref: "#/components/schemas/InTownArtist" } }
+        near: { type: array, description: "Shows near you: artists you like first, then similar taste, then what's left nearby. Each has a reason.", items: { $ref: "#/components/schemas/InTownShow" } }
+        nearError: { type: string, description: "Why shows near you may be out of date or missing, in words to show." }
+        attribution: { $ref: "#/components/schemas/InTownAttribution" }
+
+    ItemShows:
+      type: object
+      required: [enabled, needsLocation, shows, nearCount, attribution]
+      properties:
+        enabled: { type: boolean }
+        needsLocation: { type: boolean }
+        shows: { type: array, items: { $ref: "#/components/schemas/InTownShow" } }
+        nearCount: { type: integer }
+        attribution: { $ref: "#/components/schemas/InTownAttribution" }
+
+    InTownStatus:
+      type: object
+      required: [enabled, keySet, running, artistsTotal, artistsChecked, artistsMatched, showsCached, callsToday, dailyBudget]
+      properties:
+        enabled: { type: boolean }
+        keySet: { type: boolean }
+        running: { type: boolean }
+        lastSyncAt: { type: string, format: date-time }
+        artistsTotal: { type: integer, description: Artists in music libraries. }
+        artistsChecked: { type: integer, description: How many have been looked up. }
+        artistsMatched: { type: integer, description: How many were matched to the provider's artists. }
+        showsCached: { type: integer }
+        callsToday: { type: integer, description: "Calls so far today (UTC), by the background lookups and by people." }
+        dailyBudget: { type: integer, description: What the background lookups may use. }
+        quotaLimit: { type: integer, description: "The key's daily quota, as last reported." }
+        quotaRemaining: { type: integer, description: "What's left of it, as last reported." }
+        backoffUntil: { type: string, format: date-time, description: "No calls until then: the provider said to wait." }
+        lastError: { type: string, description: "The last problem, e.g. an invalid key. Empty once it's working." }
 
     MusicSettings:
       type: object

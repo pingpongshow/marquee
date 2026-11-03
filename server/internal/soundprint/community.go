@@ -1,7 +1,9 @@
 package soundprint
 
 import (
+	"cmp"
 	"context"
+	"slices"
 	"strings"
 )
 
@@ -67,6 +69,66 @@ func (s *Service) SimilarArtists(artistID int64) map[int64]float64 {
 	s.learnMu.RLock()
 	defer s.learnMu.RUnlock()
 	return s.similar[artistID]
+}
+
+// Sound-alike artists (MUSIC-27): an artist's sound is the average of their analysed tracks.
+const (
+	// soundAlikeFloor is how close two artists must be to count, whatever else is in the
+	// library; a small library's nearest artist needn't be anything like it.
+	soundAlikeFloor = 0.8
+	// soundAlikeTop is how many nearest artists a liked artist can pass on, so a big library's
+	// broad genre doesn't all count as alike.
+	soundAlikeTop = 8
+)
+
+// SoundAlike finds the artists passing keep that sound most like each liked artist. It gives
+// each one the liked artist it's closest to, leaving the liked artists themselves out.
+func (s *Service) SoundAlike(liked []int64, keep Filter) map[int64]int64 {
+	if s.Index == nil || len(liked) == 0 {
+		return nil
+	}
+	byArtist := map[int64][]*Track{}
+	for _, t := range s.Index.Where(keep) {
+		if t.ArtistID != 0 {
+			byArtist[t.ArtistID] = append(byArtist[t.ArtistID], t)
+		}
+	}
+	sounds := make(map[int64][]float32, len(byArtist))
+	for id, ts := range byArtist {
+		sounds[id] = Mean(ts)
+	}
+	seeds := make(map[int64]bool, len(liked))
+	for _, id := range liked {
+		seeds[id] = true
+	}
+	type near struct {
+		artist int64
+		score  float64
+	}
+	out, best := map[int64]int64{}, map[int64]float64{}
+	for _, seed := range liked {
+		v := sounds[seed]
+		if v == nil {
+			continue
+		}
+		var list []near
+		for id, other := range sounds {
+			if !seeds[id] {
+				if d := dot(v, other); d >= soundAlikeFloor {
+					list = append(list, near{id, d})
+				}
+			}
+		}
+		slices.SortFunc(list, func(a, b near) int {
+			return cmp.Or(cmp.Compare(b.score, a.score), cmp.Compare(a.artist, b.artist))
+		})
+		for _, n := range list[:min(soundAlikeTop, len(list))] {
+			if n.score > best[n.artist] {
+				best[n.artist], out[n.artist] = n.score, seed
+			}
+		}
+	}
+	return out
 }
 
 // TagScore is how strongly a track carries any of these tags, its own or its artist's
