@@ -36,6 +36,10 @@ struct ItemDetailView: View {
     @State private var startedHere = false
     /// The movie's or show's trailer (PLAY-22); the button shows once it's known to exist.
     @State private var trailer: ItemTrailer?
+    #if os(macOS)
+    /// An artist's upcoming shows, for the banner (MUSIC-27); nil until they've arrived.
+    @State private var shows: ItemShows?
+    #endif
     #if os(iOS)
     @Environment(\.dismiss) private var dismiss
     /// Admin music fixes (META-3): the artist or album being matched, the track being moved.
@@ -49,6 +53,9 @@ struct ItemDetailView: View {
             if let d = detail {
                 VStack(alignment: .leading, spacing: 28) {
                     header(d)
+                    #if os(macOS)
+                    if d.type == .artist, app.inTownOn, let shows { ArtistShowsBanner(artist: d, shows: shows) }
+                    #endif
                     contents(d)
                     if let extras = d.info.extras, !extras.isEmpty {
                         ShelfRow(title: "Extras") {
@@ -93,6 +100,14 @@ struct ItemDetailView: View {
             guard loadedID != id else { return }
             await load()
         }
+        #if os(macOS)
+        // Apart from the page's own load: it never waits for this.
+        .task(id: "\(id)|\(detail?.type == .artist)|\(app.inTownOn)") {
+            guard detail?.type == .artist, app.inTownOn else { return }
+            let found = try? await app.itemShows(id)
+            if !Task.isCancelled { shows = found }
+        }
+        #endif
         .alert("Couldn't play", isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {

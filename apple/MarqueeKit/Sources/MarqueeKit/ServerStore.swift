@@ -27,6 +27,16 @@ public enum ServerStore {
     private static let currentKey = "marquee.currentServer"
     private static let defaults = UserDefaults.standard
 
+    /// Debug builds only: the bundle id of a build given one of its own (app.marquee.Marquee.mac.<name>)
+    /// to run beside the real app on the same Mac. Its preferences are apart already; this keeps its
+    /// Keychain entries and files apart too, and it looks for no servers on the network.
+    public static var separateTestBuild: String? {
+        #if DEBUG
+        if let id = Bundle.main.bundleIdentifier, id.hasPrefix("app.marquee.Marquee.mac.") { return id }
+        #endif
+        return nil
+    }
+
     public static var servers: [ServerRecord] {
         get {
             guard let data = defaults.data(forKey: serversKey) else { return [] }
@@ -75,7 +85,7 @@ public enum ServerStore {
 }
 
 enum Keychain {
-    private static let service = "app.marquee"
+    private static var service: String { ServerStore.separateTestBuild ?? "app.marquee" }
 
     static func read(account: String) -> String? {
         let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,

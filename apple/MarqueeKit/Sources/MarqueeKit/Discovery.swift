@@ -22,7 +22,7 @@ public final class ServerDiscovery {
     public init() {}
 
     public func start() {
-        guard browser == nil else { return }
+        guard browser == nil, ServerStore.separateTestBuild == nil else { return }
         let params = NWParameters()
         params.includePeerToPeer = false
         let b = NWBrowser(for: .bonjourWithTXTRecord(type: "_marquee._tcp", domain: nil), using: params)

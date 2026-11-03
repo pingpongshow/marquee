@@ -37,6 +37,8 @@ enum Route: Hashable {
     case musicBrowse(library: Int64, MusicBrowse)
     /// Muse and the stations of a music library.
     case musicMuse(library: Int64)
+    /// In Town (MUSIC-27, the Mac): concerts for you, optionally with one artist's shows first.
+    case inTown(artist: Int64?)
     /// A screen under Settings.
     case settings(SettingsPage)
 }
@@ -116,6 +118,11 @@ private func routeView(_ route: Route) -> some View {
         case .favorites: MusicFavoritesView(libraryID: library)
         }
     case let .musicMuse(library): MuseStationsView(libraryID: library)
+    #if os(macOS)
+    case let .inTown(artist): InTownView(artist: artist)
+    #else
+    case .inTown: EmptyView()
+    #endif
     case let .settings(page):
         settingsPage(page)
             #if os(tvOS)

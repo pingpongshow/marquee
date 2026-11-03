@@ -801,7 +801,7 @@ private final class SessionBridge: NSObject, URLSessionDownloadDelegate, @unchec
 var appSupportDirectory: URL {
     let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
     #if os(macOS)
-    return base.appending(path: "Marquee", directoryHint: .isDirectory)
+    return base.appending(path: ServerStore.separateTestBuild ?? "Marquee", directoryHint: .isDirectory)
     #else
     return base
     #endif

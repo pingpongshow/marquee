@@ -31,7 +31,21 @@ struct MusicHomeView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
+                    #if os(macOS)
+                    HStack(alignment: .top, spacing: 0) {
+                        quickActions { withAnimation { proxy.scrollTo("musicLibraryList", anchor: .top) } }
+                        // In Town (MUSIC-27): at the end of the row, on the right.
+                        if app.inTownOn {
+                            NavigationLink(value: Route.inTown(artist: nil)) { roundLabel("In Town", "ticket") }
+                                .buttonStyle(roundStyle)
+                                .accessibilityLabel("In Town")
+                                .accessibilityIdentifier("musicInTown")
+                                .padding(.trailing, sidePadding)
+                        }
+                    }
+                    #else
                     quickActions { withAnimation { proxy.scrollTo("musicLibraryList", anchor: .top) } }
+                    #endif
                     if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
                     if !recentlyPlayed.isEmpty {
                         ShelfRow(title: "Recently Played", destination: .musicBrowse(library: libraryID, .recentlyPlayed)) {

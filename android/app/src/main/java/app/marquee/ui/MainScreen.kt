@@ -81,6 +81,9 @@ private val tabs = listOf(
     Dest("settings", "Settings", Icons.Filled.Settings),
 )
 
+// The TV's rail: Search first of what you browse, above Libraries.
+private val railTabs = tabs.sortedBy { if (it.route == "home") 0 else if (it.route == "search") 1 else 2 }
+
 // While offline (phones and tablets) only what works without the server: its screens and Settings.
 private val offlineTabs = listOf(
     Dest(OFFLINE_ROUTE, "Library", Icons.Filled.DownloadDone),
@@ -122,7 +125,7 @@ fun MainScreen() {
                 .focusProperties { enter = { railFocus[tab] ?: FocusRequester.Default } }.focusGroup(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 // Who's watching, above Home: opens the profile picker.
                 ProfileButton(nav, tv = true, modifier = Modifier.padding(bottom = 8.dp))
-                tabs.forEach { t -> TvRailItem(t, tab == t.route, Modifier.focusRequester(railFocus.getValue(t.route))) { go(t.route) } }
+                railTabs.forEach { t -> TvRailItem(t, tab == t.route, Modifier.focusRequester(railFocus.getValue(t.route))) { go(t.route) } }
                 Spacer(Modifier.weight(1f))
                 TvNowPlaying { nav.navigate("nowplaying") }
             }

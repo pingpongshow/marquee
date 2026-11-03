@@ -144,6 +144,15 @@ struct SettingsView: View {
                 Text("Audio quality shows each track's format, such as FLAC · 24-bit/96 kHz, in Now Playing and track lists.")
             }
             #if os(macOS)
+            if app.inTownOn {
+                Section {
+                    InTownLocationForm()
+                } header: {
+                    Text("In Town")
+                } footer: {
+                    Text("Where you are, for concerts near you.")
+                }
+            }
             MacUpdateSection()
             #endif
             #if !os(tvOS)

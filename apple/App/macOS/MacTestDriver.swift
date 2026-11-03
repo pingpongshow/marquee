@@ -31,6 +31,7 @@ enum MacTestDriver {
     }
 
     private static var p: MacPlayback { MacPlayback.shared }
+    static let saveLocation = Notification.Name("marquee.test.saveLocation")
     private static var fakeDevice = AudioObjectID(0)
 
     private static func run(_ line: String) async -> String {
@@ -43,6 +44,9 @@ enum MacTestDriver {
                 try await p.app.signIn(username: w[2], password: w[3])
                 return "signed in"
             case "signout": await p.app.signOut(); return "ok"
+            case "profile": // Another profile on this server, as an admin may without its PIN.
+                try await p.app.switchProfile(to: Int64(w[1])!, pin: nil, password: nil)
+                return "\(p.app.me?.displayName ?? "-") kid=\(p.app.me?.restrictions.isKid ?? false) managed=\(p.app.me?.isManaged ?? false)"
             case "pinsize": // Whether the PIN sheet's content fits the sheet.
                 let profile = Schemas.Profile(id: 1, displayName: "stephen", isManaged: false, requires: .pin)
                 let host = NSHostingView(rootView: PinEntry(profile: profile) { _ in }.macEnvironment().frame(width: 420, height: 640).preferredColorScheme(.dark))
@@ -77,6 +81,7 @@ enum MacTestDriver {
                 case "stats": MacNavigation.shared.push(.settings(.stats))
                 case "person": MacNavigation.shared.push(.person(Int64(w[2])!))
                 case "subtitle": MacNavigation.shared.push(.settings(.subtitleAppearance))
+                case "intown": MacNavigation.shared.push(.inTown(artist: w.count > 2 ? Int64(w[2]) : nil))
                 default: return "unknown route"
                 }
                 return "ok"
@@ -161,10 +166,14 @@ enum MacTestDriver {
                 let status = AudioHardwareDestroyAggregateDevice(fakeDevice)
                 return "destroyed \(status)"
             case "forgetall":
-                // Leaves no test sign-in behind.
+                // Leaves no test sign-in behind. Only in a build with its own bundle id: under the
+                // real one these are the real app's sign-ins.
+                guard let service = ServerStore.separateTestBuild else { return "refused: this build shares the real app's sign-ins" }
                 for server in ServerStore.servers { ServerStore.forget(server.id) }
-                let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "app.marquee"]
+                let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service]
                 return "keychain \(SecItemDelete(q as CFDictionary))"
+            case "separate": // Whether this build is apart from the real app.
+                return "bundle=\(Bundle.main.bundleIdentifier ?? "-") separate=\(ServerStore.separateTestBuild ?? "no") servers=\(ServerStore.servers.map(\.name))"
             case "appearance":
                 return NSApp.effectiveAppearance.name.rawValue
             case "state":
@@ -172,6 +181,15 @@ enum MacTestDriver {
             case "shot":
                 // An app can always capture its own windows, whatever Screen Recording says.
                 return shot(to: w[1], window: w.count > 2 ? Int(w[2]) : nil)
+            case "savelocation": // As In Town's Save button does: SwiftUI's buttons can't be pressed from here.
+                NotificationCenter.default.post(name: saveLocation, object: nil)
+                return "ok"
+            case "type": // Into a text field by its placeholder (_ for a space), as if typed: no keyboard.
+                let name = w[1].replacingOccurrences(of: "_", with: " ")
+                guard let field = mainContent().flatMap({ textField(name, in: $0) }) else { return "no field \(name)" }
+                field.stringValue = w.dropFirst(2).joined(separator: " ")
+                field.delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: field))
+                return "typed"
             case "press":
                 // Runs a menu item by title, as the menu would.
                 return press(w.dropFirst().joined(separator: " "))
@@ -210,6 +228,15 @@ enum MacTestDriver {
         guard let data = rep.representation(using: .png, properties: [:]) else { return "no png" }
         do { try data.write(to: URL(fileURLWithPath: path)) } catch { return "\(error)" }
         return "\(path) \(rep.pixelsWide)x\(rep.pixelsHigh) of #\(target.windowNumber)"
+    }
+
+    private static func mainContent() -> NSView? {
+        NSApp.windows.first { $0.isVisible && !($0 is NSPanel) && $0.level == .normal && $0.frame.width > 200 }?.contentView
+    }
+
+    private static func textField(_ placeholder: String, in view: NSView) -> NSTextField? {
+        if let f = view as? NSTextField, f.placeholderString == placeholder { return f }
+        return view.subviews.lazy.compactMap { textField(placeholder, in: $0) }.first
     }
 
     private static func press(_ title: String) -> String {

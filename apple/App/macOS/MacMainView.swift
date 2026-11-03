@@ -159,6 +159,7 @@ struct MainView: View {
                     row("Home", "house", MacNavigation.home)
                 }
                 Section("Libraries") {
+                    row("Search", "magnifyingglass", MacNavigation.search)
                     ForEach(LibraryEntry.list(libraries, liveTV: hasLiveTV, vodMovies: hasVodMovies, vodShows: hasVodShows)) { entry in
                         switch entry {
                         case .library(let lib): row(lib.name, icon(lib._type), "library-\(lib.id)")
@@ -175,7 +176,6 @@ struct MainView: View {
                     row("Playlists", "music.note.list", MacNavigation.playlists)
                     row("Downloads", "arrow.down.circle", MacNavigation.downloads)
                     if canDiscover { row("Discover", "safari", MacNavigation.discover) }
-                    row("Search", "magnifyingglass", MacNavigation.search)
                     row("Settings", "gearshape", MacNavigation.settings)
                 }
             }

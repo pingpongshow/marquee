@@ -75,6 +75,10 @@ struct MainView: View {
                 // iPad and Apple TV sidebar: Live TV is one of the libraries, after
                 // the video ones.
                 TabSection("Libraries") {
+                    // Search first of what you browse.
+                    Tab("Search", systemImage: "magnifyingglass", value: "search") {
+                        stack(rootTitle: true) { SearchView() }
+                    }
                     ForEach(LibraryEntry.list(libraries, liveTV: hasLiveTV, vodMovies: hasVodMovies, vodShows: hasVodShows)) { entry in
                         switch entry {
                         case .library(let lib):
@@ -232,9 +236,11 @@ struct MainView: View {
         }
         #endif
         Tab("Settings", systemImage: "gearshape", value: "settings") { stack { SettingsView() } }
-        Tab(value: "search", role: .search) {
-            stack(rootTitle: true) { SearchView() }
-
+        // iPhone's own place for it; on iPad and Apple TV it's at the top of Libraries.
+        if compact {
+            Tab(value: "search", role: .search) {
+                stack(rootTitle: true) { SearchView() }
+            }
         }
     }
 
