@@ -170,7 +170,7 @@ struct VodBrowseView: View {
             }
             .accessibilityIdentifier("vod.category")
             TextField(shows ? "Search shows" : "Search movies", text: $text)
-                #if os(iOS)
+                #if !os(tvOS)
                 .textFieldStyle(.roundedBorder)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
@@ -187,7 +187,7 @@ struct VodBrowseView: View {
                 }
             } label: {
                 Label(Self.sorts.first { $0.0 == sort }?.1 ?? "Sort", systemImage: "arrow.up.arrow.down")
-                    #if os(iOS)
+                    #if !os(tvOS)
                     .labelStyle(.iconOnly)
                     #endif
             }
@@ -280,7 +280,7 @@ struct VodBrowseView: View {
                         }
                         .font(isTV ? .callout : .footnote)
                     }
-                    #if os(iOS)
+                    #if !os(tvOS)
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.capsule)
                     .tint(Color.marqueeGold)
@@ -289,7 +289,7 @@ struct VodBrowseView: View {
                     .accessibilityIdentifier("vod.filterChip")
                 }
                 Button("Clear All") { filtersRaw = "" }
-                    #if os(iOS)
+                    #if !os(tvOS)
                     .buttonStyle(.borderless)
                     .font(.footnote)
                     #endif
@@ -646,7 +646,7 @@ struct VodMovieView: View {
                 ProgressView()
             }
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await load() }
@@ -776,7 +776,7 @@ struct VodMovieView: View {
                     .accessibilityIdentifier("vod.unwatched")
             }
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .fixedSize(horizontal: false, vertical: true)
         #endif
     }
@@ -950,7 +950,7 @@ struct VodPlayerView: View {
     @State private var upNext: UpNextContent?
     @State private var countdown: Int?
     @State private var countdownTask: Task<Void, Never>?
-    #if os(iOS)
+    #if !os(tvOS)
     @State private var chrome = PlayerChrome()
     #endif
 
@@ -976,7 +976,7 @@ struct VodPlayerView: View {
             }
             if loading && error == nil { ProgressView().tint(.white) }
             VStack {
-                #if os(iOS)
+                #if !os(tvOS)
                 ZStack {
                     if chrome.shown { topBar.transition(.opacity) }
                 }
@@ -1004,7 +1004,7 @@ struct VodPlayerView: View {
         #endif
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     private var topBar: some View {
         HStack(spacing: 12) {
             if !PlayerChrome.systemClose {
@@ -1024,7 +1024,7 @@ struct VodPlayerView: View {
     #endif
 
     private var chromeModel: PlayerChrome? {
-        #if os(iOS)
+        #if !os(tvOS)
         chrome
         #else
         nil
@@ -1050,7 +1050,9 @@ struct VodPlayerView: View {
             if Task.isCancelled || closing { await app.stopVod(s.id); return }
             session = s.id
             let item = AVPlayerItem(url: s.url)
+            #if !os(macOS)
             item.externalMetadata = metadata()
+            #endif
             player.replaceCurrentItem(with: item)
             watch(item)
             let from = startMs ?? s.startMs
@@ -1243,6 +1245,16 @@ struct VodPlayerView: View {
 }
 
 /// AVPlayerViewController for a film: native controls, scrubbing, PiP and AirPlay.
+#if os(macOS)
+private struct VodPlayerController: View {
+    let player: AVPlayer
+    var chrome: PlayerChrome?
+    var body: some View {
+        MacPlayerSurface(player: player, controls: .floating, chrome: chrome)
+            .onContinuousHover { _ in chrome?.show() }
+    }
+}
+#else
 private struct VodPlayerController: UIViewControllerRepresentable {
     let player: AVPlayer
     var chrome: PlayerChrome?
@@ -1252,7 +1264,7 @@ private struct VodPlayerController: UIViewControllerRepresentable {
         let vc = host.controller
         vc.player = player
         host.chrome = chrome
-        #if os(iOS)
+        #if !os(tvOS)
         vc.updatesNowPlayingInfoCenter = true
         vc.allowsPictureInPicturePlayback = true
         vc.entersFullScreenWhenPlaybackBegins = false
@@ -1270,7 +1282,7 @@ private struct VodPlayerController: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     final class Coordinator {
-        #if os(iOS)
+        #if !os(tvOS)
         private var rate: NSKeyValueObservation?
         /// Playing or paused, for the overlay buttons (they stay up while paused).
         func watch(_ player: AVPlayer, chrome: PlayerChrome?) {
@@ -1282,6 +1294,7 @@ private struct VodPlayerController: UIViewControllerRepresentable {
         #endif
     }
 }
+#endif
 
 /// Your rating of a film or series on demand: shown at once, reverted if the server refuses it.
 struct VodRatingStars: View {

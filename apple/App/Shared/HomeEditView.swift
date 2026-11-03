@@ -21,7 +21,7 @@ struct HomeEditView: View {
             .task { await load() }
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     private var content: some View {
         List {
             if let error { ErrorBanner(message: error) }
@@ -38,7 +38,9 @@ struct HomeEditView: View {
                 Button("Reset to Default", role: .destructive) { reset() }.disabled(!loaded)
             }
         }
+        #if os(iOS)
         .environment(\.editMode, .constant(.active))
+        #endif
     }
     #else
     private var content: some View {
@@ -98,7 +100,7 @@ struct HomeEditView: View {
                     .accessibilityLabel("Unpin \(title)")
             }
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .buttonStyle(.borderless)
         #endif
     }

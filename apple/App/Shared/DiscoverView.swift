@@ -36,7 +36,7 @@ struct DiscoverView: View {
                 guard requested else { return }
                 requested = false
                 Task { await load() }
-            }) { RequestSheet(item: $0, onWatchVod: { vodOpen = $0 }, onRequested: { requested = true }) }
+            }) { RequestSheet(item: $0, onWatchVod: { vodOpen = $0 }, onRequested: { requested = true }).macSheetFrame(560, 640) }
             .navigationDestination(item: $vodOpen) { ref in
                 if ref.kind == .movie { VodMovieView(id: ref.id) } else { VodSeriesView(id: ref.id) }
             }
@@ -340,7 +340,7 @@ struct RequestSheet: View {
                 if done { Label("Requested", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
             }
             .navigationTitle(canRequest ? "Request" : "Details")
-            #if os(iOS)
+            #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {

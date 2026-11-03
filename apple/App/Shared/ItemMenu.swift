@@ -55,13 +55,28 @@ struct TrackRadioButton: View {
                     .frame(minWidth: isTV ? 50 : 30, minHeight: isTV ? 50 : 30)
                     .contentShape(Rectangle())
             }
-            #if os(iOS)
+            #if !os(tvOS)
             .buttonStyle(.plain)
             #endif
             .fixedSize()
             .accessibilityLabel("Track Radio")
             .accessibilityIdentifier("trackRadio.\(trackID)")
         }
+    }
+}
+
+/// A menu entry that opens a page. On the Mac a context menu is outside the navigation stack, so
+/// it goes through MacNavigation.
+struct RouteMenuItem<Label: View>: View {
+    let route: Route
+    @ViewBuilder let label: Label
+
+    var body: some View {
+        #if os(macOS)
+        Button { MacNavigation.shared.push(route) } label: { label }
+        #else
+        NavigationLink(value: route) { label }
+        #endif
     }
 }
 
@@ -90,14 +105,14 @@ struct ItemMenuItems: View {
         }
         if item._type == .episode, let show = item.grandparentId {
             // Continue Watching, On Deck and episode tiles: the show's page.
-            NavigationLink(value: Route.item(show)) { Label("Go to Show", systemImage: "tv") }
+            RouteMenuItem(route: .item(show)) { Label("Go to Show", systemImage: "tv") }
         }
         Button { PlaylistPicker.shared.item = item } label: { Label("Add to Playlist…", systemImage: "text.badge.plus") }
         if item._type == .track, let album = item.parentId {
-            NavigationLink(value: Route.item(album)) { Label("Go to Album", systemImage: "square.stack") }
+            RouteMenuItem(route: .item(album)) { Label("Go to Album", systemImage: "square.stack") }
         }
         if item._type == .track || item._type == .album, let artist = item._type == .track ? item.grandparentId : item.parentId {
-            NavigationLink(value: Route.item(artist)) { Label("Go to Artist", systemImage: "music.mic") }
+            RouteMenuItem(route: .item(artist)) { Label("Go to Artist", systemImage: "music.mic") }
         }
         if showsLibraryState, FavoriteStore.canFavorite(item) {
             // The heart (USER-12): this session's change counts (the tile's data may be older).

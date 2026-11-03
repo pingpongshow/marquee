@@ -85,7 +85,7 @@ private func routeView(_ route: Route) -> some View {
     case .playlist(let id): PlaylistView(id: id)
     case .playlists: PlaylistsView()
     case let .topSongs(artist, name): TopSongsView(artistID: artist, artistName: name)
-    #if os(iOS)
+    #if !os(tvOS)
     case .downloads: DownloadsView()
     #else
     case .downloads: EmptyView()
@@ -129,20 +129,29 @@ private func routeView(_ route: Route) -> some View {
 private func settingsPage(_ page: SettingsPage) -> some View {
     switch page {
     case .stats: StatsView()
+    case .editHome: HomeEditView()
+    case .subtitleAppearance: SubtitleAppearanceView()
+    #if !os(macOS)
     case .requests: RequestApprovalsView()
     case .users: UsersView()
     case .cinema: CinemaSettingsView()
-    case .editHome: HomeEditView()
-    case .subtitleAppearance: SubtitleAppearanceView()
+    #else
+    // Administration on the Mac is the server's web app (Settings has the way there).
+    case .requests, .users, .cinema: EmptyView()
+    #endif
     #if os(iOS)
     case .librarySettings: LibrarySettingsView()
     case .libraryHealth: LibraryHealthView()
     case .integrations: IntegrationsView()
+    #else
+    case .librarySettings, .libraryHealth, .integrations: EmptyView()
+    #endif
+    #if !os(tvOS)
     case .equalizer: EqualizerView()
     case .smartDownloads: SmartDownloadsSettingsView()
     case let .downloadQuality(song): DownloadQualityView(kind: song ? .song : .video)
     #else
-    case .librarySettings, .libraryHealth, .integrations, .equalizer, .smartDownloads, .downloadQuality: EmptyView()
+    case .equalizer, .smartDownloads, .downloadQuality: EmptyView()
     #endif
     }
 }

@@ -48,7 +48,7 @@ struct RecapCard: View {
                     .accessibilityLabel("Choose the year, \(String(year))")
                     .accessibilityIdentifier("recapYear")
                 }
-                #if os(iOS)
+                #if !os(tvOS)
                 Button { showing = year } label: {
                     HStack(spacing: 2) {
                         Text("View")
@@ -63,7 +63,7 @@ struct RecapCard: View {
                 .accessibilityLabel("View your \(String(year)) in Music")
                 #endif
             }
-            #if os(iOS)
+            #if !os(tvOS)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
@@ -151,19 +151,50 @@ struct RecapView: View {
         }
         #if os(iOS)
         .statusBarHidden()
+        #endif
+        #if !os(tvOS)
         .sheet(item: $openPlaylist) { p in
             NavigationStack {
                 PlaylistView(id: p.id)
                     .marqueeDestinations()
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { openPlaylist = nil } } }
             }
+            .macSheetFrame(640, 640)
         }
         #endif
     }
 
     // MARK: - The story
 
-    #if os(iOS)
+    #if os(macOS)
+    /// The Mac: one page at a time, with Previous and Next and the left and right arrow keys.
+    @ViewBuilder private func story(_ r: ListeningRecap) -> some View {
+        let all = pages
+        pageView(all[min(page, all.count - 1)], r, index: page, count: all.count)
+            .id(page)
+            .transition(.opacity)
+            .overlay(alignment: .top) { topBar(count: all.count) }
+            .overlay(alignment: .bottom) {
+                VStack(spacing: 10) {
+                    savedBanner
+                    HStack(spacing: 16) {
+                        Button { go(-1) } label: { Label("Previous", systemImage: "chevron.left") }
+                            .keyboardShortcut(.leftArrow, modifiers: [])
+                            .disabled(page == 0)
+                        Text("\(page + 1) of \(all.count)").font(.callout).foregroundStyle(.white.opacity(0.7))
+                        Button { go(1) } label: { Label("Next", systemImage: "chevron.right") }
+                            .keyboardShortcut(.rightArrow, modifiers: [])
+                            .disabled(page >= all.count - 1)
+                    }
+                    .padding(.bottom, 12)
+                }
+            }
+    }
+
+    private func go(_ d: Int) {
+        withAnimation(.easeInOut(duration: 0.3)) { page = max(0, min(pages.count - 1, page + d)) }
+    }
+    #elseif os(iOS)
     @ViewBuilder private func story(_ r: ListeningRecap) -> some View {
         let all = pages
         TabView(selection: $page) {
@@ -230,7 +261,7 @@ struct RecapView: View {
                     .accessibilityLabel("Saved “\(saved.title)”")
                     .accessibilityIdentifier("recapSaved")
                 Spacer()
-                #if os(iOS)
+                #if !os(tvOS)
                 Button("Open") { openPlaylist = saved }.bold()
                 #endif
             }
@@ -249,7 +280,7 @@ struct RecapView: View {
         let colors = palette(index)
         return ZStack {
             LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
-            #if os(iOS)
+            #if !os(tvOS)
             GeometryReader { g in
                 Color.clear.contentShape(Rectangle())
                     .onTapGesture(coordinateSpace: .local) { loc in

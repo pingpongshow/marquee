@@ -17,9 +17,10 @@ struct StatsView: View {
                 Text("All time").tag(0)
             }
             .pickerStyle(.segmented)
+            .macLabelsHidden()
             // Year in music (MUSIC-22).
             RecapCard().listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
-                #if os(iOS)
+                #if !os(tvOS)
                 .listRowSeparator(.hidden)
                 #endif
             if let error { Text(error).foregroundStyle(.red) }

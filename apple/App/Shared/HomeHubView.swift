@@ -48,7 +48,7 @@ struct HomeHubView: View {
             .padding(.vertical)
         }
         .navigationTitle(shownTitle)
-        #if os(iOS)
+        #if !os(tvOS)
         .navigationBarTitleDisplayMode(.large)
         .refreshable { await load() }
         #endif

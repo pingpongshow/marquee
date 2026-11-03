@@ -78,6 +78,7 @@ struct VodRecommendedView: View {
                         Text("Shows").tag(true)
                     }
                     .pickerStyle(.segmented)
+                    .macLabelsHidden()
                     .frame(maxWidth: isTV ? 500 : 320)
                     .accessibilityIdentifier("vodRecommended.kind")
                     Text("Picked from your favourites, ratings and what you watch. Nothing here comes from what other people watch.")
@@ -102,7 +103,7 @@ struct VodRecommendedView: View {
             .padding(.vertical)
         }
         .navigationTitle(series ? "Recommended Shows" : "Recommended Movies")
-        #if os(iOS)
+        #if !os(tvOS)
         .refreshable { await load() }
         #endif
         .task(id: series) {

@@ -1,6 +1,8 @@
 import MarqueeKit
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 
 /// The household's profiles to switch to directly (the current one marked), with Account
 /// Settings and Sign Out: the profile entry above Home in the sidebar (iPad, Apple TV), the
@@ -105,7 +107,7 @@ struct ProfilesPage: View {
             Text("Enter \(p.displayName)'s password").font(.headline)
             SecureField("Password", text: $password)
                 .textContentType(.password)
-                #if os(iOS)
+                #if !os(tvOS)
                 .textFieldStyle(.roundedBorder)
                 #endif
                 .frame(maxWidth: 420)
@@ -192,6 +194,27 @@ final class ProfileIcon {
 
     /// A circle with the photo filling it, or the name's first letter on grey (as AvatarView).
     static func render(name: String, photo: UIImage?, size: CGFloat) -> UIImage {
+        #if os(macOS)
+        return NSImage(size: CGSize(width: size, height: size), flipped: false) { rect in
+            NSBezierPath(ovalIn: rect).addClip()
+            NSColor.gray.withAlphaComponent(0.45).setFill()
+            rect.fill()
+            if let photo, photo.size.width > 0, photo.size.height > 0 {
+                let scale = max(size / photo.size.width, size / photo.size.height)
+                let w = photo.size.width * scale, h = photo.size.height * scale
+                photo.draw(in: CGRect(x: (size - w) / 2, y: (size - h) / 2, width: w, height: h))
+            } else {
+                let letter = String(name.prefix(1)).uppercased() as NSString
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.systemFont(ofSize: size * 0.46, weight: .bold),
+                    .foregroundColor: NSColor.white,
+                ]
+                let s = letter.size(withAttributes: attrs)
+                letter.draw(at: CGPoint(x: (size - s.width) / 2, y: (size - s.height) / 2), withAttributes: attrs)
+            }
+            return true
+        }
+        #else
         let rect = CGRect(x: 0, y: 0, width: size, height: size)
         return UIGraphicsImageRenderer(size: rect.size).image { _ in
             UIBezierPath(ovalIn: rect).addClip()
@@ -211,10 +234,11 @@ final class ProfileIcon {
                 letter.draw(at: CGPoint(x: (size - s.width) / 2, y: (size - s.height) / 2), withAttributes: attrs)
             }
         }.withRenderingMode(.alwaysOriginal)
+        #endif
     }
 }
 
-#if os(iOS)
+#if !os(tvOS)
 /// iPhone: the signed-in profile's avatar at the top of Home; it opens the profiles.
 struct ProfileToolbarButton: View {
     @Environment(AppSession.self) private var app

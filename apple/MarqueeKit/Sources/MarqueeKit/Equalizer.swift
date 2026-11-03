@@ -93,6 +93,10 @@ public final class Equalizer {
     /// here, where an audio mix's volume can't go above 1.
     nonisolated func makeTap(gain: Double = 1) -> MTAudioProcessingTap? { EqualizerTap.make(state, gain: gain) }
 
+    /// The sample rates taps have started at: filled in by the audio engine as it prepares a tap,
+    /// so non-empty says the tap really is in the output path.
+    public var tapSampleRates: [Double] { state.sampleRates }
+
     public static func label(_ hz: Double) -> String { hz >= 1000 ? "\(Int(hz / 1000))k" : "\(Int(hz))" }
 }
 
@@ -127,6 +131,8 @@ final class EQState: @unchecked Sendable {
             s.version += 1
         }
     }
+
+    var sampleRates: [Double] { lock.withLock { $0.coefficients.keys.sorted() } }
 
     /// Makes sure coefficients exist for a tap's sample rate (called when a tap is prepared,
     /// not on the render thread).

@@ -1,4 +1,4 @@
-#if os(iOS)
+#if !os(tvOS)
 import MarqueeKit
 import SwiftUI
 
@@ -132,7 +132,7 @@ struct OfflineLibraryView: View {
 }
 
 /// A page of the Offline Library, looked up afresh so a download deleted there goes at once.
-private struct OfflineRouteView: View {
+struct OfflineRouteView: View {
     @Environment(Downloads.self) private var downloads
     let route: OfflineRoute
 

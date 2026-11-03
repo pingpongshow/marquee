@@ -15,11 +15,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 }
 #endif
 
+// The Mac has its own App (App/macOS/MarqueeMacApp.swift): one window, a menu bar icon and menus.
+#if !os(macOS)
 @main
 struct MarqueeApp: App {
     @State private var app: AppSession
     @State private var music: MusicPlayer
-    #if os(iOS)
+    #if !os(tvOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var downloads: Downloads
     /// Smart downloads: next episodes and favourite music kept on the device.
@@ -43,7 +45,7 @@ struct MarqueeApp: App {
         let player = MusicPlayer(app: session)
         _app = State(initialValue: session)
         _music = State(initialValue: player)
-        #if os(iOS)
+        #if !os(tvOS)
         let dl = Downloads()
         player.downloads = dl
         AppDelegate.downloads = dl
@@ -61,7 +63,7 @@ struct MarqueeApp: App {
             RootView()
                 .environment(app)
                 .environment(music)
-                #if os(iOS)
+                #if !os(tvOS)
                 .environment(downloads)
                 .environment(smart)
                 .tint(.accentColor) // tvOS keeps the system's white focus style
@@ -77,13 +79,15 @@ struct MarqueeApp: App {
         }
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     private func runSmart() {
         guard app.state == .signedIn, app.client != nil, !app.isOffline, app.me != nil else { return }
         Task { await smart.run(app) }
     }
     #endif
 }
+
+#endif
 
 /// Server → sign-in → app.
 struct RootView: View {

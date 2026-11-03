@@ -1,6 +1,8 @@
 import MarqueeKit
 import SwiftUI
 
+// The Mac's MainView, with its sidebar and bar along the bottom, is in App/macOS.
+#if !os(macOS)
 /// Tabs: Home, each library, Playlists, Search and Settings. On iPad and Apple TV they're
 /// the main sidebar; on iPhone a tab bar.
 struct MainView: View {
@@ -29,7 +31,7 @@ struct MainView: View {
     @State private var selection = "home"
     /// The signed-in profile's picture for the sidebar's profile entry (iPad, Apple TV).
     @State private var profileIcon = ProfileIcon()
-    #if os(iOS)
+    #if !os(tvOS)
     /// iPhone: the profiles, opened from the avatar on Home.
     @State private var showProfiles = false
     @Environment(SmartDownloads.self) private var smart
@@ -54,7 +56,7 @@ struct MainView: View {
             Tab("Home", systemImage: "house", value: "home") {
                 stack {
                     HomeView()
-                        #if os(iOS)
+                        #if !os(tvOS)
                         .toolbar {
                             if compact {
                                 ToolbarItem(placement: .topBarLeading) { ProfileToolbarButton { showProfiles = true } }
@@ -114,7 +116,7 @@ struct MainView: View {
         // top bar fits only about six tabs; the sidebar lists them all, and Back from the top of
         // a page (or Left from its leftmost item) opens it. iPhone keeps its tab bar.
         .tabViewStyle(.sidebarAdaptable)
-        #if os(iOS)
+        #if !os(tvOS)
         // Offline, the Offline Library takes over; the tabs stay underneath, hidden, so where you
         // were is still there when the server comes back.
         .opacity(app.isOffline ? 0 : 1)
@@ -147,7 +149,7 @@ struct MainView: View {
         // A video played: its watched state is the server's again.
         .onChange(of: video.request) { old, new in
             if new == nil, let old { WatchStore.shared.played(old.itemID) }
-            #if os(iOS)
+            #if !os(tvOS)
             // A video ended: a watched episode smart downloads fetched goes, the next one comes.
             if new == nil, old != nil { Task { try? await Task.sleep(for: .seconds(3)); await smart.run(app) } }
             #endif
@@ -188,7 +190,7 @@ struct MainView: View {
             PlayerView(request: req)
                 .environment(video)
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .sheet(isPresented: $showProfiles) {
             NavigationStack {
                 ProfilesPage(onAccountSettings: {
@@ -218,7 +220,7 @@ struct MainView: View {
         if !compact && canDiscover {
             Tab("Discover", systemImage: "safari", value: "discover") { stack { DiscoverView() } }
         }
-        #if os(iOS)
+        #if !os(tvOS)
         if !compact {
             // iPhone lists Downloads under Libraries (a sixth tab would spill into "More").
             Tab("Downloads", systemImage: "arrow.down.circle", value: "downloads") { stack { DownloadsView() } }
@@ -242,7 +244,7 @@ struct MainView: View {
     }
 
     private var compact: Bool {
-        #if os(iOS)
+        #if !os(tvOS)
         UIDevice.current.userInterfaceIdiom == .phone
         #else
         false
@@ -265,7 +267,7 @@ struct MainView: View {
         // stack (the root here, pushed ones in marqueeDestinations) keeps room for it at the
         // bottom: an inset on the stack itself didn't reach the scroll views inside, so lists
         // ended under the bar.
-        #if os(iOS)
+        #if !os(tvOS)
         .overlay(alignment: .bottom) { MiniPlayerBar() }
         #else
         .overlay(alignment: .bottom) { TVNowPlayingBar() }
@@ -307,6 +309,8 @@ struct MainView: View {
         }
     }
 }
+
+#endif
 
 struct OpenNowPlayingAction {
     let action: () -> Void
@@ -433,7 +437,7 @@ struct LibrariesList: View {
                     .accessibilityIdentifier("libraries.vodShows")
                 }
             }
-            #if os(iOS)
+            #if !os(tvOS)
             Section {
                 // Value links only: mixing them with view links in one stack re-pushes screens.
                 NavigationLink(value: Route.playlists) {

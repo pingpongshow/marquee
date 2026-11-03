@@ -38,6 +38,7 @@ struct SignInView: View {
             .task { await load() }
             .sheet(item: $chosen) { p in
                 PinEntry(profile: p) { pin in await pinSignIn(p, pin: pin) }
+                    .macSheetFrame(420, 460)
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -143,7 +144,7 @@ private struct PasswordForm: View {
         VStack(spacing: 14) {
             TextField("Username", text: $username)
                 .textContentType(.username)
-                #if os(iOS)
+                #if !os(tvOS)
                 .textInputAutocapitalization(.never)
                 #endif
                 .autocorrectionDisabled()
@@ -151,7 +152,7 @@ private struct PasswordForm: View {
             if needsCode {
                 TextField("Authenticator code", text: $code)
                     .textContentType(.oneTimeCode)
-                    #if os(iOS)
+                    #if !os(tvOS)
                     .keyboardType(.numberPad)
                     #endif
                     .accessibilityIdentifier("totpCode")
@@ -173,7 +174,7 @@ private struct PasswordForm: View {
             .buttonStyle(.borderedProminent)
             .disabled(username.isEmpty || password.isEmpty || (needsCode && code.isEmpty) || busy)
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .textFieldStyle(.roundedBorder)
         #endif
         .frame(maxWidth: 420)

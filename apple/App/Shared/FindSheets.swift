@@ -60,7 +60,7 @@ struct SubtitleSearchSheet: View {
                 }
             }
             .navigationTitle("Find Subtitles")
-            #if os(iOS)
+            #if !os(tvOS)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             #endif
             .task(id: language) {

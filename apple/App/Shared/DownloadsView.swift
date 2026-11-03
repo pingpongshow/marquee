@@ -1,4 +1,4 @@
-#if os(iOS)
+#if !os(tvOS)
 import MarqueeKit
 import SwiftUI
 
@@ -59,6 +59,7 @@ struct DownloadsView: View {
             if all.isEmpty {
                 ContentUnavailableView("No downloads", systemImage: "arrow.down.circle",
                                        description: Text("Download movies, episodes and music from their pages to watch and listen offline."))
+                    .frame(maxWidth: .infinity)
             } else {
                 Text("\(ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file)) on this device")
                     .font(.footnote).foregroundStyle(.secondary)

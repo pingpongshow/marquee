@@ -67,6 +67,7 @@ private struct SavePlaylistFlow: ViewModifier {
                 }
                 // Audio playlists only; a presenter so the playlist page has one.
                 .environment(VideoPresenter())
+                .macSheetFrame(640, 640)
             }
     }
 

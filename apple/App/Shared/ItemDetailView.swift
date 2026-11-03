@@ -6,7 +6,7 @@ struct ItemDetailView: View {
     @Environment(AppSession.self) private var app
     @Environment(VideoPresenter.self) private var video
     @Environment(MusicPlayer.self) private var music
-    #if os(iOS)
+    #if !os(tvOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
     let id: Int64
@@ -81,8 +81,10 @@ struct ItemDetailView: View {
             }
         }
         .background(alignment: .top) { backdrop }
-        #if os(iOS)
+        #if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
+        #if os(iOS)
         .sheet(item: $matching) { MusicMatchSheet(item: $0) { afterMusicFix() } }
         .sheet(item: $moving) { MoveTrackSheet(track: $0) { afterMusicFix() } }
         #endif
@@ -217,7 +219,7 @@ struct ItemDetailView: View {
     }
 
     private var compact: Bool {
-        #if os(iOS)
+        #if !os(tvOS)
         // Every iPhone, at any width or orientation (a Pro Max in landscape is "regular").
         UIDevice.current.userInterfaceIdiom == .phone || sizeClass == .compact
         #else
@@ -327,7 +329,7 @@ struct ItemDetailView: View {
                                  ? "Its frames are timed out of order, so it stutters unless converted: Marquee converts it while playing until it's repaired."
                                  : "The file is damaged and may not play properly.")
                             Text(p.detail).font(.caption).foregroundStyle(.secondary)
-                            #if os(iOS)
+                            #if !os(tvOS)
                             NavigationLink(value: Route.settings(.libraryHealth)) {
                                 Text(p.check == .frameTiming ? "Repair in Library Health" : "Open Library Health").font(.caption.weight(.semibold))
                             }
@@ -425,7 +427,7 @@ struct ItemDetailView: View {
         }
         if let trailer, d.type == .movie || d.type == .show { TrailerButton(trailer: trailer, title: d.title) }
         if [.album, .track].contains(d.type) { radioButton(d) }
-        #if os(iOS)
+        #if !os(tvOS)
         if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {
             DownloadButton(item: d.base)
         }
@@ -536,7 +538,7 @@ struct ItemDetailView: View {
                 findSubtitles(d).background(Color.black.ignoresSafeArea())
             }
             #else
-            .sheet(isPresented: $findingSubs) { findSubtitles(d) }
+            .sheet(isPresented: $findingSubs) { findSubtitles(d).macSheetFrame(560, 600) }
             #endif
             .onChange(of: fileID) {
                 audioID = nil
@@ -695,6 +697,7 @@ struct ItemDetailView: View {
                         }
                     }
                 }
+                .macFocusList(children.map(\.id))
             default:
                 EmptyView()
             }
@@ -729,6 +732,7 @@ struct ItemDetailView: View {
                     .accessibilityIdentifier("topSongs.more")
             }
         }
+        .macFocusList(topSongs.map(\.id))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("topSongs")
     }
@@ -864,6 +868,8 @@ struct TrackRow: View {
             RowRating(item: track, gap: isTV ? 8 : 4)
         }
         .padding(.trailing, sidePadding - 6)
+        .macRowHover()
+        .macKeyboardRow(id: track.id, activate: play)
     }
 }
 
@@ -894,6 +900,7 @@ struct TopSongsView: View {
                 if loading { ProgressView().frame(maxWidth: .infinity).padding() }
             }
             .padding(.vertical, 8)
+            .macFocusList(songs.map(\.id))
         }
         .navigationTitle("Top Songs")
         .task { if !loaded { await loadMore() } }

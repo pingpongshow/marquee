@@ -103,13 +103,13 @@ struct ConnectView: View {
                 Section {
                     TextField("Home address, e.g. 192.168.1.20:32500", text: $lan)
                         .textContentType(.URL)
-                        #if os(iOS)
+                        #if !os(tvOS)
                         .keyboardType(.URL).textInputAutocapitalization(.never)
                         #endif
                         .autocorrectionDisabled()
                     TextField("Tailscale address (optional)", text: $remote)
                         .textContentType(.URL)
-                        #if os(iOS)
+                        #if !os(tvOS)
                         .keyboardType(.URL).textInputAutocapitalization(.never)
                         #endif
                         .autocorrectionDisabled()

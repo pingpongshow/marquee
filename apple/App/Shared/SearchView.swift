@@ -20,6 +20,9 @@ struct SearchView: View {
     /// Search the library, or describe what you want to watch (Muse, USER-15).
     @State private var mode: Mode = .library
     @State private var muse = VideoMuse()
+    #if os(macOS)
+    @FocusState private var searchFieldFocused: Bool
+    #endif
 
     enum Mode: String, CaseIterable {
         case library = "Library", muse = "Muse"
@@ -48,6 +51,7 @@ struct SearchView: View {
                     ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .macLabelsHidden()
                 .padding(.horizontal, sidePadding)
                 if mode == .muse {
                     if muse.result == nil && !muse.busy {
@@ -69,6 +73,15 @@ struct SearchView: View {
         #endif
         #if !os(tvOS)
         .searchable(text: $search.query, prompt: mode == .muse ? "Describe what you want to watch" : "Movies, shows, music")
+        #if os(macOS)
+        .searchFocused($searchFieldFocused)
+        .onChange(of: MacNavigation.shared.searchFocused, initial: true) {
+            if MacNavigation.shared.searchFocused {
+                searchFieldFocused = true
+                MacNavigation.shared.searchFocused = false
+            }
+        }
+        #endif
         #endif
         .onSubmit(of: .search) {
             guard mode == .muse else { return }

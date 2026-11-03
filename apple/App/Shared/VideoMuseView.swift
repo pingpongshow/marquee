@@ -64,7 +64,7 @@ struct VideoMuseView: View {
                 VideoMuseChips(muse: muse, libraryID: libraryID)
                 if canVod {
                     Toggle(isOn: $includeVod) { Label("Include VOD", systemImage: "play.tv") }
-                        #if os(iOS)
+                        #if !os(tvOS)
                         .toggleStyle(.switch)
                         .tint(Color.marqueeGold)
                         .fixedSize()
@@ -90,7 +90,7 @@ struct VideoMuseView: View {
         return HStack {
             TextField("Describe what you want to watch", text: $muse.prompt)
                 .onSubmit { muse.run(app, library: libraryID) }
-                #if os(iOS)
+                #if !os(tvOS)
                 .textFieldStyle(.roundedBorder)
                 .submitLabel(.search)
                 #endif

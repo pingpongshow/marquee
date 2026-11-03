@@ -52,6 +52,7 @@ struct VodFollowControl: View {
                 case .off: off = true
                 }
             }
+            .macSheetFrame()
         }
     }
 
@@ -142,7 +143,7 @@ struct VodFollowSheet: View {
                 }
             }
             .navigationTitle(existing == nil ? "Follow \(show.title)" : show.title)
-            #if os(iOS)
+            #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
@@ -206,7 +207,7 @@ struct VodFollowingView: View {
                     .contextMenu {
                         Button("Unfollow", systemImage: "minus.circle", role: .destructive) { unfollow(f) }
                     }
-                    #if os(iOS)
+                    #if !os(tvOS)
                     .swipeActions {
                         Button("Unfollow", role: .destructive) { unfollow(f) }
                     }
@@ -265,7 +266,7 @@ struct VodFollowingLink: View {
                 NavigationLink(value: Route.vodFollowing) {
                     Label("Following (\(count))", systemImage: "checkmark.circle")
                 }
-                #if os(iOS)
+                #if !os(tvOS)
                 .buttonStyle(.bordered)
                 #endif
                 .accessibilityIdentifier("vod.followingLink")

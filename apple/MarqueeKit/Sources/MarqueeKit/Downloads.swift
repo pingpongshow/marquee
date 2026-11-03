@@ -59,7 +59,7 @@ public final class Downloads {
         public static let lowStorageBytes: Int64 = 16_000_000_000
 
         /// The quality recommended, and used until the person chooses: songs High; videos Medium
-        /// on iPhone and High on iPad; one step lower with little free space (`freeBytes` nil
+        /// on iPhone and High on iPad and the Mac; one step lower with little free space (`freeBytes` nil
         /// when it can't be told).
         public static func recommended(_ kind: Kind, isPad: Bool, freeBytes: Int64?) -> Quality {
             let wide: Quality = kind == .song || isPad ? .high : .medium
@@ -151,7 +151,7 @@ public final class Downloads {
     private static let io = DispatchQueue(label: "app.marquee.downloads.io", qos: .utility)
 
     public static let directory: URL = {
-        let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appending(path: "Downloads", directoryHint: .isDirectory)
+        let d = appSupportDirectory.appending(path: "Downloads", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         var v = URLResourceValues()
         v.isExcludedFromBackup = true
@@ -297,11 +297,12 @@ public final class Downloads {
         }
     }
 
+    /// iPad, or the Mac: a big screen, so videos are recommended at High.
     private static var isPad: Bool {
         #if canImport(UIKit)
         UIDevice.current.userInterfaceIdiom == .pad
         #else
-        false
+        true
         #endif
     }
 
@@ -793,4 +794,15 @@ private final class SessionBridge: NSObject, URLSessionDownloadDelegate, @unchec
         completion = nil
         DispatchQueue.main.async { done?() }
     }
+}
+
+/// Where the apps keep their own files: the app's container on iPhone, iPad and the Apple TV. The
+/// Mac app isn't sandboxed, so there it's a folder of its own in the user's Application Support.
+var appSupportDirectory: URL {
+    let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    #if os(macOS)
+    return base.appending(path: "Marquee", directoryHint: .isDirectory)
+    #else
+    return base
+    #endif
 }

@@ -4,7 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
-    #if os(iOS)
+    #if !os(tvOS)
     @Environment(SmartDownloads.self) private var smart
     @Environment(Downloads.self) private var downloads
     #endif
@@ -30,6 +30,13 @@ struct SettingsView: View {
                         }
                     }
                     NavigationLink("Your Stats", value: Route.settings(.stats))
+                    #if os(macOS)
+                    // On the Mac, administration is the server's web app.
+                    if app.me?.isAdmin == true {
+                        Button("Administration…") { MacWindows.openAdministration() }
+                            .accessibilityIdentifier("settings.administration")
+                    }
+                    #else
                     if app.me?.isAdmin == true {
                         NavigationLink("Requests", value: Route.settings(.requests))
                         NavigationLink("Users and Friends", value: Route.settings(.users))
@@ -40,6 +47,7 @@ struct SettingsView: View {
                         NavigationLink("Integrations", value: Route.settings(.integrations))
                         #endif
                     }
+                    #endif
                     NavigationLink("Edit Home", value: Route.settings(.editHome))
                     NavigationLink("Subtitle Appearance", value: Route.settings(.subtitleAppearance))
                     Button("Switch Profile") { switching = true }
@@ -124,7 +132,7 @@ struct SettingsView: View {
                 @Bindable var music = music
                 Toggle("Show audio quality", isOn: $music.showAudioQuality)
                     .accessibilityIdentifier("showAudioQuality")
-                #if os(iOS)
+                #if !os(tvOS)
                 NavigationLink(value: Route.settings(.equalizer)) {
                     LabeledContent("Equalizer", value: music.equalizer.enabled ? music.equalizer.preset : "Off")
                 }
@@ -135,7 +143,7 @@ struct SettingsView: View {
             } footer: {
                 Text("Audio quality shows each track's format, such as FLAC · 24-bit/96 kHz, in Now Playing and track lists.")
             }
-            #if os(iOS)
+            #if !os(tvOS)
             Section {
                 NavigationLink(value: Route.downloads) {
                     LabeledContent("Downloaded", value: "\(downloads.doneCount) \(downloads.doneCount == 1 ? "item" : "items") · \(ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file))")
@@ -188,7 +196,7 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
-        .sheet(isPresented: $switching) { ProfileSwitcher() }
+        .sheet(isPresented: $switching) { ProfileSwitcher().macSheetFrame(720, 560) }
         .task { await app.refreshInfo() } // the rating request switch (USER-19)
     }
 }

@@ -1,4 +1,4 @@
-// Renders Marquee's app icons (iOS single-size icon, tvOS layered icon and Top Shelf).
+// Renders Marquee's app icons (iOS single-size icon, macOS sizes, tvOS layered icon and Top Shelf).
 // Usage: swift scripts/make-icons.swift <output dir>
 import AppKit
 
@@ -64,6 +64,30 @@ func write(_ data: Data, _ path: String) {
 
 // iOS: one 1024 icon.
 write(render(1024, 1024) { r in background(r); sign(r) }, "ios-icon-1024.png")
+// macOS: the rounded square on a transparent canvas, at every size the Mac asks for.
+for (points, scale) in [(16, 1), (16, 2), (32, 1), (32, 2), (128, 1), (128, 2), (256, 1), (256, 2), (512, 1), (512, 2)] {
+    let px = points * scale
+    write(render(px, px) { r in
+        // Apple's grid: the body is 824/1024 of the canvas, with room for its shadow.
+        let side = r.width * 824 / 1024
+        let body = CGRect(x: (r.width - side) / 2, y: (r.height - side) / 2, width: side, height: side)
+        let clip = NSBezierPath(roundedRect: body, xRadius: side * 0.2237, yRadius: side * 0.2237)
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.3)
+        shadow.shadowBlurRadius = r.width * 0.015
+        shadow.shadowOffset = NSSize(width: 0, height: -r.width * 0.01)
+        NSGraphicsContext.saveGraphicsState()
+        shadow.set()
+        bgBottom.setFill()
+        clip.fill()
+        NSGraphicsContext.restoreGraphicsState()
+        NSGraphicsContext.saveGraphicsState()
+        clip.addClip()
+        background(body)
+        sign(body)
+        NSGraphicsContext.restoreGraphicsState()
+    }, "mac-icon_\(points)x\(points)@\(scale)x.png")
+}
 // tvOS layered icon: back (background) and front (sign) layers, small and large.
 for (name, w, h) in [("small", 400, 240), ("small2x", 800, 480), ("large", 1280, 768)] {
     write(render(w, h) { r in background(r) }, "tv-\(name)-back.png")

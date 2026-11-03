@@ -120,7 +120,7 @@ struct VodSeriesView: View {
                 }
             }
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await load() }
@@ -269,7 +269,7 @@ struct VodSeriesView: View {
                 .accessibilityIdentifier("vod.show.watched")
             }
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .fixedSize(horizontal: false, vertical: true)
         #endif
     }

@@ -270,7 +270,7 @@ struct UpNextScreen<Accessory: View>: View {
         }
         .frame(width: width, height: width * 9 / 16)
         .clipShape(RoundedRectangle(cornerRadius: isTV ? 14 : 10, style: .continuous))
-        #if os(iOS)
+        #if !os(tvOS)
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.white.opacity(0.12)))
         .shadow(color: .black.opacity(0.45), radius: 12, y: 6)
         #endif

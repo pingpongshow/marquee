@@ -54,7 +54,7 @@ struct ArtworkView: View {
 
     /// The server's picture; offline, the one kept with a download.
     private var artworkURL: URL? {
-        #if os(iOS)
+        #if !os(tvOS)
         if app.isOffline { return Downloads.posterFile(item.id) }
         #endif
         return app.imageURL(artID, width: Int(width))
@@ -200,7 +200,7 @@ extension CachedImage where Content == AnyView {
 extension AppSession {
     /// Whether to show the offline app: iPhone and iPad only, the Apple TV has no downloads.
     var offlineUI: Bool {
-        #if os(iOS)
+        #if !os(tvOS)
         isOffline
         #else
         false
@@ -402,7 +402,7 @@ struct RowRating: View {
             }
         }
         .menuIndicator(.hidden)
-        #if os(iOS)
+        #if !os(tvOS)
         .buttonStyle(.plain)
         #endif
         .fixedSize()
@@ -523,12 +523,16 @@ struct PosterCard: View {
             NavigationLink(value: Route.item(item.id)) {
                 VStack(alignment: .leading, spacing: 6) {
                     ArtworkView(item: item, shape: shape ?? .for(item), width: width)
+                        .macPosterHover()
                     titles
                 }
                 .frame(width: width)
             }
             .buttonStyle(.plain)
             .contextMenu { menu }
+            #if os(macOS)
+            .macKeyboardRow { MacNavigation.shared.push(.item(item.id)) }
+            #endif
             trackRating
         }
         #endif
@@ -755,6 +759,65 @@ let sidePadding: CGFloat = 80
 #else
 let sidePadding: CGFloat = 16
 #endif
+
+extension View {
+    /// The Mac: a song or list row lights up under the pointer. Nothing elsewhere.
+    @ViewBuilder func macRowHover() -> some View {
+        #if os(macOS)
+        modifier(MacRowHover())
+        #else
+        self
+        #endif
+    }
+
+    /// The Mac: the row takes keyboard focus; the arrow keys move along the list and Return does
+    /// what a click on it does. Nothing elsewhere.
+    @ViewBuilder func macKeyboardRow(id: Int64? = nil, activate: @escaping () -> Void) -> some View {
+        #if os(macOS)
+        modifier(MacKeyboardRow(id: id, activate: activate))
+        #else
+        self
+        #endif
+    }
+
+    /// The Mac: a list of rows the arrow keys move along, by the ids they gave macKeyboardRow, in
+    /// order. Nothing elsewhere.
+    @ViewBuilder func macFocusList(_ ids: @autoclosure () -> [Int64]) -> some View {
+        #if os(macOS)
+        modifier(MacFocusList(ids: ids()))
+        #else
+        self
+        #endif
+    }
+
+    /// The Mac: no label beside a segmented control (elsewhere it never shows one).
+    @ViewBuilder func macLabelsHidden() -> some View {
+        #if os(macOS)
+        labelsHidden()
+        #else
+        self
+        #endif
+    }
+
+    /// The Mac: a sheet's size (it would otherwise fit its content, and a list has next to no
+    /// size of its own). Nothing elsewhere.
+    @ViewBuilder func macSheetFrame(_ width: CGFloat = 520, _ height: CGFloat = 560) -> some View {
+        #if os(macOS)
+        frame(minWidth: width, idealWidth: width, minHeight: height, idealHeight: height)
+        #else
+        self
+        #endif
+    }
+
+    /// The Mac: a poster lifts under the pointer. Nothing elsewhere.
+    @ViewBuilder func macPosterHover() -> some View {
+        #if os(macOS)
+        modifier(MacPosterHover())
+        #else
+        self
+        #endif
+    }
+}
 
 #if os(tvOS)
 let isTV = true

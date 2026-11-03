@@ -6,6 +6,8 @@ import Observation
 import os
 #if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
 #endif
 
 /// App-wide music playback with a queue (MUSIC-13). AVQueuePlayer holds the current track
@@ -110,6 +112,32 @@ public final class MusicPlayer {
     public let equalizer = Equalizer()
     /// Playing to an AirPlay device, where the equaliser may not be heard.
     public private(set) var airPlaying = false
+    /// A level for all the music in this app, 0–1 (the Mac's own volume control; 1 elsewhere). The
+    /// levelling and crossfade work beneath it.
+    public var appVolume: Float = 1 {
+        didSet { if fadeTask == nil, fader == nil { player.volume = appVolume } }
+    }
+    /// Someone else (a video) owns the system's Now Playing for now: the music leaves it alone.
+    @ObservationIgnored public var nowPlayingBorrowed = false {
+        didSet { if !nowPlayingBorrowed, nowPlayingBorrowed != oldValue { updateNowPlaying() } }
+    }
+    /// Lets media keys go to something else first (a video): true means it was handled.
+    @ObservationIgnored public var mediaCommandOverride: ((MediaCommand) -> Bool)?
+    #if os(macOS)
+    /// The Core Audio device this app's music plays on; nil is the system default. Set on the
+    /// player, so the levelling and equaliser tap (on each item's audio mix, ahead of the output)
+    /// go with it, and other apps stay where they are.
+    public var audioOutputDeviceUID: String? {
+        get { player.audioOutputDeviceUniqueID }
+        set {
+            player.audioOutputDeviceUniqueID = newValue
+            fader?.audioOutputDeviceUniqueID = newValue
+        }
+    }
+
+    /// For AVRoutePickerView: AirPlay chosen there carries this player.
+    public var routingPlayer: AVPlayer { player }
+    #endif
     @ObservationIgnored private var fader: AVPlayer?
     @ObservationIgnored private var fadeTask: Task<Void, Never>?
     @ObservationIgnored private var fadingFrom: ObjectIdentifier?
@@ -237,6 +265,13 @@ public final class MusicPlayer {
             MainActor.assumeIsolated { self?.mediaServicesReset() }
         }
         #endif
+        #if os(macOS)
+        // AirPlay on the Mac is per player: there's no audio session to ask.
+        observers.append(player.observe(\.isExternalPlaybackActive) { [weak self] p, _ in
+            let on = p.isExternalPlaybackActive
+            Task { @MainActor in self?.airPlaying = on }
+        })
+        #endif
         // Signing out, switching profile or forgetting the server ends the music.
         app.onUserChange = { [weak self] in self?.stop() }
         app.userPlaybackEnded = { [weak self] in await self?.sessionsEnded() }
@@ -254,7 +289,7 @@ public final class MusicPlayer {
                 if Date().timeIntervalSince(self.lastReport) > 15, self.playing { self.report("playing") }
                 self.notePlayedThrough()
                 // Full volume whenever no crossfade is running (one never leaves it silent).
-                if self.fadeTask == nil, self.fader == nil, self.player.volume != 1 { self.player.volume = 1 }
+                if self.fadeTask == nil, self.fader == nil, self.player.volume != self.appVolume { self.player.volume = self.appVolume }
                 self.maybeCrossfade()
                 self.retryPreloadIfDue()
             }
@@ -386,6 +421,7 @@ public final class MusicPlayer {
 
     public func next() {
         noteMovedOn()
+        if let room = remote as? any RemoteQueuePlayback, room.skip(forward: true) { return }
         skipForward()
     }
 
@@ -440,6 +476,7 @@ public final class MusicPlayer {
 
     public func previous() {
         if time > 3 { seek(0); return }
+        if let room = remote as? any RemoteQueuePlayback, room.skip(forward: false) { return }
         queue.setIndex(max(0, queue.index - 1))
         rebuild()
     }
@@ -493,17 +530,27 @@ public final class MusicPlayer {
     public func stop() {
         cancelFade()
         buildGeneration += 1
-        remote?.pause()
+        let room = remote as? any RemoteQueuePlayback
+        if room == nil { remote?.pause() }
         report("paused")
         for item in player.items() { endSession(for: item) }
         player.removeAllItems()
         queue = PlayQueue()
+        // After the queue is gone: nothing carries on here. Signing out waits for this like the
+        // sessions ending, while the sign-in still works.
+        if let stopping = room?.queueStopped() {
+            let key = UUID()
+            ending[key] = Task { [weak self] in
+                await stopping.value
+                self?.ending[key] = nil
+            }
+        }
         newSource(nil)
         sleep = nil
         playing = false
         time = 0
         duration = 0
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        if !nowPlayingBorrowed { MPNowPlayingInfoCenter.default().nowPlayingInfo = nil }
     }
 
     /// Shows a short message in Now Playing (a track that wouldn't play, a Chromecast error).
@@ -767,6 +814,7 @@ public final class MusicPlayer {
 
     /// Makes sure the item after the current one is the entry that should follow.
     private func refreshFollowing() {
+        if let room = remote as? any RemoteQueuePlayback { room.queueChanged(); return }
         let items = player.items()
         let fi = queue.followingIndex
         let want = queue.entries.indices.contains(fi) ? queue.entries[fi] : nil
@@ -1030,6 +1078,10 @@ public final class MusicPlayer {
     /// tail and fades it out while the queue moves on and fades in.
     private func maybeCrossfade() {
         let secs = Double(crossfade)
+        #if os(macOS)
+        // AirPlay carries this player only: the crossfade's second player would be heard here.
+        guard !airPlaying else { return }
+        #endif
         // Starts a few seconds early: the tail loads, lines up and runs silently in step, then
         // takes over exactly `secs` before the end (loading can take seconds on a slow server).
         guard secs > 0, fadeTask == nil, playing, duration > secs * 3, duration - time <= secs + 4, duration - time > 1,
@@ -1044,6 +1096,9 @@ public final class MusicPlayer {
         }
         let f = AVPlayer(playerItem: tail)
         f.automaticallyWaitsToMinimizeStalling = false
+        #if os(macOS)
+        f.audioOutputDeviceUniqueID = player.audioOutputDeviceUniqueID
+        #endif
         fader = f
         fadingFrom = ObjectIdentifier(item)
         fadeTask = Task { [weak self] in
@@ -1095,15 +1150,15 @@ public final class MusicPlayer {
             }
             guard !Task.isCancelled else { return }
             guard self.player.currentItem === item, f.timeControlStatus == .playing else { self.endFade(); return }
-            f.volume = 1
+            f.volume = self.appVolume
             self.player.volume = 0
             self.player.advanceToNextItem()
             let steps = Int(secs * 25)
             for i in 1...steps {
                 if Task.isCancelled { break }
                 let t = Double(i) / Double(steps)
-                self.player.volume = Float(sin(t * .pi / 2)) // equal power keeps the loudness steady
-                f.volume = Float(cos(t * .pi / 2))
+                self.player.volume = self.appVolume * Float(sin(t * .pi / 2)) // equal power keeps the loudness steady
+                f.volume = self.appVolume * Float(cos(t * .pi / 2))
                 try? await Task.sleep(for: .milliseconds(40))
             }
             // Cancelled: cancelFade() has already tidied up (and a new fade may have started).
@@ -1123,7 +1178,7 @@ public final class MusicPlayer {
         fader = nil
         fadeTask = nil
         fadingFrom = nil
-        player.volume = 1
+        player.volume = appVolume
         guard let (s, dur) = fadedSession else { return }
         fadedSession = nil
         if s.session.isEmpty {
@@ -1220,6 +1275,7 @@ public final class MusicPlayer {
 
     /// Why the equaliser can't be heard right now, if it can't.
     public var equalizerNote: String? {
+        if remote is any RemoteQueuePlayback { return "The equaliser doesn't apply on Sonos: the speaker plays the music itself." }
         if remote != nil { return "The equaliser doesn't apply while casting: the speaker plays the music itself." }
         if let item = player.currentItem, sessions[ObjectIdentifier(item)]?.hls == true {
             return "This track streams in a format the equaliser can't adjust."
@@ -1286,21 +1342,38 @@ public final class MusicPlayer {
 
     private func setUpRemoteCommands() {
         let c = MPRemoteCommandCenter.shared()
-        c.playCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.resume() }; return .success }
-        c.pauseCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.pause() }; return .success }
-        c.togglePlayPauseCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.toggle() }; return .success }
-        c.nextTrackCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.next() }; return .success }
-        c.previousTrackCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.previous() }; return .success }
+        c.playCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.mediaCommand(.play) }; return .success }
+        c.pauseCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.mediaCommand(.pause) }; return .success }
+        c.togglePlayPauseCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.mediaCommand(.toggle) }; return .success }
+        c.nextTrackCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.mediaCommand(.next) }; return .success }
+        c.previousTrackCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.mediaCommand(.previous) }; return .success }
         c.changePlaybackPositionCommand.addTarget { [weak self] e in
             guard let e = e as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            MainActor.assumeIsolated { self?.seek(e.positionTime) }
+            MainActor.assumeIsolated { self?.mediaCommand(.seek(e.positionTime)) }
             return .success
         }
     }
 
+    /// A media key, Control Center or the lock screen.
+    private func mediaCommand(_ command: MediaCommand) {
+        if mediaCommandOverride?(command) == true { return }
+        switch command {
+        case .play: resume()
+        case .pause: pause()
+        case .toggle: toggle()
+        case .next: next()
+        case .previous: previous()
+        case .seek(let at): seek(at)
+        }
+    }
+
     private func updateNowPlaying() {
+        if nowPlayingBorrowed { return }
         guard let t = queue.current?.item else {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            #if os(macOS)
+            MPNowPlayingInfoCenter.default().playbackState = .stopped
+            #endif
             return
         }
         // The lock screen runs its clock from the rate: 1 only while audio actually plays here,
@@ -1328,6 +1401,10 @@ public final class MusicPlayer {
             loadArtwork(for: t)
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        #if os(macOS)
+        // On the Mac, Control Center and the media keys go by this, not the rate.
+        MPNowPlayingInfoCenter.default().playbackState = playing ? .playing : .paused
+        #endif
     }
 
     private func loadArtwork(for t: Item) {
@@ -1356,9 +1433,77 @@ public final class MusicPlayer {
             var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
             info[MPMediaItemPropertyArtwork] = art
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            #elseif canImport(AppKit)
+            guard let self, !Task.isCancelled, self.artworkLoading == id, let image = NSImage(data: data) else { return }
+            let art = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            self.artwork = art
+            self.artworkItem = id
+            guard self.queue.current?.item.id == id, !self.nowPlayingBorrowed else { return }
+            var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+            info[MPMediaItemPropertyArtwork] = art
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
             #endif
         }
     }
+}
+
+// MARK: - The Mac and Sonos rooms
+
+extension MusicPlayer: SpeakerMusicHost {
+    public var speakerQueue: (items: [Int64], index: Int) { (queue.entries.map(\.item.id), queue.index) }
+    public var speakerTime: Double { time }
+    public var speakerContext: String? { queue.current?.playContext }
+    public var speakerWaitsForMore: Bool { source?.radio != nil }
+
+    public func stopWaitingForMore() {
+        radioRetry?.cancel()
+        radioRanOut = false
+        refillGeneration += 1 // a top-up on its way would start it here, out of the blue
+        refilling = false
+        remoteQueueEnded = true
+    }
+
+    public func attachSpeaker(_ remote: any RemoteQueuePlayback) {
+        self.remote = remote
+    }
+
+    public func detachSpeaker() { remote = nil }
+
+    /// A room playing the queue itself moved on: the queue follows, and a radio tops up. Nothing
+    /// is sent back to the room for it.
+    public func remoteMoved(toQueueIndex index: Int) {
+        guard remote != nil, queue.entries.indices.contains(index), index != queue.index else { return }
+        noteFinishedIfMovedOn(to: index)
+        queue.setIndex(index)
+        time = 0
+        duration = Double(queue.current?.item.durationMs ?? 0) / 1000
+        retriedEntry = nil
+        updateNowPlaying()
+        topUpRadio()
+    }
+
+    private func noteFinishedIfMovedOn(to index: Int) {
+        if index > queue.index { noteFinished(queue.current) }
+    }
+}
+
+/// A media key, Control Center or the lock screen asking for something.
+public enum MediaCommand: Sendable {
+    case play, pause, toggle, next, previous
+    case seek(Double)
+}
+
+/// A device that holds the queue itself and moves through it on its own (a Sonos room), rather
+/// than being sent one track at a time.
+@MainActor
+public protocol RemoteQueuePlayback: RemotePlayback {
+    /// Moves on in the device's queue; false when it can't, and the player then sends it the queue
+    /// again from where it should be.
+    func skip(forward: Bool) -> Bool
+    /// The queue here changed (a radio's top-up, Play Next, a move, shuffle).
+    func queueChanged()
+    /// Everything stopped (signed out, say). The task finishes when the device has been told.
+    @discardableResult func queueStopped() -> Task<Void, Never>?
 }
 
 /// Another device playing the queue (Chromecast, D82), driven by MusicPlayer.

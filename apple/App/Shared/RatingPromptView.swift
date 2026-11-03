@@ -117,9 +117,10 @@ struct RatingPromptCard: View {
             if initialFocusDone { interact() }
         }
         #endif
-        #if os(iOS)
+        #if !os(tvOS)
         .sheet(isPresented: $commenting, onDismiss: onDone) {
             ReviewsSheet(itemID: prompt.id, title: prompt.item.title, yourRating: rating)
+                .macSheetFrame(560, 600)
         }
         #endif
     }
@@ -216,7 +217,7 @@ struct RatingPromptCard: View {
 
     @ViewBuilder private var buttons: some View {
         HStack(spacing: isTV ? 20 : 10) {
-            #if os(iOS)
+            #if !os(tvOS)
             Button("Add a comment") { interact(); commenting = true }
                 .accessibilityIdentifier("ratingPromptComment")
             #endif
@@ -231,7 +232,7 @@ struct RatingPromptCard: View {
                 #endif
                 .accessibilityIdentifier("ratingPromptNever")
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .buttonStyle(.bordered)
         .controlSize(.small)
         .font(.caption)

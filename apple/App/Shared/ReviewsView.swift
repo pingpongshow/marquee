@@ -39,6 +39,7 @@ struct ItemRatingsHeader: View {
         }
         .sheet(isPresented: $showing, onDismiss: { Task { await refresh() } }) {
             ReviewsSheet(itemID: item.id, title: item.title, yourRating: item.userRating)
+                .macSheetFrame(560, 600)
         }
     }
 }
@@ -98,7 +99,7 @@ struct ReviewsSheet: View {
                     RatingStars(itemID: itemID, rating: mine?.rating ?? yourRating, labelPrefix: "Rate ")
                         .id("\(itemID)-\(mine?.rating ?? -1)")
                         .accessibilityIdentifier("reviewRating")
-                    #if os(iOS)
+                    #if !os(tvOS)
                     TextField("Add a comment", text: $draft, axis: .vertical)
                         .lineLimit(2...8)
                         .accessibilityIdentifier("commentField")
@@ -129,7 +130,7 @@ struct ReviewsSheet: View {
                 }
             }
             .navigationTitle("Ratings & Comments")
-            #if os(iOS)
+            #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
@@ -166,7 +167,7 @@ struct ReviewsSheet: View {
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("review.\(r.userId)")
-        #if os(iOS)
+        #if !os(tvOS)
         .swipeActions {
             if isAdmin, !r.mine {
                 Button("Delete", role: .destructive) { confirmDelete = r }

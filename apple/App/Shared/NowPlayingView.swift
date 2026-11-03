@@ -102,11 +102,16 @@ struct MiniPlayerSpace: ViewModifier {
     @Environment(MusicPlayer.self) private var music
 
     func body(content: Content) -> some View {
+        #if os(macOS)
+        // The Mac's bar sits below the page, not over it.
+        content
+        #else
         content.safeAreaInset(edge: .bottom, spacing: 0) {
             if music.current != nil {
                 Color.clear.frame(height: MiniPlayerMetrics.shared.height).allowsHitTesting(false)
             }
         }
+        #endif
     }
 }
 
@@ -167,7 +172,7 @@ private struct MusicScrubber: View {
         .onChange(of: music.current?.id) { scrub = nil; editing = false }
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// The track and thumb. A tap anywhere on it jumps there; a drag moves the thumb and seeks
     /// where it's let go. The whole row's height takes touches, not only the thin line.
     private var bar: some View {
@@ -249,7 +254,7 @@ struct NowPlayingView: View {
                 .padding(.vertical, 30)
                 .onAppear { if panel == .player { panel = .queue } }
                 #else
-                if verticalSize == .compact {
+                if isLandscape {
                     landscape(t)
                 } else {
                     VStack(spacing: 16) {
@@ -269,8 +274,8 @@ struct NowPlayingView: View {
             }
             .background { backdrop(t) }
             .savePlaylistFlow($saveRequest)
-            .sheet(item: $adding) { AddToPlaylistSheet(item: $0) }
-            #if os(iOS)
+            .sheet(item: $adding) { AddToPlaylistSheet(item: $0).macSheetFrame(420, 440) }
+            #if !os(tvOS)
             .offlineBanner()
             .onChange(of: app.isOffline) { if app.isOffline, panel == .lyrics { panel = .player } }
             #endif
@@ -280,7 +285,7 @@ struct NowPlayingView: View {
     }
 
     @ViewBuilder private var sourceHeader: some View {
-        #if os(iOS)
+        #if !os(tvOS)
         // Where it plays, AirPlay (HomePod, Sonos…) and Chromecast, on the right; the same width
         // is kept free on the left, so the title has the middle to itself (truncated, never
         // under a button).
@@ -289,8 +294,12 @@ struct NowPlayingView: View {
             sourceTitle.frame(maxWidth: .infinity)
             HStack(spacing: Self.headerSpacing) {
                 Spacer(minLength: 0)
+                #if os(iOS)
                 AirPlayButton().headerButton()
                 if !app.isOffline { CastButton(tint: .secondaryLabel).padding(5).headerButton() }
+                #else
+                MacOutputButton(scope: .music).headerButton()
+                #endif
             }
             .frame(width: Self.headerGroup)
         }
@@ -299,7 +308,7 @@ struct NowPlayingView: View {
         #endif
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// Header buttons: all the same size, two on the right.
     static let headerButtonSize: CGFloat = 36
     static let headerSpacing: CGFloat = 6
@@ -313,6 +322,10 @@ struct NowPlayingView: View {
             if let s = music.source { Text(s.title).font(.footnote.weight(.semibold)).lineLimit(1).truncationMode(.tail) }
             #if os(iOS)
             if music.remote != nil, let d = CastController.shared.device {
+                Text("Playing on \(d)").font(.caption.weight(.semibold)).foregroundStyle(Color.marqueeGold).lineLimit(1)
+            }
+            #elseif os(macOS)
+            if let d = MacPlayback.shared.sonos.activeRoomName {
                 Text("Playing on \(d)").font(.caption.weight(.semibold)).foregroundStyle(Color.marqueeGold).lineLimit(1)
             }
             #endif
@@ -331,13 +344,14 @@ struct NowPlayingView: View {
             .ignoresSafeArea()
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     private var panelPicker: some View {
         Picker("Show", selection: $panel.animation()) {
             // Lyrics come from the server.
             ForEach(Panel.allCases.filter { $0 != .lyrics || !app.isOffline }, id: \.self) { Text($0.rawValue).tag($0) }
         }
         .pickerStyle(.segmented)
+        .macLabelsHidden()
         .accessibilityIdentifier("nowPlayingPanel")
     }
 
@@ -480,7 +494,7 @@ struct NowPlayingView: View {
     }
 
     private func actions(_ t: Item) -> some View {
-            #if os(iOS)
+            #if !os(tvOS)
             // Stars and the menus on one row when they fit, otherwise on two.
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 18) {
@@ -544,14 +558,14 @@ struct NowPlayingView: View {
         Button { adding = t } label: {
             Label("Add to Playlist", systemImage: "plus.circle").labelStyle(.iconOnly)
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .buttonStyle(.plain)
         #endif
         .accessibilityLabel("Add to Playlist")
         .accessibilityIdentifier("np.addToPlaylist")
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// Offline, only what works without the server.
     private func actionMenus(_ t: Item) -> some View {
         HStack(spacing: 18) {
@@ -569,6 +583,10 @@ struct NowPlayingView: View {
                 .accessibilityIdentifier("np.more")
             }
         }
+        #if os(macOS)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        #endif
         .fixedSize()
     }
     #endif
@@ -580,7 +598,18 @@ struct NowPlayingView: View {
     #else
     private let artSize: CGFloat = 340
     private let stackSpacing: CGFloat = 22
-    private var playSize: CGFloat { verticalSize == .compact ? 52 : 64 }
+    private var playSize: CGFloat { isLandscape ? 52 : 64 }
+    #endif
+
+    #if !os(tvOS)
+    /// Side by side: iPhone in landscape, and always on the Mac (a wide sheet).
+    private var isLandscape: Bool {
+        #if os(macOS)
+        true
+        #else
+        verticalSize == .compact
+        #endif
+    }
     #endif
 
     private var queueList: some View {
@@ -598,7 +627,7 @@ struct NowPlayingView: View {
             }
             Section("Up next") {
                 ForEach(Array(music.queue.upcoming)) { e in row(e, current: false) }
-                    #if os(iOS)
+                    #if !os(tvOS)
                     .onMove { from, to in
                         guard let f = from.first else { return }
                         let entries = Array(music.queue.upcoming)
@@ -614,8 +643,11 @@ struct NowPlayingView: View {
         }
         #if os(iOS)
         .environment(\.editMode, .constant(.active))
+        #endif
+        #if !os(tvOS)
         .scrollContentBackground(.hidden)
         #endif
+        .macFocusList(music.queue.entries.map { Int64($0.id) })
     }
 
     private func row(_ e: PlayQueue.Entry, current: Bool) -> some View {
@@ -623,6 +655,18 @@ struct NowPlayingView: View {
             queueButton(e, current: current)
             if FavoriteStore.canFavorite(e.item) { RowFavorite(item: e.item) }
         }
+        #if os(macOS)
+        .macRowHover()
+        .macKeyboardRow(id: Int64(e.id)) { if !current { music.jump(e.id) } }
+        .contextMenu {
+            if !current { Button("Play Now") { music.jump(e.id) } }
+            ItemMenuItems(item: e.item)
+            if !current {
+                Divider()
+                Button("Remove from Queue", role: .destructive) { music.remove(e.id) }
+            }
+        }
+        #endif
     }
 
     private func queueButton(_ e: PlayQueue.Entry, current: Bool) -> some View {
@@ -646,7 +690,7 @@ struct NowPlayingView: View {
     }
 }
 
-#if os(iOS)
+#if !os(tvOS)
 private extension View {
     /// A Now Playing header button: a fixed square, the whole of it tappable.
     func headerButton() -> some View {
@@ -655,6 +699,9 @@ private extension View {
     }
 }
 
+#endif
+
+#if os(iOS)
 /// The system AirPlay picker: AirPlay 2 speakers (HomePod, Sonos…), Apple TV and Bluetooth.
 struct AirPlayButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {

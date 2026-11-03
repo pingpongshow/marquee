@@ -60,7 +60,7 @@ struct MuseStationsView: View {
             HStack {
                 TextField("Describe what you want to hear…", text: $prompt)
                     .onSubmit { runMuse(prompt) }
-                    #if os(iOS)
+                    #if !os(tvOS)
                     .textFieldStyle(.roundedBorder)
                     .submitLabel(.go)
                     #endif
@@ -322,7 +322,7 @@ struct LyricsView: View {
                                     .foregroundStyle(!lyrics.synced || l.id == active ? Color.primary : Color.secondary.opacity(0.6))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .id(l.id)
-                                    #if os(iOS)
+                                    #if !os(tvOS)
                                     .onTapGesture { if let t = l.time { music.seek(t) } }
                                     #endif
                             }

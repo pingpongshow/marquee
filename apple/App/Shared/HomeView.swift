@@ -113,7 +113,7 @@ struct HomeView: View {
             .padding(.vertical)
         }
         .navigationTitle("Home")
-        #if os(iOS)
+        #if !os(tvOS)
         .toolbar {
             // Muse for movies and shows (USER-15).
             ToolbarItem(placement: .topBarTrailing) {
@@ -124,7 +124,7 @@ struct HomeView: View {
             }
         }
         #endif
-        #if os(iOS)
+        #if !os(tvOS)
         .sheet(isPresented: $editing, onDismiss: { Task { await load() } }) {
             NavigationStack {
                 HomeEditView()

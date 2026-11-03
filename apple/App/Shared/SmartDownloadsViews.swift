@@ -1,4 +1,4 @@
-#if os(iOS)
+#if !os(tvOS)
 import MarqueeKit
 import SwiftUI
 

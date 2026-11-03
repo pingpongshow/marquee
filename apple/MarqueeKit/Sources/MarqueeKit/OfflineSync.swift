@@ -191,7 +191,7 @@ public final class OfflineSync {
     private static let lastSyncKey = "marquee.sync.lastSync"
 
     public static var defaultURL: URL {
-        let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let d = appSupportDirectory
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d.appending(path: "pending-changes.json")
     }

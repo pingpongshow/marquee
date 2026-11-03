@@ -200,7 +200,7 @@ struct BazarrPanel: View {
     }
 }
 
-#if os(iOS)
+#if !os(tvOS)
 /// Bazarr on its own (library health's "Download with Bazarr").
 struct BazarrSheet: View {
     @Environment(\.dismiss) private var dismiss

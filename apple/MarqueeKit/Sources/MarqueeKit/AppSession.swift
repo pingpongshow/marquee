@@ -220,7 +220,7 @@ public final class AppSession {
         let platform: Schemas.DeviceInfo.PlatformPayload = UIDevice.current.userInterfaceIdiom == .pad ? .ipados : .ios
         let name = UIDevice.current.name
         #else
-        let platform: Schemas.DeviceInfo.PlatformPayload = .other
+        let platform: Schemas.DeviceInfo.PlatformPayload = .macos
         let name = Host.current().localizedName ?? "Mac"
         #endif
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -498,6 +498,15 @@ public final class AppSession {
         server = nil
         reconnectServerID = nil
         resetReachability()
+        // What's ending (a room's Stop, the last reports) goes on the connection it started on,
+        // so that connection stays until it has.
+        let sessions = urlSessions
+        urlSessions = []
+        let ended = userPlaybackEnded
+        Task {
+            await ended?()
+            for s in sessions { s.finishTasksAndInvalidate() }
+        }
         dropClients()
         baseURL = nil
         info = nil

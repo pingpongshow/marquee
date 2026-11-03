@@ -87,7 +87,7 @@ struct LiveTVView: View {
         } message: {
             Text(unavailableNotice ?? "")
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .fullScreenCover(item: $watching) { LiveWatchView(channels: channels, start: $0.id) }
         #else
         .fullScreenCover(item: $watching) { LiveWatchView(channels: channels, start: $0.id) }
@@ -95,6 +95,7 @@ struct LiveTVView: View {
         .sheet(isPresented: Binding(get: { details != nil }, set: { if !$0 { details = nil } })) {
             if let (p, c) = details {
                 ProgrammeSheet(programme: p, channel: c, canRecord: canRecord, onStopped: { recordingStopped($0) }) { recordingsRefresh += 1; Task { await load() } }
+                    .macSheetFrame()
             }
         }
     }
@@ -136,7 +137,7 @@ struct LiveTVView: View {
     }
 
     @ViewBuilder private var channelContent: some View {
-        #if os(iOS)
+        #if !os(tvOS)
         if tab != .recordings, let c = preview ?? channels.first(where: \.isAvailable) ?? channels.first { LivePreview(channel: c) { watching = WatchTarget(id: c.id) } }
         #endif
         if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
@@ -198,6 +199,7 @@ struct LiveTVView: View {
                     ForEach(tabs, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .macLabelsHidden()
             }
             if tab == .guide || tab == .now { filterBar }
         }
@@ -476,7 +478,7 @@ struct ChannelLogo: View {
     }
 }
 
-#if os(iOS)
+#if !os(tvOS)
 /// A muted live preview with "Now On" (iPhone/iPad).
 struct LivePreview: View {
     @Environment(AppSession.self) private var app
@@ -492,6 +494,9 @@ struct LivePreview: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             VideoPlayer(player: player).disabled(true)
+                #if os(macOS)
+                .onAppear { MacPlayback.shared.outputs.register(player) }
+                #endif
             HStack(spacing: 10) {
                 ChannelLogo(channel: channel).frame(width: 48, height: 28)
                 Text(error ?? (channel.isAvailable ? "Now On: \(channel.now?.title ?? channel.name)" : channel.unavailableText)).font(.footnote).lineLimit(1)
@@ -518,6 +523,9 @@ struct LivePreview: View {
         }
         .aspectRatio(16 / 9, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        #if os(macOS)
+        .frame(maxWidth: 480) // a wide window keeps room for the guide below it
+        #endif
         .padding(.horizontal, sidePadding)
         .task(id: channel.id) { await tune() }
         .onDisappear { stop() }
@@ -574,7 +582,7 @@ struct LiveWatchView: View {
     @State private var error: String?
     /// The time limit refused the channel (kids' profiles): shown full screen.
     @State private var timeLimit: String?
-    #if os(iOS)
+    #if !os(tvOS)
     /// The channel overlay shown briefly after a swipe changes channel.
     @State private var overlayChannel: LiveChannel?
     @State private var overlayToken = 0
@@ -593,7 +601,7 @@ struct LiveWatchView: View {
     private var channel: LiveChannel? { channels.first { $0.id == current } }
 
     var body: some View {
-        #if os(iOS)
+        #if !os(tvOS)
         GeometryReader { geo in
             content
                 .offset(y: pullDown)
@@ -610,7 +618,7 @@ struct LiveWatchView: View {
     private var content: some View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
-            #if os(iOS)
+            #if !os(tvOS)
             LivePicture(player: player).ignoresSafeArea()
                 .accessibilityLabel("Live TV")
                 .accessibilityValue(channel?.name ?? "")
@@ -624,7 +632,7 @@ struct LiveWatchView: View {
                     .accessibilityIdentifier("liveWatch.player")
             }
             #endif
-            #if os(iOS)
+            #if !os(tvOS)
             header
             controls.frame(maxHeight: .infinity, alignment: .bottom)
             if let c = overlayChannel { channelOverlay(c).frame(maxHeight: .infinity) }
@@ -636,7 +644,7 @@ struct LiveWatchView: View {
         .onDisappear { stop() }
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     private var header: some View {
         HStack(spacing: 12) {
             Button { dismiss() } label: { Image(systemName: "chevron.down") }.accessibilityLabel("Close Live TV")
@@ -659,6 +667,12 @@ struct LiveWatchView: View {
     /// The live picture without AVKit's controls. A live stream has nothing to scrub, and AVKit's
     /// empty scrub bar ran its live-edge thumb off the screen's right edge; the header has play,
     /// mute and AirPlay instead.
+    #if os(macOS)
+    private struct LivePicture: View {
+        let player: AVPlayer
+        var body: some View { MacPlayerSurface(player: player, controls: .none) }
+    }
+    #else
     private struct LivePicture: UIViewControllerRepresentable {
         let player: AVPlayer
 
@@ -675,6 +689,7 @@ struct LiveWatchView: View {
             if c.player !== player { c.player = player }
         }
     }
+    #endif
 
     /// Play/pause, mute and AirPlay, along the bottom where AVKit's controls were (the header
     /// keeps its width for the programme's name).
@@ -775,11 +790,13 @@ struct LiveWatchView: View {
                 if Task.isCancelled { await app.stopLive(s.id); return }
                 session = s.id
                 let item = AVPlayerItem(url: s.url)
+                #if !os(macOS)
                 if let c = channel { item.externalMetadata = metadata(c) }
+                #endif
                 player.replaceCurrentItem(with: item)
                 music.pause() // live TV takes over from the music
                 player.play()
-                #if os(iOS)
+                #if !os(tvOS)
                 paused = false
                 player.isMuted = muted
                 #endif
@@ -927,7 +944,7 @@ struct StopRecordingButtons: View {
             #endif
         }
         .buttonStyle(.bordered)
-        #if os(iOS)
+        #if !os(tvOS)
         .controlSize(.small)
         #endif
         .disabled(busy)
@@ -1042,6 +1059,7 @@ struct RecordingsList: View {
                 Text("Only mine").tag(RecordingOwner.me.rawValue)
             }
             .pickerStyle(.segmented)
+            .macLabelsHidden()
             .frame(maxWidth: 420)
             .accessibilityIdentifier("recordings.owner")
             if let usage, usage.quotaBytes > 0 || usage.usedBytes > 0 { usageMeter(usage) }
@@ -1138,7 +1156,7 @@ struct RecordingsList: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(Color.marqueeGold)
-            #if os(iOS)
+            #if !os(tvOS)
             .controlSize(.small)
             #endif
             if offset > 0, total > 0 {

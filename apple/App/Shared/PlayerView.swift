@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Full-screen video playback.
 struct PlayerView: View {
-    #if os(iOS)
+    #if !os(tvOS)
     @Environment(Downloads.self) private var downloads
     #endif
     @Environment(AppSession.self) private var app
@@ -35,6 +35,8 @@ struct PlayerView: View {
     #if os(iOS)
     @State private var casting = false
     @State private var castError: String?
+    #endif
+    #if !os(tvOS)
     /// The top buttons come and go with the player's own controls.
     @State private var chrome = PlayerChrome()
     #endif
@@ -74,15 +76,25 @@ struct PlayerView: View {
                 ProgressView()
             }
         }
+        #if os(macOS)
+        .onContinuousHover { _ in chrome.show() }
+        .background {
+            // Esc closes, whether or not the overlay's close button is showing.
+            Button("") { close() }.keyboardShortcut(.cancelAction).opacity(0)
+        }
+        #endif
         .task {
             music.pause() // a video takes over from the music
             Task { await app.refreshInfo() } // the rating request switch may have changed (USER-19)
             let p = VideoPlayback(app: app, playlistID: request.playlistID, order: request.order)
             playback = p
+            #if os(macOS)
+            MacVideo.shared.began(player: p.player, playback: p, close: close)
+            #endif
             let t = WatchTogether(app: app, player: p.player, itemID: request.itemID)
             together = t
             p.onRestart = { [weak t] in t?.restarting() }
-            #if os(iOS)
+            #if !os(tvOS)
             // Downloaded: play from the device (works offline, saves bandwidth).
             if let file = downloads.localURL(request.itemID) {
                 await begin(p) { await p.startLocal(itemID: request.itemID, file: file, downloads: downloads) }
@@ -100,17 +112,22 @@ struct PlayerView: View {
         }
         .onDisappear {
             life.closed = true
-            #if os(iOS)
+            #if !os(tvOS)
             // AVKit's own close button (iOS 26) dismisses the cover without close(): do the rest
             // of it here (each step does nothing the second time).
             askAfterClosing()
             endUpNext()
             if presenter.request?.id == request.id { presenter.request = nil }
+            #endif
+            #if os(iOS)
             let cast = CastController.shared
             cast.videoActive = false
             cast.onVideoConnected = nil
             cast.onVideoEnded = nil
             cast.onVideoFinished = nil
+            #endif
+            #if os(macOS)
+            if let p = playback { MacVideo.shared.ended(player: p.player) }
             #endif
             together?.leave()
             Task { await playback?.stop() }
@@ -130,7 +147,7 @@ struct PlayerView: View {
                 close() // asks for a rating over the page (USER-19)
             }
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .sheet(item: $timing) { kind in
             if let p = playback { TimingSheet(kind: kind, playback: p).presentationDetents([.height(300)]) }
         }
@@ -142,7 +159,7 @@ struct PlayerView: View {
 
     @ViewBuilder private func overlays(_ p: VideoPlayback) -> some View {
         VStack {
-            #if os(iOS)
+            #if !os(tvOS)
             // Hidden buttons leave the screen altogether (and the accessibility tree); the row
             // keeps its space so nothing below it moves.
             ZStack {
@@ -152,7 +169,11 @@ struct PlayerView: View {
             .frame(maxWidth: .infinity)
             // Below AVKit's own top bar (PiP, volume), so neither covers the other.
             .padding(.horizontal)
+            #if os(macOS)
+            .padding(.top, 34) // below the window's traffic lights
+            #else
             .padding(.top, PlayerChrome.topInset)
+            #endif
             .animation(.easeInOut(duration: 0.25), value: chrome.shown)
             #endif
             if let i = trailerIndex, trailers.indices.contains(i) { trailerBar(trailers[i]) }
@@ -166,7 +187,7 @@ struct PlayerView: View {
             Spacer()
             HStack {
                 Spacer()
-                #if os(iOS)
+                #if !os(tvOS)
                 if let m = p.activeMarker {
                     Button { p.skipMarker() } label: {
                         Text(m.kind == .intro ? "Skip Intro" : "Skip Credits").font(.headline).padding(.horizontal, 18).padding(.vertical, 10)
@@ -179,7 +200,7 @@ struct PlayerView: View {
         }
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// Close at the left; settings, Cast and Watch Together at the right.
     private func topButtons(_ p: VideoPlayback) -> some View {
         HStack {
@@ -190,7 +211,11 @@ struct PlayerView: View {
             Spacer()
             if trailerIndex == nil {
                 if together?.group == nil { optionsMenu(p) }
+                #if os(iOS)
                 CastButton(tint: .white).frame(width: 28, height: 28).modifier(PlayerBubbleBackground())
+                #else
+                MacVideoTopButtons(playback: p)
+                #endif
                 if let t = together { togetherButton(t) }
             }
         }
@@ -234,6 +259,9 @@ struct PlayerView: View {
         }
     }
 
+    #endif
+
+    #if !os(tvOS)
     /// Watch together: start a group, or see who's in it and leave.
     @ViewBuilder private func togetherButton(_ t: WatchTogether) -> some View {
         if let g = t.group {
@@ -329,7 +357,7 @@ struct PlayerView: View {
                 .background(.ultraThinMaterial, in: Capsule())
                 .accessibilityIdentifier("trailerTitle")
             Spacer()
-            #if os(iOS)
+            #if !os(tvOS)
             Button("Skip") { nextTrailer() }.buttonStyle(.bordered)
             Button("Skip All") { skipTrailers() }.buttonStyle(.borderedProminent)
             #endif
@@ -340,7 +368,7 @@ struct PlayerView: View {
         #endif
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// Speed, subtitle/audio timing and night mode (PLAY-19, PLAY-17); hidden while watching
     /// together.
     private func optionsMenu(_ p: VideoPlayback) -> some View {
@@ -427,7 +455,7 @@ struct PlayerView: View {
         endUpNext()
         let s = p.session
         Task {
-            #if os(iOS)
+            #if !os(tvOS)
             if p.offlineTitle != nil, let file = downloads.localURL(request.itemID) {
                 guard await begin(p, { await p.startLocal(itemID: request.itemID, file: file, downloads: downloads) }) else { return }
                 await p.player.seek(to: .zero)
@@ -451,7 +479,7 @@ struct PlayerView: View {
 
     /// The overlay's visibility model (iPhone/iPad only; the TV has no overlay buttons).
     private var chromeModel: PlayerChrome? {
-        #if os(iOS)
+        #if !os(tvOS)
         chrome
         #else
         nil
@@ -507,7 +535,11 @@ final class PlayerChrome {
     /// From iOS 26 AVKit's top bar has its own close button (at the left, with AirPlay), which
     /// dismisses the player: ours would be a second one right below it.
     static var systemClose: Bool {
+        #if os(macOS)
+        false
+        #else
         if #available(iOS 26, tvOS 26, *) { true } else { false }
+        #endif
     }
 
     private(set) var visible = true
@@ -561,6 +593,7 @@ final class PlayerChrome {
     }
 }
 
+#if !os(macOS)
 /// Holds the AVPlayerViewController and adds it once this view has a size. Added during
 /// SwiftUI's first layout pass, at zero width, its controls break their own constraints.
 final class PlayerHost: UIViewController {
@@ -580,7 +613,7 @@ final class PlayerHost: UIViewController {
         controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(controller.view)
         controller.didMove(toParent: self)
-        #if os(iOS)
+        #if !os(tvOS)
         // Taps on the video bring the overlay buttons back (or hide them), alongside AVKit's
         // own controls: recognised together with AVKit's gestures, without taking the touch.
         let tap = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
@@ -592,7 +625,7 @@ final class PlayerHost: UIViewController {
         #endif
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     @objc private func tapped(_ g: UITapGestureRecognizer) {
         guard let chrome, let root = controller.view else { return }
         // A tap on one of AVKit's buttons or the scrubber is using the controls: keep both up.
@@ -625,8 +658,9 @@ final class PlayerHost: UIViewController {
     // The Siri Remote's focus goes to the player's controls.
     override var preferredFocusEnvironments: [any UIFocusEnvironment] { [controller] }
 }
+#endif
 
-#if os(iOS)
+#if !os(tvOS)
 /// One round bubble per overlay button: a single material background, no system button
 /// chrome around it.
 struct PlayerBubble: View {
@@ -642,10 +676,15 @@ struct PlayerBubbleBackground: ViewModifier {
             .frame(width: 44, height: 44)
             .background(.ultraThinMaterial, in: Circle())
             .contentShape(Circle())
+            #if os(iOS)
             .contentShape(.hoverEffect, Circle())
+            #endif
     }
 }
 
+#endif
+
+#if os(iOS)
 /// Picture in Picture hides the overlay buttons; coming back shows them.
 extension PlayerController.Coordinator: AVPlayerViewControllerDelegate {
     func playerViewControllerWillStartPictureInPicture(_ vc: AVPlayerViewController) {
@@ -662,6 +701,7 @@ extension PlayerHost: UIGestureRecognizerDelegate {
 }
 #endif
 
+#if !os(macOS)
 /// AVPlayerViewController: native controls, PiP, AirPlay, subtitle menu and Now Playing.
 struct PlayerController: UIViewControllerRepresentable {
     let playback: VideoPlayback
@@ -677,7 +717,7 @@ struct PlayerController: UIViewControllerRepresentable {
         let vc = host.controller
         vc.player = playback.player
         host.chrome = chrome
-        #if os(iOS)
+        #if !os(tvOS)
         vc.delegate = context.coordinator
         context.coordinator.chrome = chrome
         context.coordinator.watch(playback.player)
@@ -685,7 +725,7 @@ struct PlayerController: UIViewControllerRepresentable {
         #endif
         // Speed has its own menu, which watch together can hide (PLAY-19).
         vc.speeds = []
-        #if os(iOS)
+        #if !os(tvOS)
         vc.updatesNowPlayingInfoCenter = true
         vc.allowsPictureInPicturePlayback = true
         vc.canStartPictureInPictureAutomaticallyFromInline = true
@@ -699,7 +739,7 @@ struct PlayerController: UIViewControllerRepresentable {
     func updateUIViewController(_ host: PlayerHost, context: Context) {
         let vc = host.controller
         if vc.player !== playback.player { vc.player = playback.player }
-        #if os(iOS)
+        #if !os(tvOS)
         context.coordinator.watch(playback.player)
         #endif
         #if os(tvOS)
@@ -728,7 +768,7 @@ struct PlayerController: UIViewControllerRepresentable {
 
     final class Coordinator: NSObject {
         var menuSignature: String?
-        #if os(iOS)
+        #if !os(tvOS)
         weak var chrome: PlayerChrome?
         private weak var watched: AVPlayer?
         private var rate: NSKeyValueObservation?
@@ -814,6 +854,8 @@ struct PlayerController: UIViewControllerRepresentable {
     #endif
 }
 
+#endif
+
 /// Skip buttons for a cinema trailer (the TV shows them as contextual actions).
 struct TrailerActions {
     let skip: () -> Void
@@ -834,7 +876,7 @@ func offsetLabel(_ ms: Int) -> String {
     ms == 0 ? "0 ms" : ms > 0 ? "+\(ms) ms" : "−\(-ms) ms"
 }
 
-#if os(iOS)
+#if !os(tvOS)
 /// Subtitle or audio timing: −/+ 100 ms, the current value and Reset (PLAY-17).
 struct TimingSheet: View {
     let kind: TimingKind
@@ -873,6 +915,9 @@ struct TimingSheet: View {
     }
 }
 
+#endif
+
+#if os(iOS)
 /// Shown over the player while the video plays on a Cast device: what's casting and its controls.
 struct CastingPanel: View {
     let title: String

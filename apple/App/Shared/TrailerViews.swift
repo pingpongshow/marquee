@@ -1,6 +1,6 @@
 import MarqueeKit
 import SwiftUI
-#if os(iOS)
+#if !os(tvOS)
 import WebKit
 #endif
 
@@ -14,7 +14,7 @@ struct TrailerButton: View {
     let trailer: ItemTrailer
     /// The movie or show, for the message when YouTube can't be opened.
     let title: String
-    #if os(iOS)
+    #if !os(tvOS)
     @State private var youtube: YouTubeTrailer?
     #else
     @State private var unavailable = false
@@ -24,7 +24,7 @@ struct TrailerButton: View {
         Button(action: play) { Label(label, systemImage: "film") }
             .buttonStyle(.bordered)
             .accessibilityIdentifier("trailerButton")
-            #if os(iOS)
+            #if !os(tvOS)
             .fullScreenCover(item: $youtube) { YouTubeTrailerPlayer(trailer: $0) }
             #else
             .alert("Trailer", isPresented: $unavailable) {
@@ -50,7 +50,7 @@ struct TrailerButton: View {
             if let id = trailer.itemId { video.play(id) }
         case .youtube:
             guard let key = trailer.youtubeKey.flatMap(YouTubeTrailer.validKey) else { return }
-            #if os(iOS)
+            #if !os(tvOS)
             youtube = YouTubeTrailer(key: key, name: trailer.name ?? title)
             #else
             // No WebKit on the TV: the YouTube app, if it's installed.
@@ -78,12 +78,16 @@ struct YouTubeTrailer: Identifiable {
     /// neither could be opened. On iPhone/iPad only the error fallback's button calls this.
     @MainActor
     static func openApp(_ key: String) async -> Bool {
+        #if os(macOS)
+        return NSWorkspace.shared.open(watchURL(key))
+        #else
         if let app = URL(string: "youtube://watch?v=\(key)"), await UIApplication.shared.open(app) { return true }
         return await UIApplication.shared.open(watchURL(key))
+        #endif
     }
 }
 
-#if os(iOS)
+#if !os(tvOS)
 /// The trailer full screen in YouTube's embedded player, with a close button. Only when the
 /// embed fails (the owner disallows embedding: errors 150/152/153) is there a way out to YouTube.
 struct YouTubeTrailerPlayer: View {
@@ -112,7 +116,9 @@ struct YouTubeTrailerPlayer: View {
             .padding()
         }
         .preferredColorScheme(.dark)
+        #if os(iOS)
         .statusBarHidden()
+        #endif
         .task {
             if ProcessInfo.processInfo.arguments.contains("-marquee-test-youtube-embed-error") { error = 150 }
         }
@@ -144,33 +150,37 @@ struct YouTubeTrailerPlayer: View {
 /// URL, so the iframe's request carries a referrer (YouTube refuses embeds without one). Links
 /// in the player (the YouTube logo, the title, "Watch on YouTube") never leave the web view, so
 /// iOS can't hand them to the YouTube app; the player's errors come back through `onError`.
-private struct YouTubeEmbed: UIViewRepresentable {
+private struct YouTubeEmbed {
     let key: String
     let onError: (Int) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onError: onError) }
 
-    func makeUIView(context: Context) -> WKWebView {
+    fileprivate func makeWeb(_ coordinator: Coordinator) -> WKWebView {
         let config = WKWebViewConfiguration()
+        #if os(iOS)
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         config.allowsPictureInPictureMediaPlayback = true
-        config.userContentController.add(context.coordinator, name: "marquee")
+        #else
+        config.mediaTypesRequiringUserActionForPlayback = []
+        #endif
+        config.userContentController.add(coordinator, name: "marquee")
         let web = WKWebView(frame: .zero, configuration: config)
-        web.navigationDelegate = context.coordinator
-        web.uiDelegate = context.coordinator
+        web.navigationDelegate = coordinator
+        web.uiDelegate = coordinator
+        #if os(iOS)
         web.isOpaque = false
         web.backgroundColor = .black
         web.scrollView.backgroundColor = .black
         web.scrollView.isScrollEnabled = false
         web.scrollView.contentInsetAdjustmentBehavior = .never
+        #endif
         web.loadHTMLString(Self.page(key), baseURL: Self.origin)
         return web
     }
 
-    func updateUIView(_ web: WKWebView, context: Context) {}
-
-    static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) {
+    fileprivate static func dismantleWeb(_ web: WKWebView) {
         web.configuration.userContentController.removeScriptMessageHandler(forName: "marquee")
         web.loadHTMLString("", baseURL: nil) // stop the sound when the player closes
     }
@@ -222,5 +232,19 @@ private struct YouTubeEmbed: UIViewRepresentable {
             onError(code)
         }
     }
+}
+#endif
+
+#if os(macOS)
+extension YouTubeEmbed: NSViewRepresentable {
+    func makeNSView(context: Context) -> WKWebView { makeWeb(context.coordinator) }
+    func updateNSView(_ web: WKWebView, context: Context) {}
+    static func dismantleNSView(_ web: WKWebView, coordinator: Coordinator) { dismantleWeb(web) }
+}
+#elseif os(iOS)
+extension YouTubeEmbed: UIViewRepresentable {
+    func makeUIView(context: Context) -> WKWebView { makeWeb(context.coordinator) }
+    func updateUIView(_ web: WKWebView, context: Context) {}
+    static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) { dismantleWeb(web) }
 }
 #endif

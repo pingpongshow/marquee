@@ -47,7 +47,7 @@ struct CinemaSettingsView: View {
                 }
                 HStack {
                     TextField("Or enter an item id", text: $idText)
-                        #if os(iOS)
+                        #if !os(tvOS)
                         .keyboardType(.numberPad)
                         #endif
                     Button("Use") { useID() }.disabled(Int64(idText) == nil)
@@ -176,7 +176,7 @@ struct UsersView: View {
             }
             Spacer()
             Button(role: .destructive) { delete(i) } label: { Image(systemName: "trash") }
-                #if os(iOS)
+                #if !os(tvOS)
                 .buttonStyle(.borderless)
                 #endif
                 .accessibilityLabel("Delete invite \(note)")
@@ -232,7 +232,7 @@ struct InviteSheet: View {
                 }
             }
             .navigationTitle("Invite a Friend")
-            #if os(iOS)
+            #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
@@ -245,7 +245,7 @@ struct InviteSheet: View {
     @ViewBuilder private var form: some View {
         Section {
             TextField("Note (who it's for)", text: $note)
-            #if os(iOS)
+            #if !os(tvOS)
             Stepper("Link expires in \(days) day\(days == 1 ? "" : "s")", value: $days, in: 1...90)
             #else
             Picker("Link expires in", selection: $days) {
@@ -283,11 +283,11 @@ struct InviteSheet: View {
     @ViewBuilder private func created(_ link: URL) -> some View {
         Section {
             Text(link.absoluteString).font(.callout.monospaced())
-                #if os(iOS)
+                #if !os(tvOS)
                 .textSelection(.enabled)
                 #endif
                 .accessibilityIdentifier("inviteLink")
-            #if os(iOS)
+            #if !os(tvOS)
             ShareLink(item: link, subject: Text("Join me on \(app.server?.name ?? "Marquee")"),
                       message: Text("Here's an invite to my Marquee server.")) {
                 Label("Share Link", systemImage: "square.and.arrow.up")

@@ -104,7 +104,7 @@ struct MusicHomeView: View {
                     row("Muse & Stations", "wand.and.stars", .musicMuse(library: libraryID), id: "muse", last: true)
                 }
             }
-            #if os(iOS)
+            #if !os(tvOS)
             .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
             #endif
             .padding(.horizontal, sidePadding)
@@ -131,7 +131,7 @@ struct MusicHomeView: View {
             .padding(.horizontal, rowPadding)
             .padding(.vertical, rowVertical)
             .contentShape(Rectangle())
-            #if os(iOS)
+            #if !os(tvOS)
             .overlay(alignment: .bottom) {
                 if !last { Divider().padding(.leading, rowPadding + iconWidth + 14) }
             }
@@ -170,7 +170,7 @@ struct MusicHomeView: View {
                         .accessibilityLabel("Muse")
                         .accessibilityIdentifier("musicMuse")
                 }
-                #if os(iOS)
+                #if !os(tvOS)
                 // The Library list is far down on a phone: a shortcut to it.
                 Button(action: showLibrary) { roundLabel("Library", "books.vertical") }
                     .buttonStyle(.plain)
@@ -383,6 +383,8 @@ struct MusicSongsView: View {
                     RowFavorite(item: t)
                     RowRating(item: t, gap: isTV ? 8 : 4)
                 }
+                .macRowHover()
+                .macKeyboardRow(id: t.id) { music.play(tracks, start: i, source: "Songs") }
                 .onAppear { if i >= tracks.count - 40 { Task { await loadMore() } } }
             }
             if loading { ProgressView() }
@@ -391,6 +393,7 @@ struct MusicSongsView: View {
             }
         }
         .listStyle(.plain)
+        .macFocusList(tracks.map(\.id))
         .navigationTitle("Songs")
         #if os(tvOS)
         // The TV hides the navigation bar as the list scrolls: the sort menu stays pinned at
@@ -634,6 +637,7 @@ struct MusicFavoritesView: View {
                     ForEach(Kind.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .macLabelsHidden()
                 .accessibilityIdentifier("favoritesKind")
                 .padding(.horizontal, sidePadding)
                 Picker("Which", selection: $rated) {
@@ -641,6 +645,7 @@ struct MusicFavoritesView: View {
                     Text("Rated 4★+").tag(true)
                 }
                 .pickerStyle(.segmented)
+                .macLabelsHidden()
                 .accessibilityIdentifier("favoritesSource")
                 .padding(.horizontal, sidePadding)
                 if let error {
@@ -721,6 +726,8 @@ struct MusicFavoritesView: View {
                     RowRating(item: t, gap: isTV ? 8 : 4)
                 }
                 .padding(.trailing, sidePadding - 6)
+                .macRowHover()
+                .macKeyboardRow(id: t.id) { music.play(list, start: i, source: "Favourites") }
             }
         }
     }

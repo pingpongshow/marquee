@@ -146,7 +146,7 @@ struct RowDislike: View {
                     .frame(minWidth: target, minHeight: target)
                     .contentShape(Rectangle())
             }
-            #if os(iOS)
+            #if !os(tvOS)
             .buttonStyle(.plain)
             #endif
             .fixedSize()
@@ -227,7 +227,7 @@ struct RowFavorite: View {
                 .frame(minWidth: target, minHeight: target)
                 .contentShape(Rectangle())
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .buttonStyle(.plain)
         #endif
         .fixedSize()

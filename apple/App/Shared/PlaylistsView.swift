@@ -276,7 +276,7 @@ struct PlaylistView: View {
     @Environment(VideoPresenter.self) private var video
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
-    #if os(iOS)
+    #if !os(tvOS)
     @Environment(Downloads.self) private var downloads
     #endif
     let id: Int64
@@ -286,7 +286,7 @@ struct PlaylistView: View {
     @State private var error: String?
     /// Someone else's playlist, shared with this person: asking whether to remove it.
     @State private var confirmingRemove = false
-    #if os(iOS)
+    #if !os(tvOS)
     @State private var sharing = false
     #endif
 
@@ -294,7 +294,7 @@ struct PlaylistView: View {
         List {
             if let p = playlist {
                 header(p)
-                #if os(iOS)
+                #if !os(tvOS)
                 .listRowSeparator(.hidden)
                 #endif
             }
@@ -324,9 +324,12 @@ struct PlaylistView: View {
                     if FavoriteStore.canFavorite(e.item) { RowFavorite(item: e.item) }
                     if e.item._type == .track { RowRating(item: e.item, gap: isTV ? 8 : 4) }
                 }
+                .macRowHover()
+                .macKeyboardRow(id: Int64(i)) { play(i) }
             }
         }
         .listStyle(.plain)
+        .macFocusList(entries.indices.map(Int64.init))
         .overlay {
             if let error, playlist == nil {
                 ContentUnavailableView {
@@ -343,9 +346,9 @@ struct PlaylistView: View {
         .navigationTitle(playlist?.title ?? "Playlist")
         .task { if !loaded { await load() } }
         .refreshable { await load() }
-        #if os(iOS)
+        #if !os(tvOS)
         .sheet(isPresented: $sharing) {
-            if let playlist { PlaylistShareSheet(playlist: playlist) { Task { await load() } } }
+            if let playlist { PlaylistShareSheet(playlist: playlist) { Task { await load() } }.macSheetFrame() }
         }
         #endif
         .alert("Remove “\(playlist?.title ?? "")”?", isPresented: $confirmingRemove) {
@@ -360,7 +363,7 @@ struct PlaylistView: View {
     private func remove() {
         ActionError.run {
             try await app.removePlaylistShare(id)
-            #if os(iOS)
+            #if !os(tvOS)
             downloads.unsyncPlaylist(id)
             #endif
             PlaylistChanges.shared.changed()
@@ -423,7 +426,7 @@ struct PlaylistView: View {
             Button { play(0) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
             Button { play(0, shuffle: true) } label: { Label("Shuffle", systemImage: "shuffle") }.buttonStyle(.bordered)
         } secondary: {
-            #if os(iOS)
+            #if !os(tvOS)
             PlaylistDownloadButton(id: id)
             if let p = playlist, p.readOnly != true {
                 Button { sharing = true } label: { Label("Share", systemImage: "person.2") }
@@ -441,7 +444,7 @@ struct PlaylistView: View {
     }
 
     private var compact: Bool {
-        #if os(iOS)
+        #if !os(tvOS)
         // Every iPhone, at any width or orientation (a Pro Max in landscape is "regular").
         UIDevice.current.userInterfaceIdiom == .phone || sizeClass == .compact
         #else
@@ -484,7 +487,7 @@ struct PlaylistView: View {
     }
 }
 
-#if os(iOS)
+#if !os(tvOS)
 /// Choose who your playlist is shared with (MUSIC-24): people by name, whether each has accepted,
 /// and everyone on the server for admins. Saved as each switch changes.
 struct PlaylistShareSheet: View {
