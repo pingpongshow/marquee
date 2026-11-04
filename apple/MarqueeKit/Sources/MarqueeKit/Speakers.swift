@@ -260,11 +260,34 @@ public final class SonosSession: RemoteQueuePlayback {
     }
 
     /// Clears the list while the server can't be reached.
-    public func clearRooms() { rooms = [] }
+    public func clearRooms() {
+        rooms = []
+        waitingRoom = nil
+    }
+
+    /// A room picked while nothing's playing: it takes the music as soon as there's some.
+    public private(set) var waitingRoom: Speaker?
+
+    /// Nothing waits any more (a Mac output was picked, or the server's gone).
+    public func clearWaitingRoom() { waitingRoom = nil }
+
+    /// The queue's about to start here: true when the room waiting for it has taken it instead.
+    public func takeWaitingMusic() -> Bool {
+        guard let speaker = waitingRoom, let host, host.speakerQueue.index >= 0 else { return false }
+        waitingRoom = nil
+        select(speaker)
+        return true
+    }
 
     /// Local playback stops and the queue goes to this room from the current track and position.
+    /// With nothing to send yet, the room waits for it.
     public func select(_ speaker: Speaker) {
-        guard let host, host.speakerQueue.index >= 0 else { return }
+        guard let host else { return }
+        guard host.speakerQueue.index >= 0 else {
+            waitingRoom = speaker
+            return
+        }
+        waitingRoom = nil
         if room?.id == speaker.id, state != .idle { return }
         if let old = room, state != .idle {
             // From one room to another: the first stops, and the queue moves on from where it was.

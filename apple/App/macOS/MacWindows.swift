@@ -154,7 +154,7 @@ final class MacWindows: NSObject {
     }
 
     private func makeMusicPanel() -> NSPanel {
-        let size = CGSize(width: 680, height: 84)
+        let size = CGSize(width: 740, height: 84)
         let panel = MacMiniPanel(contentRect: CGRect(origin: .zero, size: size), styleMask: [.borderless, .fullSizeContentView], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.isMovableByWindowBackground = true

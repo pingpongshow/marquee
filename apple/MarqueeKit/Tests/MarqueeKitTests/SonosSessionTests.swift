@@ -559,3 +559,38 @@ private func untilHeld(_ api: StubAPI) async {
     #expect(q.change(items: [0, 0, 0, 0, 1, 2, 3], index: 3) == .resend([0, 1, 2, 3]))
     #expect(q.playerIndex(forRoomIndex: 2) == 6)
 }
+
+/// A room picked with nothing playing waits, and takes the music from the first note; picking a
+/// Mac output calls it off.
+@MainActor @Test func aRoomPickedWithNothingPlayingWaitsForMusic() async {
+    let api = StubAPI(room()), host = StubHost()
+    let s = SonosSession(api: api, host: host, autoPoll: false)
+    let items = host.items, index = host.index
+    host.items = []
+    host.index = -1
+    #expect(s.takeWaitingMusic() == false, "nothing waits yet")
+    s.select(room())
+    #expect(s.waitingRoom != nil)
+    #expect(host.attached == nil, "nothing to send yet")
+    #expect(s.isActive == false)
+    #expect(s.takeWaitingMusic() == false, "no music yet: it keeps waiting")
+    #expect(s.waitingRoom != nil)
+    host.items = items
+    host.index = index
+    #expect(s.takeWaitingMusic() == true)
+    #expect(s.waitingRoom == nil)
+    #expect(host.attached != nil)
+    #expect(s.takeWaitingMusic() == false, "only once")
+    await s.settled()
+
+    let empty = StubHost()
+    empty.items = []
+    empty.index = -1
+    let waiting = SonosSession(api: api, host: empty, autoPoll: false)
+    waiting.select(room())
+    waiting.clearWaitingRoom()
+    empty.items = items
+    empty.index = index
+    #expect(waiting.takeWaitingMusic() == false, "called off")
+    #expect(empty.attached == nil)
+}

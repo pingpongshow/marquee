@@ -207,17 +207,17 @@ struct MacOutputButton: View {
     }
 
     private var active: Bool {
-        (scope == .music && sonos.activeRoomName != nil) || playback.outputs.activeUID != nil || playback.music.airPlaying
+        (scope == .music && (sonos.activeRoomName ?? sonos.waitingRoom?.name) != nil) || playback.outputs.activeUID != nil || playback.music.airPlaying
     }
 
     private var icon: String {
-        if scope == .music, sonos.activeRoomName != nil { return "hifispeaker.fill" }
+        if scope == .music, (sonos.activeRoomName ?? sonos.waitingRoom?.name) != nil { return "hifispeaker.fill" }
         if playback.music.airPlaying { return "airplayaudio" }
         return "speaker.wave.2.fill"
     }
 
     private var valueText: String {
-        if scope == .music, let room = sonos.activeRoomName { return room }
+        if scope == .music, let room = sonos.activeRoomName ?? sonos.waitingRoom?.name { return room }
         if let uid = playback.outputs.activeUID { return playback.outputs.devices.first { $0.uid == uid }?.name ?? uid }
         return "System default"
     }
@@ -268,9 +268,9 @@ struct MacOutputPicker: View {
                 Divider()
                 header("Sonos")
                 ForEach(sonos.rooms, id: \.id) { r in
-                    row(title: r.name, subtitle: r.model, icon: "hifispeaker", selected: sonos.room?.id == r.id && sonos.isActive,
+                    row(title: r.name, subtitle: sonos.waitingRoom?.id == r.id ? "Plays here when you start something" : r.model, icon: "hifispeaker",
+                        selected: (sonos.room?.id == r.id && sonos.isActive) || sonos.waitingRoom?.id == r.id,
                         identifier: "output.sonos.\(r.id)") { sonos.select(r) }
-                    .disabled(music.current == nil)
                 }
                 Text("The equaliser, crossfade and levelling don't apply on Sonos.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -323,6 +323,7 @@ struct MacOutputPicker: View {
     /// A Mac output: back from a room if there is one (which resumes here), then that device.
     private func pick(_ uid: String?) {
         outputs.choose(uid)
+        sonos.clearWaitingRoom()
         if inRoom { sonos.leave() }
     }
 }

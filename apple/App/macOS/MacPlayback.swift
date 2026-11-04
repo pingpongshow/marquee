@@ -43,7 +43,9 @@ final class MacPlayback {
         #else
         let api: any SpeakerAPI = ServerSpeakerAPI(app: session)
         #endif
-        sonos = SonosSession(api: api, host: player)
+        let sonos = SonosSession(api: api, host: player)
+        self.sonos = sonos
+        player.willPlayHere = { sonos.takeWaitingMusic() }
         outputs = MacAudioOutputs(music: player)
         // The saved level, or a test's: tests stay quiet.
         if let i = args.firstIndex(of: "-marquee-test-volume"), args.indices.contains(i + 1), let v = Float(args[i + 1]) {

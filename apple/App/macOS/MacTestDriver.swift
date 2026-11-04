@@ -58,6 +58,12 @@ enum MacTestDriver {
                     try rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: w[1]))
                 }
                 return "fitting \(fit)"
+            case "queuewin": // The song list in a window of its own, to look at.
+                let w = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 360, height: 460), styleMask: [.titled], backing: .buffered, defer: false)
+                w.isReleasedWhenClosed = false
+                w.contentView = NSHostingView(rootView: MacQueueList().macEnvironment().preferredColorScheme(.dark))
+                w.orderFront(nil)
+                return "window \(w.windowNumber)"
             case "notifystate": // What macOS says about notifications for this app.
                 let c = UNUserNotificationCenter.current()
                 let before = await c.notificationSettings()

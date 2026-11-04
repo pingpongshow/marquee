@@ -673,6 +673,8 @@ public final class MusicPlayer {
     /// Replaces everything in the player with the current entry and what follows it.
     /// `autoplay` false loads it paused; `load` false only clears the player (the queue ended).
     private func rebuild(at start: Double = 0, autoplay: Bool = true, load: Bool = true) {
+        // A room picked before anything played takes it from the first note.
+        if remote == nil, load, willPlayHere?() == true { return }
         cancelFade()
         buildGeneration += 1
         let gen = buildGeneration
@@ -755,6 +757,10 @@ public final class MusicPlayer {
     }
 
     // MARK: - Remote playback (Chromecast, D82)
+
+    /// Asked as the queue's about to play on this device: true when something else (a room
+    /// waiting for music) has taken it instead.
+    @ObservationIgnored public var willPlayHere: (() -> Bool)?
 
     /// Set while the queue plays on another device: tracks go there one by one and transport
     /// commands are forwarded; this player keeps the queue. Cleared, playback carries on here.

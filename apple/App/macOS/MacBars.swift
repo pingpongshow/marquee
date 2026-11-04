@@ -78,11 +78,70 @@ struct MacTransport: View {
     }
 }
 
-/// + (add to playlist), ♡ and ★ for the song playing, then the output picker.
+/// What's playing and what's next: click to play one, drag to reorder.
+struct MacQueueList: View {
+    @Environment(MusicPlayer.self) private var music
+    @Environment(AppSession.self) private var app
+
+    var body: some View {
+        List {
+            if let current = music.current {
+                Section("Now Playing") { row(current, current: true) }
+            }
+            Section("Up Next") {
+                let upcoming = Array(music.queue.upcoming)
+                if upcoming.isEmpty {
+                    Text("Nothing else is queued.").foregroundStyle(.secondary)
+                }
+                ForEach(upcoming) { row($0, current: false) }
+                    .onMove { from, to in
+                        guard let f = from.first else { return }
+                        music.move(upcoming[f].id, to: music.queue.index + 1 + (to > f ? to - 1 : to))
+                    }
+            }
+        }
+        .accessibilityIdentifier("queue.list")
+    }
+
+    private func row(_ e: PlayQueue.Entry, current: Bool) -> some View {
+        HStack(spacing: 10) {
+            Button { if !current { music.jump(e.id) } } label: {
+                HStack(spacing: 10) {
+                    ArtworkView(item: e.item, shape: .square, width: 36).frame(width: 36)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(e.item.title).lineLimit(1).foregroundStyle(current ? Color.marqueeGold : .primary)
+                        Text(e.item.artistCredit ?? e.item.grandparentTitle ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if !current {
+                Button { music.remove(e.id) } label: { Image(systemName: "xmark").font(.caption).foregroundStyle(.secondary) }
+                    .buttonStyle(.plain)
+                    .help("Remove from Up Next")
+                    .accessibilityLabel("Remove \(e.item.title) from Up Next")
+            }
+        }
+        .contextMenu {
+            if !current { Button("Play Now") { music.jump(e.id) } }
+            ItemMenuItems(item: e.item)
+            if !current {
+                Divider()
+                Button("Remove from Queue", role: .destructive) { music.remove(e.id) }
+            }
+        }
+    }
+}
+
+/// + (add to playlist), Track Radio, ♡ and ★ for the song playing, the song list, then the
+/// output picker.
 struct MacSongActions: View {
     @Environment(MusicPlayer.self) private var music
     @Environment(AppSession.self) private var app
     @State private var adding = false
+    @State private var showingQueue = false
     var showsDislike = false
 
     var body: some View {
@@ -93,10 +152,17 @@ struct MacSongActions: View {
                         .popover(isPresented: $adding, arrowEdge: .top) {
                             AddToPlaylistSheet(item: t).macEnvironment().frame(width: 360, height: 420).preferredColorScheme(.dark)
                         }
+                    MacBarButton(systemImage: "music.note", label: "Track Radio", identifier: "bar.trackRadio") {
+                        music.startRadio(itemID: t.id, app: app)
+                    }
                 }
                 RowFavorite(item: t, size: 15, target: 28, identifier: "bar.favorite")
                 // Its own identity per track, so a menu left open as the track changes can't rate the next one.
                 RowRating(item: t, compact: true).id(t.id)
+                MacBarButton(systemImage: "list.bullet", label: "Up Next", identifier: "bar.queue", isOn: showingQueue) { showingQueue.toggle() }
+                    .popover(isPresented: $showingQueue, arrowEdge: .top) {
+                        MacQueueList().macEnvironment().frame(width: 360, height: 460).preferredColorScheme(.dark)
+                    }
             }
             MacOutputButton(scope: .music)
         }
@@ -210,7 +276,7 @@ struct MacMiniBar: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .frame(minWidth: 620, maxWidth: .infinity, minHeight: 84, maxHeight: .infinity)
+        .frame(minWidth: 680, maxWidth: .infinity, minHeight: 84, maxHeight: .infinity)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.08)))
         .accessibilityElement(children: .contain)

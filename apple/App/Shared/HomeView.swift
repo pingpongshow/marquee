@@ -119,9 +119,11 @@ struct HomeView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink(value: Route.museVideo(library: nil)) { Label("Muse", systemImage: "sparkles") }
             }
+            #if !os(macOS)
             ToolbarItem(placement: .topBarTrailing) {
                 Button { editing = true } label: { Label("Edit Home", systemImage: "slider.horizontal.3") }
             }
+            #endif
         }
         #endif
         #if !os(tvOS)
