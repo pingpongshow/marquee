@@ -51,9 +51,6 @@ struct MarqueeApp: App {
         AppDelegate.downloads = dl
         _downloads = State(initialValue: dl)
         _smart = State(initialValue: SmartDownloads(downloads: dl))
-        Shared.app = session
-        Shared.music = player
-        Shared.downloads = dl
         CastController.setUp(app: session, music: player) // Chromecast (D82)
         #endif
     }

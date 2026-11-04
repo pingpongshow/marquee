@@ -14,7 +14,7 @@ import (
 )
 
 // Image keys (D85): artwork, people photos and avatars are loaded by URLs that players,
-// notifications, Android Auto, CarPlay and Cast devices fetch themselves. Those URLs carry an
+// notifications, Android Auto and Cast devices fetch themselves. Those URLs carry an
 // image key rather than the sign-in token: "<user id>.<HMAC>", accepted only for GET requests
 // to image endpoints, so a key that leaks shows pictures but grants nothing else.
 
