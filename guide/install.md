@@ -197,7 +197,6 @@ Marquee has Unraid templates with an icon, a WebUI link and every field explaine
 | Music | `/media/music` | (empty) | Your music, read-only. Optional. |
 | Recordings | `/recordings` | `/mnt/user/appdata/marquee/recordings` | Live TV recordings. Read/write. Shown under *Show more settings*. |
 | Plex data (optional) | `/plex` | (empty) | A Plex data folder to import from, read-only. |
-| Intel Quick Sync | `/dev/dri` | (empty) | Set to `/dev/dri` for Intel hardware transcoding. You also need `--group-add=<render group id>` in *Extra Parameters*. |
 | NVIDIA_VISIBLE_DEVICES | | `all` | Which NVIDIA GPUs Marquee may use: `all`, or a GPU's UUID from `nvidia-smi -L`. |
 | TZ | | `UTC` | Your time zone, e.g. `Europe/London`. Recording schedules use it. |
 | MARQUEE_LOG_LEVEL | | `info` | `debug`, `info`, `warn` or `error`. |
@@ -211,6 +210,7 @@ The template's *Extra Parameters* (switch on **Advanced View**) are:
 - `--runtime=nvidia` gives the container the NVIDIA GPU. It needs the **Nvidia Driver** plugin. **Remove it if you have no NVIDIA GPU**, or the container won't start. The image already sets `NVIDIA_DRIVER_CAPABILITIES=compute,video,utility`.
 - `--user 99:100` runs Marquee as Unraid's usual `nobody:users`, which owns shares by default.
 - `--tmpfs /transcode:size=8g,…` is the transcode scratch space in RAM. Make `size` smaller if your server is short of memory.
+- For **Intel Quick Sync**, add `--device=/dev/dri` and `--group-add=<render group id>` (find the id with `stat -c %g /dev/dri/renderD128`). The template has no device field: an empty one makes Unraid pass `--device=''` to Docker, which refuses to create the container.
 
 **Marquee-Soundprint template**
 

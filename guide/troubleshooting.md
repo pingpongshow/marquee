@@ -35,7 +35,9 @@ For more detail, set `MARQUEE_LOG_LEVEL=debug` (in `.env`, or the template's var
 <details>
 <summary><b>The container won't start or keeps restarting</b></summary>
 
-Look at `docker logs marquee`. Common causes:
+On Unraid, **Apply** can fail with **`docker: bad format for path:`** and nothing after the colon. The container was never created, so there are no logs: one of the template's *Device* fields is empty, and Unraid passes an empty field straight to Docker as `--device=''`. Older copies of the Marquee template had an optional **Intel Quick Sync** device field. Edit the container with **Advanced View** on, remove that field (or set it to `/dev/dri`), and **Apply** again; fetching [the template](install.md#on-unraid) again keeps it from coming back.
+
+Otherwise look at `docker logs marquee`. Common causes:
 
 - **`could not select device driver "nvidia"`** or **unknown runtime "nvidia"**: the container asks for the NVIDIA runtime but the host doesn't have it. On Unraid, remove `--runtime=nvidia` from *Extra Parameters* if you have no NVIDIA GPU, or install the **Nvidia Driver** plugin. With compose, leave out `compose.nvidia.yaml`, or install the NVIDIA Container Toolkit.
 - **`create /config: permission denied`**: the `config` folder isn't writable by `PUID:PGID`. Fix its owner (see [Folders and permissions](install.md#folders-and-permissions)).
@@ -101,7 +103,7 @@ Enter the 6-character code exactly as the TV shows it, while it's still on scree
    docker run --rm --runtime=nvidia nvidia/cuda:12.8.0-base-ubuntu24.04 nvidia-smi
    ```
    Check `NVIDIA_VISIBLE_DEVICES` is `all` or your GPU's UUID, and `NVIDIA_DRIVER_CAPABILITIES` includes `video`.
-3. **Intel:** pass `/dev/dri` into the container (`compose.intel.yaml`, or the **Intel Quick Sync** device on Unraid), and add the group that owns the render device: `RENDER_GID` in `.env`, or `--group-add=<id>` on Unraid.
+3. **Intel:** pass `/dev/dri` into the container (`compose.intel.yaml`, or `--device=/dev/dri` in *Extra Parameters* on Unraid), and add the group that owns the render device: `RENDER_GID` in `.env`, or `--group-add=<id>` on Unraid.
    ```bash
    stat -c %g /dev/dri/renderD128
    ```
