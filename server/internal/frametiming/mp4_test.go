@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -172,6 +175,124 @@ func TestOffsets(t *testing.T) {
 	b := cttsBox(ctts)
 	if n := binary.BigEndian.Uint32(b.data[4:]); n != 4 {
 		t.Errorf("%d entries, want the two zeros merged into 4", n)
+	}
+}
+
+// Frames the decoder couldn't read keep their place: those decoded around them stay in order,
+// and every sample ends up with a time.
+func TestPlaceUndecoded(t *testing.T) {
+	for _, c := range []struct {
+		order []int
+		n     int
+		want  []int
+	}{
+		{[]int{0, 2, 3, 1, 4}, 5, []int{0, 2, 3, 1, 4}},          // nothing missing
+		{[]int{2, 3, 1, 4}, 5, []int{0, 2, 3, 1, 4}},             // the first
+		{[]int{0, 2, 3, 1}, 5, []int{0, 2, 3, 1, 4}},             // the last
+		{[]int{0, 3, 1, 4}, 5, []int{0, 3, 2, 1, 4}},             // among reordered frames
+		{[]int{0, 4}, 5, []int{0, 1, 2, 3, 4}},                   // a run
+		{[]int{0, 5, 3, 4, 7}, 8, []int{0, 1, 2, 5, 3, 4, 6, 7}}, // several apart
+	} {
+		got := placeUndecoded(c.order, c.n)
+		if !slices.Equal(got, c.want) {
+			t.Errorf("placeUndecoded(%v, %d) = %v, want %v", c.order, c.n, got, c.want)
+		}
+	}
+}
+
+// A few frames blanked out in the file don't stop the order being worked out, and the repair
+// still reads as in order; a lot of them do.
+func TestRepairWithDamagedFrames(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+	ctx := context.Background()
+	dir := t.TempDir()
+	good, broken := filepath.Join(dir, "good.mp4"), filepath.Join(dir, "broken.mp4")
+	if out, err := exec.Command("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=24:duration=10",
+		"-c:v", "libx265", "-x265-params", "log-level=error:bframes=4:keyint=48", "-tag:v", "hvc1", good).CombinedOutput(); err != nil {
+		t.Fatalf("%v %s", err, out)
+	}
+	breakTiming(t, good, broken)
+	whole, err := Order(ctx, nil, "", broken, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packets := ffprobeLines(t, "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pos,size", "-of", "csv=p=0", broken)
+	blank := func(path string, samples ...int) {
+		f, err := os.OpenFile(path, os.O_WRONLY, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		for _, i := range samples {
+			size, pos, _ := strings.Cut(strings.TrimSuffix(packets[i], ","), ",")
+			n, _ := strconv.Atoi(size)
+			at, _ := strconv.ParseInt(pos, 10, 64)
+			if _, err := f.WriteAt(make([]byte, n), at); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	damaged, fixed := filepath.Join(dir, "damaged.mp4"), filepath.Join(dir, "fixed.mp4")
+	raw, _ := os.ReadFile(broken)
+	os.WriteFile(damaged, raw, 0o644)
+	blank(damaged, 100)
+	order, err := Order(ctx, nil, "", damaged, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(order) != len(whole) {
+		t.Fatalf("%d frames placed, want %d", len(order), len(whole))
+	}
+	skip := func(o []int) []int { return slices.DeleteFunc(slices.Clone(o), func(i int) bool { return i == 100 }) }
+	if !slices.Equal(skip(order), skip(whole)) {
+		t.Error("the frames around the damage changed order")
+	}
+	if _, err := Rewrite(damaged, fixed, order); err != nil {
+		t.Fatal(err)
+	}
+	if reason, err := Check(ctx, nil, "", fixed); err != nil || reason != "" {
+		t.Errorf("the repaired file is still flagged: %q %v", reason, err)
+	}
+
+	os.WriteFile(damaged, raw, 0o644)
+	blank(damaged, 60, 70, 80, 90, 100)
+	if _, err := Order(ctx, nil, "", damaged, nil); err == nil || !strings.Contains(err.Error(), "frames decoded") {
+		t.Errorf("too much damage: %v", err)
+	}
+}
+
+// A stray byte after the last box doesn't stop a repair, and is kept; without the index or the
+// media the file still isn't one to touch.
+func TestStrayBytesAfterTheLastBox(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string, b []byte) *os.File {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		f, err := os.Open(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { f.Close() })
+		return f
+	}
+	box := func(typ string) []byte { return append([]byte{0, 0, 0, 8}, typ...) }
+	whole := append(box("mdat"), box("moov")...)
+	if tops, err := topBoxes(write("stray.mp4", append(slices.Clone(whole), 0))); err != nil || len(tops) != 2 {
+		t.Errorf("a stray byte: %v %v", tops, err)
+	}
+	if tops, err := topBoxes(write("junk.mp4", append(slices.Clone(whole), 0, 0, 0, 200, 'j', 'u', 'n', 'k'))); err != nil || len(tops) != 2 {
+		t.Errorf("a box that overruns the file, after the index and media: %v %v", tops, err)
+	}
+	if _, err := topBoxes(write("no-index.mp4", append(box("mdat"), 0))); !errors.Is(err, ErrNotMP4) {
+		t.Errorf("no index: %v", err)
+	}
+	if _, err := topBoxes(write("cut.mp4", append(box("moov"), 0, 0, 0, 200, 'm', 'd', 'a', 't'))); !errors.Is(err, ErrNotMP4) {
+		t.Errorf("media cut short: %v", err)
 	}
 }
 

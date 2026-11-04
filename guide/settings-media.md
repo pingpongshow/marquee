@@ -391,11 +391,13 @@ Running the import again updates everything without duplicating it. New users cr
 | Upgrade candidates | Info | Movies and episodes whose best file is SD or 720p, or has a low bitrate for its resolution (under 10 Mb/s for 4K or 3 Mb/s for 1080p in H.264, half that for HEVC, AV1 and VP9). |
 | Missing artwork | Info | Movies, shows and albums without a poster. |
 
-Damaged files are found only among movies, episodes and personal videos added (or replaced) since the check arrived; files that were already in the library aren't checked. Replacing a damaged file with a good copy clears it after the next scan and check. Live TV recordings are left to the DVR.
+Damaged files are found only among movies, episodes and personal videos added (or replaced) since the check arrived; files that were already in the library aren't checked. A picture that stops up to five minutes before the sound or subtitles isn't counted as damage: the end is checked where the picture stops. A file whose streams all stop more than a few seconds before its stated length still counts as damaged: it was cut short. Replacing a damaged file with a good copy clears it after the next scan and check. Live TV recordings are left to the DVR.
 
 ### Repairing frame timing errors
 
 Files in **Frame timing errors** have **Repair**, and the check has **Repair all**. A repair works out the order the frames are shown in from the video itself and writes it into the file: nothing is re-encoded, so the picture and sound are exactly as they were. It reads the whole video once, which takes a few minutes for a film, at low priority, two files at a time; the files being repaired head the list, with their progress, and the rest are repaired in the order listed. The repaired file is checked before it replaces the original, which goes to the media trash. A file that's playing waits until it stops. Once repaired, the file leaves the list and plays as it is again (direct play).
+
+A repair copes with a file that's also damaged in a few places, so long as at least 99% of its video can be read. It puts the timing right, but the damaged moments still glitch: that part of the file is gone, and only a new copy brings it back. A repair that can't go ahead says why in the list.
 
 Only MP4 and MOV files can be repaired. Other files with this problem stay in the list and keep being converted while playing; replacing them with a good copy clears them. AVI files aren't checked, since AVI doesn't store when frames are shown.
 

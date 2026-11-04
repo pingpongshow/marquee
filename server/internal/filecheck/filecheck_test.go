@@ -186,6 +186,44 @@ func TestRunFindsDamagedNewFiles(t *testing.T) {
 	}
 }
 
+// A picture that stops before the sound isn't damage, as long as the file reaches its stated
+// end and the picture doesn't stop too long before it. A file cut short, or whose picture
+// went missing long before the end, is still damaged.
+func TestPictureStoppingBeforeTheEnd(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+	e := newEnv(t)
+	ctx := context.Background()
+	movies := e.library("movies", false)
+	film := func(name, picture, sound string, ms int64) int64 {
+		path := filepath.Join(e.dir, name)
+		if out, err := exec.Command("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=25:duration="+picture,
+			"-f", "lavfi", "-i", "sine=frequency=440:duration="+sound,
+			"-c:v", "libx264", "-preset", "ultrafast", "-g", "25", "-c:a", "aac", "-b:a", "32k", path).CombinedOutput(); err != nil {
+			t.Skipf("ffmpeg couldn't make a test file: %v %s", err, out)
+		}
+		return e.file(movies, "movie", path, ms, false)
+	}
+	early := film("Early (2020).mkv", "60", "120", 120_000)
+	missing := film("Missing (2021).mkv", "60", "400", 400_000)
+	// Its picture and sound both stop 60 seconds before the length it claims.
+	cut := film("Cut (2022).mkv", "60", "60", 120_000)
+
+	s := &Service{DB: e.db, Timing: func(context.Context, string) (string, error) { return "", nil }}
+	if _, err := s.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if c, r := e.state(early); !c.Valid || r.Valid {
+		t.Errorf("picture stopping a minute early: checked %v, error %q", c, r.String)
+	}
+	for name, id := range map[string]int64{"picture missing for minutes": missing, "cut short": cut} {
+		if _, r := e.state(id); r.String != "The end doesn't decode: no frames" {
+			t.Errorf("%s: error %q", name, r.String)
+		}
+	}
+}
+
 // Turned off (Settings → Scheduled Tasks), the task doesn't start after a scan; Run now
 // still runs it. A known length that's far off fails the check without decoding.
 func TestTaskTurnedOff(t *testing.T) {

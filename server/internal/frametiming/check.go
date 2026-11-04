@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -47,6 +48,10 @@ func Checked(container, path string) bool {
 
 // checkSeconds is how much of the start Check decodes.
 const checkSeconds = 8
+
+// MaxDamagedPercent is how much of a file's video can be unreadable for a repair to go ahead:
+// beyond that, too little of the frame order is known.
+const MaxDamagedPercent = 1
 
 // Check reports what's wrong with the file's frame timing ("" = nothing): the frames of its
 // first seconds, decoded and so in display order, must carry rising times. It runs FFprobe
@@ -105,7 +110,8 @@ func times(out []byte) []int64 {
 // Order works out the order the video track's frames are shown in: order[k] is the
 // decode-order index (the sample's place in the file) of the k-th frame shown. It decodes
 // the whole track at low priority, with the edit list ignored so every sample comes out;
-// progress hears the fraction done.
+// a few samples that don't decode don't stop it (placeUndecoded). progress hears the
+// fraction done.
 func Order(ctx context.Context, lookPath func(string) (string, error), ffprobe, path string, progress func(float64)) ([]int, error) {
 	ffprobe = or(ffprobe, "ffprobe")
 	// The samples in decode order, by time (which, decode order being all they carry, are
@@ -180,10 +186,41 @@ func Order(ctx context.Context, lookPath func(string) (string, error), ffprobe, 
 	if bad != nil {
 		return nil, bad
 	}
-	if len(order) != len(packets) {
+	if (len(packets)-len(order))*100 > len(packets)*MaxDamagedPercent {
 		return nil, fmt.Errorf("%d of %d frames decoded, so their order can't be worked out", len(order), len(packets))
 	}
-	return order, nil
+	if len(order) < len(packets) {
+		slog.Warn("damaged video: frames that don't decode", "path", path, "frames", len(packets)-len(order), "of", len(packets))
+	}
+	return placeUndecoded(order, len(packets)), nil
+}
+
+// placeUndecoded gives the samples the decoder couldn't read a place among the n frames of
+// order, so the frames around them keep their times: each is shown after as many frames as
+// were decoded before it, which can only be a few frames out, and only around the damage.
+func placeUndecoded(order []int, n int) []int {
+	if len(order) == n {
+		return order
+	}
+	seen := make([]bool, n)
+	for _, i := range order {
+		seen[i] = true
+	}
+	out := make([]int, 0, n)
+	placed := 0 // frames of order out holds
+	decoded := 0
+	for i, ok := range seen {
+		if ok {
+			decoded++
+			continue
+		}
+		for placed < decoded {
+			out = append(out, order[placed])
+			placed++
+		}
+		out = append(out, i)
+	}
+	return append(out, order[placed:]...)
 }
 
 func or(s, def string) string {

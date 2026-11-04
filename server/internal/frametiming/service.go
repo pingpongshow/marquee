@@ -327,7 +327,7 @@ func (s *Service) Repair(ctx context.Context, fileID int64, progress func(float6
 		return err
 	}
 	progress(0.95)
-	if err := s.verify(ctx, part, durationMS); err != nil {
+	if err := s.verify(ctx, path, part, durationMS); err != nil {
 		os.Remove(part)
 		return fmt.Errorf("the repaired copy failed its check, so the file was left as it was: %w", err)
 	}
@@ -360,19 +360,33 @@ func (s *Service) Repair(ctx context.Context, fileID int64, progress func(float6
 // errPlaying puts a repair back in the queue: the file started playing while it was made.
 var errPlaying = errors.New("the file is playing; tried again later")
 
-// verify checks the repaired copy before it replaces anything: its timing passes Check, it's
-// as long as the original (within 1%), and a few seconds at its start, middle and end decode.
-func (s *Service) verify(ctx context.Context, path string, durationMS int64) error {
+// verify checks the repaired copy before it replaces anything: its timing passes Check, and
+// a few seconds at its start, middle and end decode. A spot the original doesn't decode at
+// either says nothing about the copy (a film's picture can stop before its sound, leaving
+// the end check past the last frame), so long as some spot does.
+func (s *Service) verify(ctx context.Context, original, path string, durationMS int64) error {
 	if reason, err := Check(ctx, s.LookPath, s.FFprobe, path); err != nil {
 		return err
 	} else if reason != "" {
 		return errors.New(reason)
 	}
+	decode := func(file string, at float64) error {
+		return encode.DecodeCheckLow(ctx, s.LookPath, or(s.FFmpeg, "ffmpeg"), file, at, 5, true)
+	}
+	decoded := false
 	end := float64(durationMS) / 1000
 	for _, at := range []float64{0, end * 0.5, max(0, end-min(30, end/3))} {
-		if err := encode.DecodeCheckLow(ctx, s.LookPath, or(s.FFmpeg, "ffmpeg"), path, at, 5, true); err != nil {
+		err := decode(path, at)
+		if err == nil {
+			decoded = true
+			continue
+		}
+		if decode(original, at) == nil {
 			return fmt.Errorf("it doesn't decode at %ds: %v", int(at), err)
 		}
+	}
+	if !decoded {
+		return errors.New("it doesn't decode anywhere")
 	}
 	return nil
 }

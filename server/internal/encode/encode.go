@@ -278,20 +278,25 @@ func decodeCheck(ctx context.Context, lookPath func(string) (string, error), ffm
 		}
 	}
 	if frames == 0 {
-		return errors.New("no frames")
+		return ErrNoFrames
 	}
 	return nil
 }
+
+// ErrNoFrames is a decode check that found nothing to decode where it looked.
+var ErrNoFrames = errors.New("no frames")
 
 // decodeErrors is FFmpeg's error output without the null muxer's own complaints (such as
 // "non monotonically increasing dts" after seeking into a stream with uneven timestamps):
 // nothing is written anywhere, so they say nothing about whether the file decodes. Nor do
 // FFmpeg's "Last message repeated N times" notes: the message they count stands or goes
-// on its own.
+// on its own. Nor does a chapter index pointing at a track that isn't there: only chapter
+// names are lost.
 func decodeErrors(stderr string) string {
 	var keep []string
 	for _, line := range strings.Split(stderr, "\n") {
-		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "[null @") && !strings.HasPrefix(line, "Last message repeated") {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "[null @") && !strings.HasPrefix(line, "Last message repeated") &&
+			!strings.HasSuffix(line, "Referenced QT chapter track not found") {
 			keep = append(keep, line)
 		}
 	}
@@ -381,14 +386,37 @@ func Available(ffmpeg string) func(name string) bool {
 // picture can stop before the file does, with audio or subtitles running on. ok=false when
 // FFprobe can't tell.
 func VideoEnd(ctx context.Context, ffprobe, path string, videoIndex int, durationMS int64) (ms int64, ok bool) {
-	if videoIndex < 0 || durationMS <= 0 {
+	if videoIndex < 0 {
+		return 0, false
+	}
+	return packetsEnd(ctx, ffprobe, path, strconv.Itoa(videoIndex), durationMS)
+}
+
+// PictureEnd is VideoEnd for the first video stream that isn't cover art.
+func PictureEnd(ctx context.Context, ffprobe, path string, durationMS int64) (ms int64, ok bool) {
+	return packetsEnd(ctx, ffprobe, path, "V:0", durationMS)
+}
+
+// FileEnd is where the last of the file's streams, of any kind, really ends: a file that
+// says it's longer than that was cut short.
+func FileEnd(ctx context.Context, ffprobe, path string, durationMS int64) (ms int64, ok bool) {
+	return packetsEnd(ctx, ffprobe, path, "", durationMS)
+}
+
+// packetsEnd is the end of the last packet of the streams selected ("" = all).
+func packetsEnd(ctx context.Context, ffprobe, path, streams string, durationMS int64) (ms int64, ok bool) {
+	if durationMS <= 0 {
 		return 0, false
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	from := max(0, durationMS/1000-300)
-	out, err := exec.CommandContext(ctx, ffprobe, "-v", "error", "-select_streams", strconv.Itoa(videoIndex),
-		"-read_intervals", strconv.FormatInt(from, 10)+"%", "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0", path).Output()
+	args := []string{"-v", "error"}
+	if streams != "" {
+		args = append(args, "-select_streams", streams)
+	}
+	args = append(args, "-read_intervals", strconv.FormatInt(from, 10)+"%", "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0", path)
+	out, err := exec.CommandContext(ctx, ffprobe, args...).Output()
 	if err != nil {
 		return 0, false
 	}

@@ -1,7 +1,8 @@
 // Package filecheck checks video files (the Check files task), at low priority and one file
 // at a time. Each movie, episode and personal video added to the library (or replaced) gets
 // the playback check VOD downloads get: its length must be plausible where it is known, and
-// a few seconds at its start and near its end must decode. Files that fail are listed in
+// a few seconds at its start and near its end (where its picture stops, when that's before
+// the file's end) must decode. Files that fail are listed in
 // Library Health → Unplayable files with the reason; files that pass keep only
 // media_files.checked_at. Files already in the library when that check arrived were marked
 // checked by the migration and aren't checked.
@@ -312,7 +313,11 @@ func (s *Service) check(ctx context.Context, p pending) (string, error) {
 		positions = append(positions, EndPosition(p.durationMS))
 	}
 	for i, at := range positions {
-		if err := s.decode(ctx, p.path, at); err != nil {
+		err := s.decode(ctx, p.path, at)
+		if i > 0 && errors.Is(err, encode.ErrNoFrames) {
+			err = s.decodeEndOfPicture(ctx, p, err)
+		}
+		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
 				return "", err
 			}
@@ -324,6 +329,32 @@ func (s *Service) check(ctx context.Context, p pending) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+// How far before a file's stated end its streams may stop. Its last stream, of any kind, must
+// reach the end, or the file was cut short; its picture can stop sooner, with sound or
+// subtitles running on (seen: over two minutes), but not this much sooner.
+const (
+	maxFileGapMS    = 5_000
+	maxPictureGapMS = 5 * 60_000
+)
+
+// decodeEndOfPicture checks the end again where the picture stops, for a file with nothing
+// to decode at its end check. A file that was cut short or has lost its picture stays
+// damaged, with noFrames as the reason.
+func (s *Service) decodeEndOfPicture(ctx context.Context, p pending, noFrames error) error {
+	ffprobe := s.FFprobe
+	if ffprobe == "" {
+		ffprobe = "ffprobe"
+	}
+	if end, ok := encode.FileEnd(ctx, ffprobe, p.path, p.durationMS); !ok || end < p.durationMS-maxFileGapMS {
+		return noFrames
+	}
+	picture, ok := encode.PictureEnd(ctx, ffprobe, p.path, p.durationMS)
+	if !ok || picture < p.durationMS-maxPictureGapMS {
+		return noFrames
+	}
+	return s.decode(ctx, p.path, EndPosition(picture))
 }
 
 // ffmpegPrefix is the context FFmpeg starts its messages with ("[in#0/matroska,webm @ 0x…] ").

@@ -124,6 +124,38 @@ func TestQueueRepairs(t *testing.T) {
 	}
 }
 
+// The repaired copy has to decode wherever the original does, and no more: a film whose
+// picture stops before its sound passes, a copy that's lost part of the picture doesn't.
+func TestVerifyAgainstTheOriginal(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+	ctx := context.Background()
+	dir := t.TempDir()
+	s := &Service{LookPath: noLook}
+	make := func(name string, args ...string) string {
+		p := filepath.Join(dir, name)
+		if out, err := exec.Command("ffmpeg", append(append([]string{"-v", "error"}, args...), p)...).CombinedOutput(); err != nil {
+			t.Fatalf("%v %s", err, out)
+		}
+		return p
+	}
+	video := func(seconds string) []string {
+		return []string{"-f", "lavfi", "-i", "testsrc2=size=320x180:rate=24:duration=" + seconds,
+			"-f", "lavfi", "-i", "sine=frequency=440:duration=60", "-c:v", "libx264", "-bf", "3", "-g", "24", "-c:a", "aac", "-b:a", "32k"}
+	}
+	// The picture stops 50 seconds before the sound, past where the end is checked.
+	short := make("short.mp4", video("10")...)
+	if err := s.verify(ctx, short, short, 60000); err != nil {
+		t.Errorf("a film whose picture stops early: %v", err)
+	}
+	// The copy has lost picture the original has.
+	whole := make("whole.mp4", video("60")...)
+	if err := s.verify(ctx, whole, short, 60000); err == nil || !strings.Contains(err.Error(), "doesn't decode at") {
+		t.Errorf("a copy missing its picture: %v", err)
+	}
+}
+
 // Repair all works down Library Health's list, by title (not the order the files were
 // found in); a repair asked for later waits for those.
 func TestQueueOrder(t *testing.T) {

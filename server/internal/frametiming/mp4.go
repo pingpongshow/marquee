@@ -356,31 +356,44 @@ type topBox struct {
 	off, size int64
 }
 
+// topBoxes lists a file's top-level boxes. Bytes after them that aren't a box (some muxers
+// leave a stray byte at the end) don't matter once the index and media have been found: they
+// aren't listed, and Rewrite copies them as they are.
 func topBoxes(f *os.File) ([]topBox, error) {
 	st, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
 	var out []topBox
+	var moov, mdat bool
+	tail := func() ([]topBox, error) {
+		if moov && mdat {
+			return out, nil
+		}
+		return nil, ErrNotMP4
+	}
 	var hdr [16]byte
 	for off := int64(0); off < st.Size(); {
 		if _, err := f.ReadAt(hdr[:8], off); err != nil {
-			return nil, ErrNotMP4
+			return tail()
 		}
 		size := int64(binary.BigEndian.Uint32(hdr[:]))
 		switch size {
 		case 1:
 			if _, err := f.ReadAt(hdr[8:16], off+8); err != nil {
-				return nil, ErrNotMP4
+				return tail()
 			}
 			size = int64(binary.BigEndian.Uint64(hdr[8:]))
 		case 0:
 			size = st.Size() - off
 		}
 		if size < 8 || off+size > st.Size() {
-			return nil, ErrNotMP4
+			return tail()
 		}
-		out = append(out, topBox{typ: string(hdr[4:8]), off: off, size: size})
+		typ := string(hdr[4:8])
+		moov = moov || typ == "moov"
+		mdat = mdat || typ == "mdat"
+		out = append(out, topBox{typ: typ, off: off, size: size})
 		off += size
 	}
 	return out, nil

@@ -28,3 +28,18 @@ func TestDecodeErrorsIgnoresRepeatNotes(t *testing.T) {
 		}
 	}
 }
+
+// A chapter index pointing at a missing track loses chapter names, not picture; anything else
+// the demuxer says still counts.
+func TestDecodeErrorsIgnoresMissingChapterTrack(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"[mov,mp4,m4a,3gp,3g2,mj2 @ 0x1] Referenced QT chapter track not found\n[in#0 @ 0x2] Referenced QT chapter track not found\n", ""},
+		{"[in#0 @ 0x2] Referenced QT chapter track not found\n[hevc @ 0x3] Invalid NAL unit size\n", "[hevc @ 0x3] Invalid NAL unit size"},
+		{"[mov,mp4,m4a,3gp,3g2,mj2 @ 0x1] stream 0, offset 0x20: partial file\n", "[mov,mp4,m4a,3gp,3g2,mj2 @ 0x1] stream 0, offset 0x20: partial file"},
+	}
+	for _, c := range cases {
+		if got := decodeErrors(c.in); got != c.want {
+			t.Errorf("decodeErrors(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
