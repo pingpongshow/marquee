@@ -49,14 +49,70 @@ func openRemote(ctx context.Context, client *http.Client, url, ua string) (*remo
 	return f, nil
 }
 
-// block returns block n, fetching it if needed. Caller must not hold f.mu.
+// remoteTries is how many times a block is asked for when the connection is cut part way
+// (some sources drop it, notably while another stream of the same account starts).
+const remoteTries = 3
+
+// errShortRange is a source answering a range from somewhere else than was asked.
+var errShortRange = errors.New("the server answered a different range")
+
+// block returns block n, fetching it if needed. A source may answer a range with less than
+// was asked for, or cut the connection part way: the rest is asked for again, so a block
+// is only short at the end of the file. Caller must not hold f.mu.
 func (f *remoteFile) block(n int64) ([]byte, error) {
 	f.mu.Lock()
 	b, ok := f.blocks[n]
+	f.mu.Unlock()
 	if ok {
-		f.mu.Unlock()
 		return b, nil
 	}
+	start := n * remoteBlock
+	cuts := 0
+	for {
+		end := start + remoteBlock
+		f.mu.Lock()
+		size := f.size
+		f.mu.Unlock()
+		if size >= 0 && end > size {
+			end = size
+		}
+		if start+int64(len(b)) >= end {
+			break
+		}
+		got, err := f.fetch(start+int64(len(b)), end-1)
+		b = append(b, got...)
+		if errors.Is(err, io.EOF) && len(b) > 0 {
+			break // past the end: what there is
+		}
+		if err != nil {
+			var cut *cutError
+			if !errors.As(err, &cut) || f.ctx.Err() != nil {
+				return nil, err
+			}
+			if cuts++; cuts >= remoteTries {
+				return nil, cut.err
+			}
+			continue
+		}
+		if len(got) == 0 {
+			break // nothing more to have
+		}
+	}
+	f.mu.Lock()
+	f.blocks[n] = b
+	f.mu.Unlock()
+	return b, nil
+}
+
+// cutError is a connection that failed or was cut part way: worth asking again.
+type cutError struct{ err error }
+
+func (e *cutError) Error() string { return e.err.Error() }
+
+// fetch asks for bytes from..to (inclusive) and returns what arrived, learning the file's
+// size from Content-Range.
+func (f *remoteFile) fetch(from, to int64) ([]byte, error) {
+	f.mu.Lock()
 	if f.reads >= maxRemoteReads {
 		f.mu.Unlock()
 		return nil, errors.New("too many reads for a keyframe index")
@@ -70,15 +126,14 @@ func (f *remoteFile) block(n int64) ([]byte, error) {
 	if f.ua != "" {
 		req.Header.Set("User-Agent", f.ua)
 	}
-	start := n * remoteBlock
-	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, start+remoteBlock-1))
+	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", from, to))
 	resp, err := f.client.Do(req)
 	if err != nil {
 		var ue interface{ Unwrap() error }
 		if errors.As(err, &ue) && ue.Unwrap() != nil {
 			err = ue.Unwrap() // *url.Error names the link, which may hold a password
 		}
-		return nil, err
+		return nil, &cutError{err}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusRequestedRangeNotSatisfiable {
@@ -88,6 +143,10 @@ func (f *remoteFile) block(n int64) ([]byte, error) {
 		return nil, fmt.Errorf("%w (answered %d)", errNoRanges, resp.StatusCode)
 	}
 	if cr := resp.Header.Get("Content-Range"); cr != "" {
+		var a, z int64
+		if _, err := fmt.Sscanf(strings.TrimPrefix(cr, "bytes "), "%d-%d/", &a, &z); err == nil && a != from {
+			return nil, errShortRange
+		}
 		if i := strings.LastIndexByte(cr, '/'); i >= 0 {
 			if total, err := strconv.ParseInt(cr[i+1:], 10, 64); err == nil {
 				f.mu.Lock()
@@ -96,14 +155,11 @@ func (f *remoteFile) block(n int64) ([]byte, error) {
 			}
 		}
 	}
-	b, err = io.ReadAll(io.LimitReader(resp.Body, remoteBlock))
+	got, err := io.ReadAll(io.LimitReader(resp.Body, to-from+1))
 	if err != nil {
-		return nil, err
+		return got, &cutError{err}
 	}
-	f.mu.Lock()
-	f.blocks[n] = b
-	f.mu.Unlock()
-	return b, nil
+	return got, nil
 }
 
 func (f *remoteFile) ReadAt(p []byte, off int64) (int, error) {
