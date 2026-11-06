@@ -17,7 +17,8 @@ scripts/e2e/with-server.sh '<cmd>'   # run <cmd> with the server and the fakes u
 
 `with-server.sh` starts the server, `scripts/fake-iptv.py` (port 32598), `scripts/fake-bazarr.py`
 (port 32767) and `scripts/fake-vod.py` (films.m3u on 32621, an Xtream Codes server on 32622, as the
-VOD UI tests expect), runs the command, then stops them all. Logs go to `.e2e/*.log`.
+VOD UI tests expect), runs the command, then stops them all. Logs go to `.e2e/*.log`. With `MARQUEE_FAKE_VOD_SLOW=<seconds>`
+the fake VOD sources answer each video request that late, like a slow IPTV source.
 
 ## What's in it
 

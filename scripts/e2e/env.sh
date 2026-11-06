@@ -49,7 +49,7 @@ e2e_start_fakes() {
     --tv "$E/recordings/TV" --anime "$E/media/anime" > "$E/fake-bazarr.log" 2>&1 &
   echo $! >> "$E/fakes.pid"
   python3 "$REPO/scripts/fake-vod.py" --m3u-port $VOD_M3U_PORT --xtream-port $VOD_XTREAM_PORT \
-    --media "$E/vod-media" > "$E/fake-vod.log" 2>&1 &
+    --media "$E/vod-media" --slow "${MARQUEE_FAKE_VOD_SLOW:-0}" > "$E/fake-vod.log" 2>&1 &
   echo $! >> "$E/fakes.pid"
   i=0
   until curl -s -m 1 -o /dev/null "http://127.0.0.1:$BAZARR_PORT/" && curl -s -m 1 -o /dev/null "http://127.0.0.1:$IPTV_PORT/output/m3u"; do

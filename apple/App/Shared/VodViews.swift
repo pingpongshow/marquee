@@ -1052,6 +1052,11 @@ struct VodPlayerView: View {
             }
             if Task.isCancelled || closing { await app.stopVod(s.id); return }
             session = s.id
+            // A source's file converted as it plays can take a while to be ready.
+            guard try await app.vodStreamReady(s.url) else {
+                throw MarqueeError(current.isEpisode ? "The episode took too long to start." : "The movie took too long to start.")
+            }
+            if Task.isCancelled || closing { return }
             let item = AVPlayerItem(url: s.url)
             #if !os(macOS)
             item.externalMetadata = metadata()
@@ -1066,7 +1071,6 @@ struct VodPlayerView: View {
             // Asked for at once, as for the library's videos, so the stream is fetched from there
             // rather than from the beginning.
             if from > 0 { await seek() }
-            // A source's file converted as it plays can take a while to be ready.
             for _ in 0..<600 where item.status == .unknown && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(100)) }
             if Task.isCancelled || closing { return }
             if item.status == .failed { throw MarqueeError(item.error?.localizedDescription ?? "This couldn't be played") }
@@ -1086,7 +1090,11 @@ struct VodPlayerView: View {
             if !Task.isCancelled { reachedTimeLimit(reached) }
         } catch {
             loading = false
-            if !Task.isCancelled { self.error = error.localizedDescription }
+            guard !Task.isCancelled else { return }
+            self.error = error.localizedDescription
+            // Nothing plays: the server stops converting it (a try again starts afresh, rather
+            // than competing with this one for the source).
+            endSession()
         }
     }
 

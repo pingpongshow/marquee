@@ -156,6 +156,34 @@ public extension AppSession {
         _ = try? await vodAPI.stopVodSession(path: .init(sessionId: session))
     }
 
+    /// Waits until a source's file the server converts as it plays has its start ready. That
+    /// can take longer than AVPlayer waits for it (a 4K film resumed part way through took
+    /// about 20 seconds), so it's asked for here first, patiently. True when it's ready or
+    /// isn't converted; false when it wasn't ready in `seconds`.
+    func vodStreamReady(_ url: URL, within seconds: Double = 90) async throws -> Bool {
+        guard url.path.hasPrefix("/api/v1/stream/"), url.lastPathComponent == "master.m3u8" else { return true }
+        let initURL = url.deletingLastPathComponent().appending(path: "init.mp4")
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            // The server waits up to 45 seconds for the start before answering 503.
+            var req = URLRequest(url: initURL, timeoutInterval: 50)
+            req.cachePolicy = .reloadIgnoringLocalCacheData
+            do {
+                let (_, resp) = try await URLSession.shared.data(for: req)
+                switch (resp as? HTTPURLResponse)?.statusCode {
+                case 200: return true
+                case 503: break // not yet
+                default: return true // the player reports what's wrong
+                }
+            } catch let e as URLError where e.code == .timedOut || e.code == .networkConnectionLost {
+            } catch let e as URLError where e.code == .cancelled {
+                throw CancellationError()
+            }
+            try await Task.sleep(for: .seconds(1))
+        }
+        return false
+    }
+
     /// Reloads every source now (admin only).
     func refreshVod() async throws -> VodStatus {
         switch try await vodAPI.refreshVod() {

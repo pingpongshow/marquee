@@ -14,9 +14,10 @@ tests expect them:
                                  12-second episodes) and "Apple Other Show" (Comedy, 1985)
 
 The videos are made with FFmpeg into --media (default .e2e/vod-media) the first time, and served
-with byte ranges (AVPlayer needs them).
+with byte ranges (AVPlayer needs them). --slow S answers each video request S seconds late, like a
+slow source: the server then takes a while to have a converted file's start ready.
 
-Usage: scripts/fake-vod.py [--m3u-port N] [--xtream-port N] [--media DIR]
+Usage: scripts/fake-vod.py [--m3u-port N] [--xtream-port N] [--media DIR] [--slow S]
 """
 import argparse
 import http.server
@@ -27,6 +28,7 @@ import socketserver
 import subprocess
 import sys
 import threading
+import time
 import urllib.parse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -105,6 +107,7 @@ def make_short(media):
 
 class Handler(http.server.BaseHTTPRequestHandler):
     media = ""
+    slow = 0.0
 
     def log_message(self, fmt, *args):
         sys.stderr.write("%s %s\n" % (self.server.server_address[1], fmt % args))
@@ -122,6 +125,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path = os.path.join(self.media, os.path.basename(name))
         if not os.path.isfile(path):
             return self.send(404, "not found", "text/plain")
+        if self.slow:
+            time.sleep(self.slow)
         size = os.path.getsize(path)
         start, end = 0, size - 1
         m = re.match(r"bytes=(\d*)-(\d*)$", self.headers.get("Range", ""))
@@ -246,9 +251,11 @@ def main():
     p.add_argument("--m3u-port", type=int, default=32621)
     p.add_argument("--xtream-port", type=int, default=32622)
     p.add_argument("--media", default=os.path.join(ROOT, ".e2e", "vod-media"))
+    p.add_argument("--slow", type=float, default=0, help="seconds to wait before answering a video request")
     a = p.parse_args()
     make_media(a.media)
     Handler.media = a.media
+    Handler.slow = a.slow
     servers = [Server(("127.0.0.1", a.m3u_port), M3UHandler), Server(("127.0.0.1", a.xtream_port), XtreamHandler)]
     for s in servers[1:]:
         threading.Thread(target=s.serve_forever, daemon=True).start()

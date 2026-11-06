@@ -261,11 +261,11 @@ final class VodUITests: XCTestCase {
         XCTAssertEqual(resume.label, "Resume from 0:20")
         resume.tap()
         XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 10))
-        sleep(6)
-        app.closePlayer()
-        // Carried on from 0:20, not from the start.
-        try eventually(10, "resumed past the reported point") { (try movie(id, user.token)["positionMs"] as? Int ?? 0) > 20000 }
+        // Carried on from 0:20, not from the start (the player reports every 10 seconds, once
+        // it plays: a slow source can take a while to start).
+        try eventually(60, "resumed past the reported point") { (try movie(id, user.token)["positionMs"] as? Int ?? 0) > 20000 }
         shot("resumed")
+        app.closePlayer()
     }
 
     /// A film on demand goes on the watchlist from its page and off again (USER-8); Home's Your
