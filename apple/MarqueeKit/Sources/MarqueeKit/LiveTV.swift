@@ -1,3 +1,6 @@
+// Left out of App Store builds (scripts/archive-app-store.sh): no Live TV, VOD or Discover there.
+#if !MARQUEE_APP_STORE
+
 import Foundation
 import MarqueeAPI
 
@@ -211,3 +214,5 @@ public extension LiveProgramme {
         return total > 0 ? min(1, max(0, Date().timeIntervalSince(start) / total)) : 0
     }
 }
+
+#endif

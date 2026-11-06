@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { api, unwrap } from "@/api/client";
-import { meQuery, playlistsQuery } from "@/api/queries";
+import { meQuery, playlistsQuery, useMuseOn } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import { Alert, Spinner } from "@/components/ui";
 import { Poster } from "../browse/Poster";
@@ -232,6 +232,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
   const favArtists = useQuery(favoritesQuery(libraryId, "artist", 12));
   const error = radio.error ?? shuffle.error;
   const inTownOn = useInTownOn();
+  const museOn = useMuseOn();
 
   return (
     <div className="space-y-10 p-6 lg:p-8">
@@ -246,7 +247,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
         <div className="flex flex-wrap gap-2" role="group" aria-label="Quick actions">
           {ready && <QuickAction icon={<Radio />} label="Library Radio" busy={radio.isPending} onClick={() => radio.mutate({ seed: "library", libraryId })} />}
           <QuickAction icon={<Shuffle />} label="Shuffle All" busy={shuffle.isPending} onClick={() => shuffle.mutate()} />
-          {ready && <QuickAction icon={<Sparkles />} label="Muse" to={{ libraryId, section: "muse" }} />}
+          {ready && museOn && <QuickAction icon={<Sparkles />} label="Muse" to={{ libraryId, section: "muse" }} />}
           {inTownOn && <QuickAction icon={<Ticket />} label="In Town" inTown />}
         </div>
         {error && <Alert tone="error">{error.message}</Alert>}
@@ -305,7 +306,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
           <LibraryRow icon={<Guitar />} title="Genres" libraryId={libraryId} section="genres" />
           {(ready || !!facets.data?.genres.length) && <LibraryRow icon={<Palette />} title="Moods & Styles" libraryId={libraryId} section="moods" />}
           {!!facets.data?.decades.length && <LibraryRow icon={<CalendarDays />} title="Decades" libraryId={libraryId} section="decades" />}
-          {(ready || status?.enabled) && <LibraryRow icon={<Sparkles />} title="Muse & Stations" libraryId={libraryId} section="muse" />}
+          {(ready || status?.enabled) && <LibraryRow icon={<Sparkles />} title={museOn ? "Muse & Stations" : "Stations"} libraryId={libraryId} section="muse" />}
         </ul>
       </section>
     </div>
@@ -363,7 +364,8 @@ export function MusicSectionPage({ libraryId, name, section }: { libraryId: numb
   const facets = useAlbumFacets(libraryId);
   const { ready } = useMusicStatus();
   const mixes = useMixes(libraryId);
-  const title = musicSectionTitles[section];
+  const museOn = useMuseOn();
+  const title = section === "muse" && !museOn ? "Stations" : musicSectionTitles[section];
   if (facets.isPending && (section === "genres" || section === "decades")) return <Spinner />;
   return (
     <div className="p-6 lg:p-8">
@@ -386,7 +388,7 @@ export function MusicSectionPage({ libraryId, name, section }: { libraryId: numb
       {section === "muse" && (
         <div className="space-y-8">
           <AnalysisNote />
-          <MusePanel libraryId={libraryId} />
+          {museOn && <MusePanel libraryId={libraryId} />}
           {ready && (
             <div>
               <h2 className="mb-3 text-lg font-semibold">Stations</h2>
@@ -398,7 +400,7 @@ export function MusicSectionPage({ libraryId, name, section }: { libraryId: numb
               {mixes.data.map((m) => <MixCard key={m.id} mix={m} />)}
             </Shelf>
           )}
-          {!ready && <p className="text-muted">Radios and Muse need Soundprint, which hasn't analysed this library yet.</p>}
+          {!ready && <p className="text-muted">{museOn ? "Radios and Muse need" : "Radios need"} Soundprint, which hasn't analysed this library yet.</p>}
         </div>
       )}
     </div>

@@ -162,6 +162,7 @@ func apiErr(code, msg string) Error { return Error{Code: code, Message: msg} }
 var (
 	errUnauthorized = apiErr("unauthorized", "authentication required")
 	errForbidden    = apiErr("forbidden", "administrator access required")
+	errMuseOff      = apiErr("muse_off", "Muse is turned off on this server.")
 )
 
 // session returns the caller's session; ok=false means unauthenticated.
@@ -201,6 +202,7 @@ func (h *Handlers) GetSystemInfo(ctx context.Context, _ GetSystemInfoRequestObje
 		RemoteUrl:     remoteURL(h.Settings.Get()),
 		RatingPrompt:  ptr(h.Settings.Get().General.RatingPrompt),
 		InTown:        ptr(h.inTownOn()),
+		Muse:          ptr(h.Settings.Get().General.Muse),
 	}, nil
 }
 

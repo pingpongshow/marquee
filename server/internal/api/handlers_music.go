@@ -386,6 +386,9 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	if !ok {
 		return MusicMuse401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
+	if !h.Settings.Get().General.Muse {
+		return MusicMuse503JSONResponse{ServiceUnavailableJSONResponse(errMuseOff)}, nil
+	}
 	prompt := strings.TrimSpace(req.Body.Prompt)
 	if len(prompt) < 2 {
 		return MusicMuse400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "describe the music you want"))}, nil

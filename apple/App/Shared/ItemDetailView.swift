@@ -17,7 +17,9 @@ struct ItemDetailView: View {
     @State private var topSongsTotal = 0
     @State private var related: [Item] = []
     /// Also on VOD: films or series on demand like this movie or show (LIVE-6).
+    #if !MARQUEE_APP_STORE
     @State private var vodSimilar: [VodSuggestion] = []
+    #endif
     @State private var soundsLike: [Item] = []
     @State private var series: [(collection: Item, members: [Item])] = []
     @State private var watchlisted = false
@@ -78,7 +80,9 @@ struct ItemDetailView: View {
                             ForEach(related, id: \.id) { PosterCard(item: $0) }
                         }
                     }
+                    #if !MARQUEE_APP_STORE
                     VodSuggestionRow(title: "Also on VOD", list: vodSimilar, identifier: "item.alsoOnVod")
+                    #endif
                 }
                 .padding(.bottom, 40)
             } else if let error {
@@ -148,7 +152,9 @@ struct ItemDetailView: View {
             async let sounds: [Item]? = d.type == .artist || d.type == .album ? try? app.soundsLike(id, limit: 15) : []
             async let found = collectionMembers(d.info.collections ?? [])
             async let trail: ItemTrailer? = d.type == .movie || d.type == .show ? try? app.trailer(id) : nil
+            #if !MARQUEE_APP_STORE
             async let onVod: [VodSuggestion]? = d.type == .movie || d.type == .show ? try? app.itemVodSimilar(id) : []
+            #endif
             children = try await kids
             related = await rel ?? []
             let songs = await top
@@ -157,7 +163,9 @@ struct ItemDetailView: View {
             soundsLike = await sounds ?? []
             series = await found
             trailer = await trail
+            #if !MARQUEE_APP_STORE
             vodSimilar = await onVod ?? []
+            #endif
             // Only once it all arrived: a page left while loading (a cast member opened before
             // the shelves came) loads them again on return instead of keeping them empty.
             if !Task.isCancelled { loadedID = id }

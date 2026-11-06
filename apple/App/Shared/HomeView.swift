@@ -19,7 +19,9 @@ struct HomeView: View {
     @State private var videoPlaylists: [Playlist] = []
     @State private var editing = false
     /// A film or episode on demand playing from Continue Watching.
+    #if !MARQUEE_APP_STORE
     @State private var vodPlaying: VodPlayTarget?
+    #endif
     /// Counts loads, so an older one finishing late doesn't put back rows a newer one changed.
     @State private var loads = 0
 
@@ -59,8 +61,10 @@ struct HomeView: View {
                     if hub.id == Self.vodRow {
                         // Watch on VOD (LIVE-6, USER-16): films and series on demand picked
                         // for this viewer.
+                        #if !MARQUEE_APP_STORE
                         VodSuggestionRow(title: hub.title, list: hub.vodEntries ?? [], identifier: "home.vodSuggestions",
                                          seeAll: seeAll(hub))
+                        #endif
                     } else if let mixed = hub.mixedEntries {
                         // Suggestion rows (USER-16): library titles and films and series on
                         // demand together, in the server's order; those on demand are marked VOD
@@ -104,7 +108,9 @@ struct HomeView: View {
                 if loaded {
                     HStack(spacing: 30) {
                         Button { editing = true } label: { Label("Edit Home", systemImage: "slider.horizontal.3") }
-                        NavigationLink(value: Route.museVideo(library: nil)) { Label("Muse", systemImage: "sparkles") }
+                        if app.museOn {
+                            NavigationLink(value: Route.museVideo(library: nil)) { Label("Muse", systemImage: "sparkles") }
+                        }
                     }
                     .padding(.horizontal, sidePadding)
                 }
@@ -116,8 +122,10 @@ struct HomeView: View {
         #if !os(tvOS)
         .toolbar {
             // Muse for movies and shows (USER-15).
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink(value: Route.museVideo(library: nil)) { Label("Muse", systemImage: "sparkles") }
+            if app.museOn {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink(value: Route.museVideo(library: nil)) { Label("Muse", systemImage: "sparkles") }
+                }
             }
             #if !os(macOS)
             ToolbarItem(placement: .topBarTrailing) {
@@ -162,12 +170,16 @@ struct HomeView: View {
             if !loaded || loadedVersion != HomeChanges.shared.version { await load() }
         }
         .onChange(of: video.request) { if video.request == nil { Task { await load() } } }
+        #if !MARQUEE_APP_STORE
         .modifier(VodContinuePlayback(target: $vodPlaying, onDismiss: { Task { await load() } }))
+        #endif
     }
 
     /// A film or episode on demand from Continue Watching, where it stopped.
     private func playVod(_ entry: ContinueEntry) {
+        #if !MARQUEE_APP_STORE
         ActionError.run { vodPlaying = try await app.vodPlayTarget(entry) }
+        #endif
     }
 
     /// Takes an entry off Continue Watching: a library title as before, or one on demand (an
@@ -183,7 +195,9 @@ struct HomeView: View {
         }
         ActionError.run {
             do {
+                #if !MARQUEE_APP_STORE
                 try await app.removeVodFromContinueWatching(entry)
+                #endif
             } catch {
                 hubs = before
                 throw error
@@ -197,7 +211,11 @@ struct HomeView: View {
 
     /// A mixed row's titles, less those on demand this viewer said Not interested to.
     private static func visible(_ entries: [HomeEntry]) -> [HomeEntry] {
+        #if !MARQUEE_APP_STORE
         entries.filter { e in e.vod.map { !VodSuggestionHides.shared.isHidden($0) } ?? true }
+        #else
+        entries.filter { $0.item != nil }
+        #endif
     }
 
     /// Continue Watching with nothing in it (the server may send the row with no library items
@@ -261,7 +279,19 @@ struct HomeView: View {
         loads += 1
         let load = loads
         do {
-            let fresh = try await app.hubs(vod: true, mixed: true).filter {
+            #if !MARQUEE_APP_STORE
+            let all = try await app.hubs(vod: true, mixed: true)
+            #else
+            // No films or episodes on demand, which Continue Watching sends whatever's asked.
+            let all = try await app.hubs().map { hub in
+                guard let entries = hub.entries else { return hub }
+                var only = hub
+                only.entries = entries.filter { $0.item != nil }
+                only.total = only.entries?.count
+                return only
+            }
+            #endif
+            let fresh = all.filter {
                 !Self.isEmptyContinue($0) && !($0.id == Self.vodRow && ($0.vodEntries ?? []).isEmpty)
                     && !($0.mixedEntries?.isEmpty == true && $0.items.isEmpty)
             }
@@ -353,7 +383,9 @@ struct RemoveFromContinueMenu: ViewModifier {
     func body(content: Content) -> some View {
         if action != nil || mark != nil {
             content.contextMenu {
+                #if !MARQUEE_APP_STORE
                 if let mark { VodMarkWatchedButtons(save: mark) }
+                #endif
                 if let action { RemoveFromContinueButton(action: action) }
             }
         } else {

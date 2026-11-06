@@ -78,6 +78,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SystemInfo/inTown`.
             public var inTown: Swift.Bool?
+            /// False when an admin turned Muse off (USER-15, MUSIC-5): apps hide it. Missing (an older server) means on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SystemInfo/muse`.
+            public var muse: Swift.Bool?
             /// Creates a new `SystemInfo`.
             ///
             /// - Parameters:
@@ -92,6 +96,7 @@ extension Components {
             ///   - remoteUrl: The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away.
             ///   - ratingPrompt: The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference.
             ///   - inTown: An admin turned In Town on (MUSIC-27). It's for the whole server, as this needs no sign-in: apps show its button and artist banners only when the signed-in user's restrictions.isKid isn't true too.
+            ///   - muse: False when an admin turned Muse off (USER-15, MUSIC-5): apps hide it. Missing (an older server) means on.
             public init(
                 serverId: Swift.String,
                 serverName: Swift.String,
@@ -103,7 +108,8 @@ extension Components {
                 lanUrl: Swift.String? = nil,
                 remoteUrl: Swift.String? = nil,
                 ratingPrompt: Swift.Bool? = nil,
-                inTown: Swift.Bool? = nil
+                inTown: Swift.Bool? = nil,
+                muse: Swift.Bool? = nil
             ) {
                 self.serverId = serverId
                 self.serverName = serverName
@@ -116,6 +122,7 @@ extension Components {
                 self.remoteUrl = remoteUrl
                 self.ratingPrompt = ratingPrompt
                 self.inTown = inTown
+                self.muse = muse
             }
             public enum CodingKeys: String, CodingKey {
                 case serverId
@@ -129,6 +136,7 @@ extension Components {
                 case remoteUrl
                 case ratingPrompt
                 case inTown
+                case muse
             }
         }
         /// - Remark: Generated from `#/components/schemas/Health`.
@@ -2989,25 +2997,33 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/GeneralSettings/ratingPrompt`.
             public var ratingPrompt: Swift.Bool?
+            /// Muse for music, movies and shows (USER-15, MUSIC-5). Off hides it in every app, and its requests answer 503 with the code muse_off. Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/GeneralSettings/muse`.
+            public var muse: Swift.Bool?
             /// Creates a new `GeneralSettings`.
             ///
             /// - Parameters:
             ///   - serverName:
             ///   - metadataLanguage:
             ///   - ratingPrompt: Ask people to rate a movie or episode when they finish it (USER-19). Default off.
+            ///   - muse: Muse for music, movies and shows (USER-15, MUSIC-5). Off hides it in every app, and its requests answer 503 with the code muse_off. Default on.
             public init(
                 serverName: Swift.String? = nil,
                 metadataLanguage: Swift.String? = nil,
-                ratingPrompt: Swift.Bool? = nil
+                ratingPrompt: Swift.Bool? = nil,
+                muse: Swift.Bool? = nil
             ) {
                 self.serverName = serverName
                 self.metadataLanguage = metadataLanguage
                 self.ratingPrompt = ratingPrompt
+                self.muse = muse
             }
             public enum CodingKeys: String, CodingKey {
                 case serverName
                 case metadataLanguage
                 case ratingPrompt
+                case muse
             }
         }
         /// - Remark: Generated from `#/components/schemas/NetworkSettings`.

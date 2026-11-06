@@ -381,6 +381,45 @@ final class MarqueeUITests: XCTestCase {
         return out
     }
 
+    /// App Store builds leave out Live TV, VOD and Discover; every other build lists Live TV.
+    func testLiveTVOnlyOutsideAppStoreBuilds() {
+        connectAndSignIn()
+        app.tabBars.buttons["Libraries"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Libraries"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Movies'")).firstMatch.waitForExistence(timeout: 15))
+        shot("libraries")
+        #if MARQUEE_APP_STORE
+        XCTAssertFalse(app.buttons["libraries.liveTV"].exists)
+        XCTAssertFalse(app.buttons["libraries.vod"].exists)
+        XCTAssertFalse(app.buttons["libraries.vodShows"].exists)
+        #else
+        XCTAssertTrue(app.buttons["libraries.liveTV"].waitForExistence(timeout: 15))
+        #endif
+    }
+
+    /// An admin turning Muse off (USER-15) hides it from this app. Turned back on, it returns
+    /// when the app next comes to the foreground.
+    func testMuseSwitch() throws {
+        try adminAPI("PATCH", "/settings", ["general": ["muse": false]])
+        addTeardownBlock { try? self.adminAPI("PATCH", "/settings", ["general": ["muse": true]]) }
+        connectAndSignIn()
+        XCTAssertFalse(app.navigationBars["Home"].buttons["Muse"].exists, "Home")
+        openLibrary("Movies")
+        XCTAssertTrue(app.navigationBars["Movies"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Muse"].exists, "a library")
+        shot("muse-off-library")
+        app.tabBars.buttons["Search"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Search"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Muse"].exists, "Search")
+        shot("muse-off-search")
+
+        try adminAPI("PATCH", "/settings", ["general": ["muse": true]])
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(app.buttons["Muse"].waitForExistence(timeout: 15), "Search, back on")
+        shot("muse-on-search")
+    }
+
     /// Watch together (SYNC-1): the admin starts a group over the API; this device joins from
     /// Home, then follows the admin's pause.
     func testWatchTogether() throws {

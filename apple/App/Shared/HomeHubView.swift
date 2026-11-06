@@ -62,9 +62,11 @@ struct HomeHubView: View {
     /// The row's titles: its mixed entries when it has them (less those on demand marked Not
     /// interested), else its library items.
     static func entries(_ hub: Hub) -> [HomeEntry] {
+        #if !MARQUEE_APP_STORE
         if let mixed = hub.mixedEntries {
             return mixed.filter { e in e.vod.map { !VodSuggestionHides.shared.isHidden($0) } ?? true }
         }
+        #endif
         return hub.items.map { HomeEntry(kind: .item, key: "item:\($0.id)", item: $0) }
     }
 
@@ -72,7 +74,11 @@ struct HomeHubView: View {
         loading = true
         defer { loading = false }
         do {
+            #if !MARQUEE_APP_STORE
             hub = try await app.hub(id, mixed: true, limit: 100)
+            #else
+            hub = try await app.hub(id, mixed: false, limit: 100)
+            #endif
             error = nil
         } catch {
             self.error = (error as? MarqueeError)?.message ?? error.localizedDescription
@@ -101,8 +107,11 @@ struct HomeEntryTile: View {
     var body: some View {
         if let item = entry.item {
             PosterCard(item: item, width: width, shape: PosterShape.for(item) == .wide ? .wide : nil, suggestion: suggestion)
-        } else if let s = entry.vod {
+        }
+        #if !MARQUEE_APP_STORE
+        if entry.item == nil, let s = entry.vod {
             VodSuggestionTile(suggestion: s, width: width, mixed: true, watchlist: watchlist)
         }
+        #endif
     }
 }

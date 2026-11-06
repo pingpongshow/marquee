@@ -32,7 +32,12 @@ public extension AppSession {
 
     /// A playlist from a description (Muse, MUSIC-5).
     func muse(_ prompt: String, library: Int64? = nil, limit: Int = 40) async throws -> Station {
-        try await musicAPI.musicMuse(body: .json(.init(prompt: prompt, limit: limit, libraryId: library))).ok.body.json
+        switch try await musicAPI.musicMuse(body: .json(.init(prompt: prompt, limit: limit, libraryId: library))) {
+        case let .ok(r): return try r.body.json
+        case let .badRequest(e): throw MarqueeError((try? e.body.json.message) ?? "Muse didn't understand that.")
+        case let .serviceUnavailable(e): throw MarqueeError((try? e.body.json.message) ?? "Muse isn't available right now.")
+        default: throw MarqueeError("Muse didn't answer.")
+        }
     }
 
     /// A path between two tracks (Sound Journey, MUSIC-4).

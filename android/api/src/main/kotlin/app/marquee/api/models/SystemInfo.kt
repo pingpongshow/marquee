@@ -43,6 +43,7 @@ import kotlinx.serialization.Contextual
  * @param remoteUrl The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away.
  * @param ratingPrompt The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference.
  * @param inTown An admin turned In Town on (MUSIC-27). It's for the whole server, as this needs no sign-in: apps show its button and artist banners only when the signed-in user's restrictions.isKid isn't true too.
+ * @param muse False when an admin turned Muse off (USER-15, MUSIC-5): apps hide it. Missing (an older server) means on.
  */
 @Serializable
 
@@ -85,7 +86,11 @@ data class SystemInfo (
 
     /* An admin turned In Town on (MUSIC-27). It's for the whole server, as this needs no sign-in: apps show its button and artist banners only when the signed-in user's restrictions.isKid isn't true too. */
     @SerialName(value = "inTown")
-    val inTown: kotlin.Boolean? = null
+    val inTown: kotlin.Boolean? = null,
+
+    /* False when an admin turned Muse off (USER-15, MUSIC-5): apps hide it. Missing (an older server) means on. */
+    @SerialName(value = "muse")
+    val muse: kotlin.Boolean? = null
 
 ) {
 

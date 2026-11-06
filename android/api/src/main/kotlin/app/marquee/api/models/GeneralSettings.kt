@@ -34,6 +34,7 @@ import kotlinx.serialization.Contextual
  * @param serverName 
  * @param metadataLanguage 
  * @param ratingPrompt Ask people to rate a movie or episode when they finish it (USER-19). Default off.
+ * @param muse Muse for music, movies and shows (USER-15, MUSIC-5). Off hides it in every app, and its requests answer 503 with the code muse_off. Default on.
  */
 @Serializable
 
@@ -47,7 +48,11 @@ data class GeneralSettings (
 
     /* Ask people to rate a movie or episode when they finish it (USER-19). Default off. */
     @SerialName(value = "ratingPrompt")
-    val ratingPrompt: kotlin.Boolean? = null
+    val ratingPrompt: kotlin.Boolean? = null,
+
+    /* Muse for music, movies and shows (USER-15, MUSIC-5). Off hides it in every app, and its requests answer 503 with the code muse_off. Default on. */
+    @SerialName(value = "muse")
+    val muse: kotlin.Boolean? = null
 
 ) {
 

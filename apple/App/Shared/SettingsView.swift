@@ -38,7 +38,9 @@ struct SettingsView: View {
                     }
                     #else
                     if app.me?.isAdmin == true {
+                        #if !MARQUEE_APP_STORE
                         NavigationLink("Requests", value: Route.settings(.requests))
+                        #endif
                         NavigationLink("Users and Friends", value: Route.settings(.users))
                         NavigationLink("Cinema Trailers", value: Route.settings(.cinema))
                         #if os(iOS)

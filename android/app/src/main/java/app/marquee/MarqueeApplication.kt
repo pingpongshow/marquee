@@ -26,8 +26,8 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
                 if (marquee.state.value == Marquee.State.SignedIn) marquee.scope.launch { marquee.sync.syncNow() }
                 // Live TV entry points follow whether it's usable now (LIVE-1).
                 if (marquee.state.value == Marquee.State.SignedIn) marquee.refreshLiveTv()
-                // Rating requests follow the admin's switch (USER-19).
-                if (marquee.state.value == Marquee.State.SignedIn) marquee.refreshRatingPrompt()
+                // Rating requests and Muse follow the admin's switches (USER-19).
+                if (marquee.state.value == Marquee.State.SignedIn) marquee.refreshInfo()
             }
             override fun onActivityStopped(activity: android.app.Activity) {
                 if (--started == 0) marquee.setForeground(false)

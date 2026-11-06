@@ -1,3 +1,6 @@
+// Left out of App Store builds (scripts/archive-app-store.sh): no Live TV, VOD or Discover there.
+#if !MARQUEE_APP_STORE
+
 import AVKit
 import MarqueeKit
 import SwiftUI
@@ -1321,3 +1324,5 @@ struct VodRatingStars: View {
         .onChange(of: rating) { local = nil }
     }
 }
+
+#endif

@@ -73,7 +73,7 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           label: "General",
           icon: Server,
           component: GeneralSettings,
-          keywords: "server name language restart reboot rating prompt rate stars ask",
+          keywords: "server name language restart reboot rating prompt rate stars ask muse",
           description: "Server identity and defaults.",
         },
         {

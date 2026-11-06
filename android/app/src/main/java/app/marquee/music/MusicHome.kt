@@ -60,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -151,6 +152,7 @@ private class Favorites(val albums: List<ItemSummary> = emptyList(), val artists
 @Composable
 fun MusicHome(nav: NavHostController, library: Library) {
     val marquee = LocalMarquee.current
+    val museOn by marquee.muse.collectAsState()
     val music = LocalMusic.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -226,7 +228,7 @@ fun MusicHome(nav: NavHostController, library: Library) {
                         music.play(tracks, 0, source = "Shuffle All")
                     }
                 })
-                if (enabled) add(Triple("Muse", Icons.Filled.AutoAwesome) { nav.navigate("musicmuse/$lib") })
+                if (enabled && museOn) add(Triple("Muse", Icons.Filled.AutoAwesome) { nav.navigate("musicmuse/$lib") })
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = sidePadding).semantics { contentDescription = "Quick actions" },
                 horizontalArrangement = Arrangement.spacedBy(if (marquee.isTv) 28.dp else 8.dp, if (marquee.isTv) Alignment.Start else Alignment.CenterHorizontally)) {
@@ -293,7 +295,7 @@ fun MusicHome(nav: NavHostController, library: Library) {
                 LibraryRow(Icons.Filled.Category, "Genres", null) { nav.navigate("musicbrowse/$lib/genres") }
                 if (enabled) LibraryRow(Icons.Filled.Waves, "Moods & Styles", null) { nav.navigate("musicbrowse/$lib/moods") }
                 if (enabled && discover?.decades?.isNotEmpty() == true) LibraryRow(Icons.Filled.CalendarMonth, "Decades", discover.decades.size) { nav.navigate("musicbrowse/$lib/decades") }
-                if (enabled) LibraryRow(Icons.Filled.AutoAwesome, "Muse & Stations", null) { nav.navigate("musicmuse/$lib") }
+                if (enabled) LibraryRow(Icons.Filled.AutoAwesome, if (museOn) "Muse & Stations" else "Stations", null) { nav.navigate("musicmuse/$lib") }
             }
         }
     }
@@ -362,8 +364,9 @@ private fun PlaylistCard(p: Playlist, width: Dp, onClick: () -> Unit) {
 @Composable
 fun MusicMuseScreen(nav: NavHostController, libraryId: Long) {
     val d = rememberMusicDiscoverData(libraryId)
+    val museOn by LocalMarquee.current.muse.collectAsState()
     LazyColumn(contentPadding = PaddingValues(sidePadding), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text("Muse & Stations", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        item { Text(if (museOn) "Muse & Stations" else "Stations", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
         item {
             if (d == null) Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             else MusicDiscover(libraryId, d, onOpenPlaylist = { nav.navigate("playlist/$it") })

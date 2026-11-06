@@ -208,12 +208,18 @@ class Marquee(context: Context) {
      */
     val ratingPrompt: StateFlow<Boolean> = _ratingPrompt
 
-    fun refreshRatingPrompt() {
+    private val _muse = MutableStateFlow(true)
+    /** Muse shows unless an admin turned it off on this server (an older server doesn't say). */
+    val muse: StateFlow<Boolean> = _muse
+
+    /** The admin's switches in system info may have changed. */
+    fun refreshInfo() {
         if (baseUrl == null) return
         scope.launch {
             val i = runCatching { system.getSystemInfo() }.getOrNull() ?: return@launch
             info = i
             _ratingPrompt.value = i.ratingPrompt == true
+            _muse.value = i.muse != false
         }
     }
 
@@ -405,6 +411,7 @@ class Marquee(context: Context) {
         baseUrl = chosen.first
         info = chosen.second
         _ratingPrompt.value = chosen.second.ratingPrompt == true
+        _muse.value = chosen.second.muse != false
         _connection.value++
         if (token == null) { _state.value = State.SignedOut; return }
         val me = withContext(Dispatchers.IO) { runCatching { auth.getMe() } }
@@ -449,7 +456,7 @@ class Marquee(context: Context) {
         _me.value = withContext(Dispatchers.IO) { runCatching { auth.getMe() }.getOrNull() }
         _state.value = State.SignedIn
         refreshLiveTv()
-        refreshRatingPrompt()
+        refreshInfo()
     }
 
     suspend fun signOut() {

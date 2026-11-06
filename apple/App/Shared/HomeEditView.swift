@@ -107,7 +107,7 @@ struct HomeEditView: View {
 
     private func load() async {
         do {
-            rows = try await app.homeLayout()
+            rows = Self.shown(try await app.homeLayout())
             error = nil
         } catch {
             self.error = error.localizedDescription
@@ -135,12 +135,21 @@ struct HomeEditView: View {
         save()
     }
 
+    /// An App Store build has no Watch on VOD row to arrange.
+    private static func shown(_ rows: [HomeLayoutRow]) -> [HomeLayoutRow] {
+        #if MARQUEE_APP_STORE
+        rows.filter { $0.id != "vod-suggestions" }
+        #else
+        rows
+        #endif
+    }
+
     private func save() {
         let wanted = rows
         Task {
             do {
                 let saved = try await app.saveHomeLayout(wanted)
-                if rows.map(\.id) == wanted.map(\.id) { rows = saved }
+                if rows.map(\.id) == wanted.map(\.id) { rows = Self.shown(saved) }
                 error = nil
             } catch {
                 self.error = error.localizedDescription

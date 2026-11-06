@@ -88,7 +88,7 @@ targets:
       - target: MarqueeTopShelf
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.marquee.Marquee.tv
+        PRODUCT_BUNDLE_IDENTIFIER: app.marquee.Marquee
         PRODUCT_NAME: Marquee
         CODE_SIGN_ENTITLEMENTS: App/tvOS/MarqueeTV.entitlements
         TARGETED_DEVICE_FAMILY: "3"
@@ -169,7 +169,7 @@ targets:
       - App/TopShelfShared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.marquee.Marquee.tv.topshelf
+        PRODUCT_BUNDLE_IDENTIFIER: app.marquee.Marquee.topshelf
         CODE_SIGN_ENTITLEMENTS: App/TopShelf/TopShelf.entitlements
     info:
       path: App/TopShelf/Info.plist

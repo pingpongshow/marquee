@@ -72,6 +72,8 @@ public final class AppSession {
     /// The address in use (LAN or Tailscale).
     public private(set) var baseURL: URL?
     public private(set) var info: Schemas.SystemInfo?
+    /// Muse shows unless an admin turned it off on this server (an older server doesn't say).
+    public var museOn: Bool { info?.muse != false }
     public private(set) var me: User? {
         didSet {
             // Keep the image key, so image URLs use it from the start next time.

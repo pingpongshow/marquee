@@ -1,3 +1,6 @@
+// Left out of App Store builds (scripts/archive-app-store.sh): no Live TV, VOD or Discover there.
+#if !MARQUEE_APP_STORE
+
 import Foundation
 import MarqueeAPI
 
@@ -90,3 +93,5 @@ public extension VodFollow {
         }
     }
 }
+
+#endif

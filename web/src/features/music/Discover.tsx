@@ -13,6 +13,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { api, imageUrl, unwrap } from "@/api/client";
+import { useMuseOn } from "@/api/queries";
 import type { Station } from "@/api/types";
 import { Alert } from "@/components/ui";
 import { useMusicActions } from "../player/MusicPlayer";
@@ -103,13 +104,14 @@ export function useAlbumFacets(libraryId: number) {
 /** "Listening to your music: n of m tracks analysed" while Soundprint catches up. */
 export function AnalysisNote() {
   const { status: st } = useMusicStatus();
+  const museOn = useMuseOn();
   if (!st?.enabled || st.analyzed >= st.total) return null;
   return (
     <p className="flex items-center gap-2 text-sm text-muted">
       <Sparkles className="size-4 text-accent" aria-hidden />
       {st.available
         ? `Listening to your music: ${st.analyzed.toLocaleString()} of ${st.total.toLocaleString()} tracks analysed. Radios and mixes improve as it goes.`
-        : "The Soundprint analysis service isn't running, so radios and Muse are unavailable."}
+        : `The Soundprint analysis service isn't running, so ${museOn ? "radios and Muse are" : "radios are"} unavailable.`}
     </p>
   );
 }

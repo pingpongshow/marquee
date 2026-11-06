@@ -234,7 +234,7 @@ fun ServerSettingsScreen() {
         ratingPrompt = on
         scope.launch {
             withContext(Dispatchers.IO) { runCatching { marquee.settings.updateSettings(ServerSettingsUpdate(general = app.marquee.api.models.GeneralSettings(ratingPrompt = on))) } }
-                .onSuccess { ratingPrompt = it.general.ratingPrompt == true; generalStatus = null; marquee.refreshRatingPrompt() }
+                .onSuccess { ratingPrompt = it.general.ratingPrompt == true; generalStatus = null; marquee.refreshInfo() }
                 .onFailure { ratingPrompt = before; generalStatus = "Couldn't save: ${serverMessage(it)}" }
         }
     }

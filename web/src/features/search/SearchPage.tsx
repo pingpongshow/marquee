@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { clsx } from "clsx";
 import { Search, Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { searchQuery } from "@/api/queries";
+import { searchQuery, useMuseOn } from "@/api/queries";
 import { Spinner } from "@/components/ui";
 import { Poster } from "../browse/Poster";
 import { TrackRadioButton } from "../music/RadioButtons";
@@ -14,9 +14,11 @@ import { groupLabels, resultSubtitle } from "./SearchBox";
 
 /** Search, with Muse (USER-15) as a second mode: describe what you want to watch. */
 export function SearchPage() {
-  const { q, mode, lib } = useSearch({ from: "/search" });
+  const { q, mode: wanted, lib } = useSearch({ from: "/search" });
   const navigate = useNavigate({ from: "/search" });
-  const tabs = (
+  const museOn = useMuseOn();
+  const mode = museOn ? wanted : undefined;
+  const tabs = museOn && (
     <div className="mb-6 flex w-fit rounded-md bg-surface-2 p-0.5 text-sm" role="tablist" aria-label="Search mode">
       {(
         [

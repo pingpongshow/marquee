@@ -83,12 +83,14 @@ struct MainView: View {
                         switch entry {
                         case .library(let lib):
                             Tab(lib.name, systemImage: icon(lib._type), value: "library-\(lib.id)") { stack { LibraryView(libraryID: lib.id) } }
+                        #if !MARQUEE_APP_STORE
                         case .liveTV:
                             Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right", value: "livetv") { stack { LiveTVView() } }
                         case .vodMovies:
                             Tab("VOD Movies", systemImage: "film.stack", value: "vodMovies") { stack { VodPage() } }
                         case .vodShows:
                             Tab("VOD Shows", systemImage: "play.tv", value: "vodShows") { stack { VodPage(shows: true) } }
+                        #endif
                         }
                     }
                     if libraries.isEmpty, librariesError != nil {
@@ -221,9 +223,11 @@ struct MainView: View {
     @TabContentBuilder<String>
     private var otherTabs: some TabContent<String> {
         Tab("Playlists", systemImage: "music.note.list", value: "playlists") { stack { PlaylistsView() } }
+        #if !MARQUEE_APP_STORE
         if !compact && canDiscover {
             Tab("Discover", systemImage: "safari", value: "discover") { stack { DiscoverView() } }
         }
+        #endif
         #if !os(tvOS)
         if !compact {
             // iPhone lists Downloads under Libraries (a sixth tab would spill into "More").
@@ -282,9 +286,11 @@ struct MainView: View {
 
     private func loadAll() async {
         guard app.client != nil, !app.isOffline else { return }
+        #if !MARQUEE_APP_STORE
         async let requests = try? app.requestsStatus()
         async let live = try? app.liveStatus()
         async let vod = try? app.vodStatus()
+        #endif
         do {
             libraries = try await app.libraries()
             librariesError = nil
@@ -292,6 +298,7 @@ struct MainView: View {
         } catch {
             librariesError = error.localizedDescription
         }
+        #if !MARQUEE_APP_STORE
         // A failed check keeps what was known (a tab doesn't vanish on a blip).
         if let s = await requests { canDiscover = s.enabled && s.canRequest }
         // Live TV is listed when its channels are usable; VOD Movies and VOD Shows (LIVE-6)
@@ -302,6 +309,7 @@ struct MainView: View {
             hasVodShows = v.enabled && v.series > 0
         }
         if let l { hasLiveTV = l.enabled }
+        #endif
     }
 
     private func icon(_ t: Schemas.LibraryType) -> String {
@@ -339,21 +347,26 @@ extension EnvironmentValues {
 /// shows on demand, LIVE-6) right after it when they have something.
 enum LibraryEntry: Identifiable {
     case library(Library)
+    #if !MARQUEE_APP_STORE
     case liveTV
     case vodMovies
     case vodShows
+    #endif
 
     var id: String {
         switch self {
         case .library(let l): "library-\(l.id)"
+        #if !MARQUEE_APP_STORE
         case .liveTV: "liveTV"
         case .vodMovies: "vod"
         case .vodShows: "vodShows"
+        #endif
         }
     }
 
     static func list(_ libraries: [Library], liveTV: Bool, vodMovies: Bool = false, vodShows: Bool = false) -> [LibraryEntry] {
         var out = libraries.map(LibraryEntry.library)
+        #if !MARQUEE_APP_STORE
         let video: Set<Schemas.LibraryType> = [.movies, .shows, .anime, .videos]
         var at = (libraries.lastIndex { video.contains($0._type) }).map { $0 + 1 } ?? libraries.count
         // Live TV after the video libraries when it has channels; VOD Movies and VOD Shows
@@ -367,6 +380,7 @@ enum LibraryEntry: Identifiable {
             at += 1
         }
         if vodShows { out.insert(.vodShows, at: at) }
+        #endif
         return out
     }
 }
@@ -405,6 +419,7 @@ struct LibrariesList: View {
                             Image(systemName: icon(lib._type)).foregroundStyle(Color.marqueeGold)
                         }
                     }
+                #if !MARQUEE_APP_STORE
                 case .liveTV:
                     NavigationLink(value: Route.liveTV) {
                         Label {
@@ -441,6 +456,7 @@ struct LibrariesList: View {
                         }
                     }
                     .accessibilityIdentifier("libraries.vodShows")
+                #endif
                 }
             }
             #if !os(tvOS)
@@ -452,12 +468,14 @@ struct LibrariesList: View {
                 NavigationLink(value: Route.downloads) {
                     Label("Downloads", systemImage: "arrow.down.circle").foregroundStyle(.primary)
                 }
+                #if !MARQUEE_APP_STORE
                 // iPhone: Discover lives here (a sixth tab would spill into "More").
                 if canDiscover {
                     NavigationLink(value: Route.discover) {
                         Label("Discover", systemImage: "safari").foregroundStyle(.primary)
                     }
                 }
+                #endif
             }
             #endif
         }
@@ -470,7 +488,9 @@ struct LibrariesList: View {
     }
 
     private func loadDiscover() async {
+        #if !MARQUEE_APP_STORE
         if let s = try? await app.requestsStatus() { canDiscover = s.enabled && s.canRequest }
+        #endif
     }
 }
 

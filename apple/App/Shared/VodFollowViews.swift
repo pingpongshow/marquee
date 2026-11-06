@@ -1,3 +1,6 @@
+// Left out of App Store builds (scripts/archive-app-store.sh): no Live TV, VOD or Discover there.
+#if !MARQUEE_APP_STORE
+
 import MarqueeKit
 import SwiftUI
 
@@ -276,3 +279,5 @@ struct VodFollowingLink: View {
         .onAppear { Task { count = (try? await app.vodFollows().count) ?? count } }
     }
 }
+
+#endif

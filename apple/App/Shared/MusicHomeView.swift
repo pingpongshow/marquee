@@ -115,7 +115,7 @@ struct MusicHomeView: View {
                     row("Decades", "calendar", .musicBrowse(library: libraryID, .decades), id: "decades")
                 }
                 if soundprint {
-                    row("Muse & Stations", "wand.and.stars", .musicMuse(library: libraryID), id: "muse", last: true)
+                    row(app.museOn ? "Muse & Stations" : "Stations", "wand.and.stars", .musicMuse(library: libraryID), id: "muse", last: true)
                 }
             }
             #if !os(tvOS)
@@ -178,7 +178,7 @@ struct MusicHomeView: View {
                     guard !tracks.isEmpty else { throw MarqueeError("There's no music here yet.") }
                     music.play(tracks, source: "Shuffle All")
                 }
-                if soundprint {
+                if soundprint, app.museOn {
                     NavigationLink(value: Route.musicMuse(library: libraryID)) { roundLabel("Muse", "wand.and.stars") }
                         .buttonStyle(roundStyle)
                         .accessibilityLabel("Muse")

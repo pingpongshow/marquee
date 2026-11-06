@@ -114,6 +114,7 @@ fun HomeScreen(nav: NavHostController) {
     val connection by marquee.connection.collectAsState()
     val me by marquee.me.collectAsState()
     val offline by marquee.offline.collectAsState()
+    val museOn by marquee.muse.collectAsState()
     var groups by remember { mutableStateOf(emptyList<app.marquee.api.models.WatchGroup>()) }
     LaunchedEffect(connection) {
         while (true) {
@@ -153,7 +154,7 @@ fun HomeScreen(nav: NavHostController) {
                     Row(Modifier.padding(horizontal = sidePadding).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Home", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         // Muse: describe what to watch (USER-15).
-                        if (!offline) IconButton({ nav.navigate("muse") }, Modifier.focusRing()) { Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold) }
+                        if (!offline && museOn) IconButton({ nav.navigate("muse") }, Modifier.focusRing()) { Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold) }
                         // Rows: order, hide and pinned collections and playlists (USER-12).
                         if (!offline) androidx.compose.material3.TextButton({ nav.navigate("edithome") }, Modifier.focusRing()) {
                             Icon(Icons.Filled.Edit, null)
@@ -403,6 +404,7 @@ enum class LibrarySort(val label: String, val api: app.marquee.api.apis.ItemsApi
 @Composable
 fun LibraryScreen(nav: NavHostController, libraryId: Long, initialSort: String? = null) {
     val marquee = LocalMarquee.current
+    val museOn by marquee.muse.collectAsState()
     // Kept while the library is on the back stack, so coming back keeps its place in the grid.
     val items = rememberCached("library-$libraryId-items") { mutableStateListOf<ItemSummary>() }
     var total by rememberCached("library-$libraryId-total") { mutableIntStateOf(-1) }
@@ -448,7 +450,7 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long, initialSort: String? 
         Row(Modifier.padding(horizontal = sidePadding, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(library?.name ?: "", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             // Muse for movies and shows (USER-15).
-            if (library?.type in listOf(LibraryType.MOVIES, LibraryType.SHOWS, LibraryType.ANIME)) IconButton({ nav.navigate("muse?lib=$libraryId") }, Modifier.focusRing()) {
+            if (museOn && library?.type in listOf(LibraryType.MOVIES, LibraryType.SHOWS, LibraryType.ANIME)) IconButton({ nav.navigate("muse?lib=$libraryId") }, Modifier.focusRing()) {
                 Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold)
             }
             if (library?.type == LibraryType.MOVIES) listOf(false to "All", true to "Collections").forEach { (c, label) ->
@@ -781,6 +783,7 @@ private fun PlaylistMenu(p: app.marquee.api.models.Playlist, nav: NavHostControl
 @Composable
 fun SearchScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
+    val museOn by marquee.muse.collectAsState()
     // Saved, so coming back from a result (or another tab) keeps the search and runs it again.
     var q by rememberSaveable { mutableStateOf("") }
     var results by remember { mutableStateOf<SearchResults?>(null) }
@@ -799,12 +802,12 @@ fun SearchScreen(nav: NavHostController) {
     // Muse (USER-15): describe what you want to watch instead of searching by name.
     var muse by rememberSaveable { mutableStateOf(false) }
     Column {
-        Row(Modifier.padding(start = sidePadding, end = sidePadding, top = sidePadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (museOn) Row(Modifier.padding(start = sidePadding, end = sidePadding, top = sidePadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(!muse, { muse = false }, { Text("Search") }, Modifier.focusRing(RoundedCornerShape(8.dp)))
             FilterChip(muse, { muse = true }, { Text("Muse") }, Modifier.focusRing(RoundedCornerShape(8.dp)),
                 leadingIcon = { Icon(Icons.Filled.AutoAwesome, null, Modifier.size(18.dp)) })
         }
-        if (muse) { MuseVideoPanel(nav, null); return@Column }
+        if (muse && museOn) { MuseVideoPanel(nav, null); return@Column }
         OutlinedTextField(q, { q = it }, label = { Text("Search movies, shows, music…") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(sidePadding),
             leadingIcon = { Icon(Icons.Filled.Search, null) },
             trailingIcon = if (q.isEmpty()) null else { { IconButton({ q = "" }, Modifier.focusRing()) { Icon(Icons.Filled.Close, "Clear search") } } },
@@ -834,7 +837,7 @@ fun SettingsScreen(nav: NavHostController) {
     val offline by marquee.offline.collectAsState()
     val scope = rememberCoroutineScope()
     // The rating switch below shows only while the server asks for ratings (USER-19).
-    LaunchedEffect(Unit) { marquee.refreshRatingPrompt() }
+    LaunchedEffect(Unit) { marquee.refreshInfo() }
     var switching by remember { mutableStateOf(false) }
     if (switching) ProfileSwitcher(nav, onDismiss = { switching = false })
     var signingOut by remember { mutableStateOf(false) }

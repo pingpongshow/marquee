@@ -47,12 +47,14 @@ struct SearchView: View {
                 .padding(.leading, 150)
                 .padding(.trailing, sidePadding)
                 #endif
-                Picker("Search mode", selection: $mode) {
-                    ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                if app.museOn {
+                    Picker("Search mode", selection: $mode) {
+                        ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .macLabelsHidden()
+                    .padding(.horizontal, sidePadding)
                 }
-                .pickerStyle(.segmented)
-                .macLabelsHidden()
-                .padding(.horizontal, sidePadding)
                 if mode == .muse {
                     if muse.result == nil && !muse.busy {
                         Text("Describe what you want to watch, or try one of these:").font(.callout).foregroundStyle(.secondary)
@@ -89,6 +91,7 @@ struct SearchView: View {
             muse.run(app, library: nil)
         }
         .onChange(of: muse.prompt) { if mode == .muse, query != muse.prompt { query = muse.prompt } }
+        .onChange(of: app.museOn) { if !app.museOn { mode = .library } }
         .task(id: "\(mode)|\(query)") {
             guard mode == .library else { return }
             let q = query.trimmingCharacters(in: .whitespaces)

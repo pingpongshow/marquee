@@ -682,6 +682,26 @@ class MarqueeUiTest {
         return okhttp3.OkHttpClient().newCall(req).execute().use { it.body!!.string() }
     }
 
+    /** An admin turning Muse off (USER-15) hides it from this app; turned back on, it returns. */
+    @Test fun museSwitch() {
+        adminApi("PATCH", "/settings", """{"general":{"muse":false}}""")
+        try {
+            connectAndSignIn()
+            rule.onAllNodes(hasContentDescription("Muse")).assertCountEquals(0)
+            shot("muse-off-home")
+            tap("Search")
+            rule.waitUntilAtLeastOneExists(hasText("Search movies, shows, music…"), 10_000)
+            rule.onAllNodesWithText("Muse").assertCountEquals(0)
+            shot("muse-off-search")
+            adminApi("PATCH", "/settings", """{"general":{"muse":true}}""")
+            (context.applicationContext as MarqueeApplication).marquee.refreshInfo()
+            rule.waitUntilAtLeastOneExists(hasText("Muse"), 15_000)
+            shot("muse-on-search")
+        } finally {
+            adminApi("PATCH", "/settings", """{"general":{"muse":true}}""")
+        }
+    }
+
     /** Watch together (SYNC-1): the admin starts a group; this device joins from Home and follows the admin's pause. */
     @Test fun watchTogether() {
         val created = adminApi("POST", "/syncplay/groups", """{"itemId":359,"positionMs":30000}""")

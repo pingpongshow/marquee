@@ -68,6 +68,12 @@ export function GeneralSettings() {
           checked={!!s.draft.ratingPrompt}
           onChange={(v) => s.update({ ratingPrompt: v })}
         />
+        <Toggle
+          label="Muse"
+          help="Lets people describe the music, movies and shows they want in words. Turning it off hides Muse in the web app and every other app on this server. Radios, mixes and recommendations keep working."
+          checked={!!s.draft.muse}
+          onChange={(v) => s.update({ muse: v })}
+        />
       </Card>
       <div className="mt-6">
         <RestartServer />

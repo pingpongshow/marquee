@@ -20,12 +20,16 @@ struct ContinueEntryTile: View {
             } else {
                 PosterCard(item: item, shape: PosterShape.for(item) == .wide ? .wide : nil, onRemoveFromContinue: onRemove)
             }
-        } else {
+        }
+        #if !MARQUEE_APP_STORE
+        if entry.item == nil {
             VodContinueCard(entry: entry, onRemove: onRemove, play: { playVod(entry) })
         }
+        #endif
     }
 }
 
+#if !MARQUEE_APP_STORE
 /// A film or episode on demand in Continue Watching: wide art like the library's tiles, and a
 /// tap resumes it in the VOD player (an episode with Up Next).
 struct VodContinueCard: View {
@@ -79,6 +83,8 @@ struct VodMarkWatchedButtons: View {
     }
 }
 
+#endif
+
 /// The row's last tile when there's more than it shows: opens the Continue Watching page.
 struct ContinueViewMoreTile: View {
     let total: Int
@@ -111,6 +117,7 @@ struct ContinueViewMoreTile: View {
     #endif
 }
 
+#if !MARQUEE_APP_STORE
 /// Plays Continue Watching's films and episodes on demand full screen: `target` is what's
 /// playing; `onDismiss` runs when the player closes (the list refreshes then).
 struct VodContinuePlayback: ViewModifier {
@@ -133,6 +140,7 @@ extension AppSession {
         return nil
     }
 }
+#endif
 
 /// Every Continue Watching entry, newest first, a page at a time as it scrolls (Home's row
 /// shows the first 20).
@@ -141,9 +149,13 @@ struct ContinueWatchingView: View {
     @Environment(VideoPresenter.self) private var video
     @State private var entries: [ContinueEntry] = []
     @State private var total: Int?
+    /// How many the server has sent (an App Store build shows fewer: no films on demand).
+    @State private var fetched = 0
     @State private var loading = false
     @State private var error: String?
+    #if !MARQUEE_APP_STORE
     @State private var playing: VodPlayTarget?
+    #endif
 
     private static let pageSize = 50
 
@@ -188,7 +200,9 @@ struct ContinueWatchingView: View {
         .onChange(of: video.request) { if video.request == nil { Task { await reload() } } }
         // Marked watched or unwatched (or removed) from a tile's menu: it's left the list.
         .onChange(of: HomeChanges.shared.version) { Task { await reload() } }
+        #if !MARQUEE_APP_STORE
         .modifier(VodContinuePlayback(target: $playing, onDismiss: { Task { await reload() } }))
+        #endif
     }
 
     #if os(tvOS)
@@ -202,7 +216,8 @@ struct ContinueWatchingView: View {
         defer { loading = false }
         do {
             let page = try await app.continueWatching(offset: 0, limit: Self.pageSize)
-            entries = page.entries
+            entries = Self.shown(page.entries)
+            fetched = page.entries.count
             total = page.total
             error = nil
         } catch is CancellationError {
@@ -212,21 +227,32 @@ struct ContinueWatchingView: View {
     }
 
     private func loadMore() async {
-        guard !loading, let total, entries.count < total else { return }
+        guard !loading, let total, fetched < total else { return }
         loading = true
         defer { loading = false }
         do {
-            let page = try await app.continueWatching(offset: entries.count, limit: Self.pageSize)
+            let page = try await app.continueWatching(offset: fetched, limit: Self.pageSize)
             let have = Set(entries.map(\.key))
-            entries += page.entries.filter { !have.contains($0.key) }
+            entries += Self.shown(page.entries).filter { !have.contains($0.key) }
+            fetched += page.entries.count
             self.total = page.total
         } catch {
             ActionError.shared.message = error.localizedDescription
         }
     }
 
+    private static func shown(_ entries: [ContinueEntry]) -> [ContinueEntry] {
+        #if !MARQUEE_APP_STORE
+        entries
+        #else
+        entries.filter { $0.item != nil }
+        #endif
+    }
+
     private func play(_ entry: ContinueEntry) {
+        #if !MARQUEE_APP_STORE
         ActionError.run { playing = try await app.vodPlayTarget(entry) }
+        #endif
     }
 
     /// Gone at once (an episode takes the rest of its show with it), then confirmed by the server.
@@ -240,7 +266,9 @@ struct ContinueWatchingView: View {
                 if let item = entry.item {
                     try await app.removeFromContinueWatching(item.id)
                 } else {
+                    #if !MARQUEE_APP_STORE
                     try await app.removeVodFromContinueWatching(entry)
+                    #endif
                 }
             } catch {
                 (entries, total) = before

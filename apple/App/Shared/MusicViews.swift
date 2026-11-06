@@ -23,26 +23,26 @@ struct MuseStationsView: View {
                     if status.analyzed < status.total {
                         Label(status.available
                               ? "Listening to your music: \(status.analyzed.formatted()) of \(status.total.formatted()) tracks analysed. Radios and mixes improve as it goes."
-                              : "The Soundprint analysis service isn't running, so radios and Muse are unavailable.",
+                              : "The Soundprint analysis service isn't running, so \(app.museOn ? "radios and Muse are" : "radios are") unavailable.",
                               systemImage: "sparkles")
                             .font(.footnote).foregroundStyle(.secondary)
                             .padding(.horizontal, sidePadding)
                     }
                     if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
-                    muse
+                    if app.museOn { muse }
                     stations
                 }
                 .padding(.vertical)
                 .disabled(busy)
                 .savePlaylistFlow($saveRequest)
             } else if loaded {
-                ContentUnavailableView("Muse is off", systemImage: "wand.and.stars",
-                                       description: Text("Muse and stations need the server's Soundprint analysis."))
+                ContentUnavailableView(app.museOn ? "Muse is off" : "Stations are off", systemImage: "wand.and.stars",
+                                       description: Text("\(app.museOn ? "Muse and stations need" : "Stations need") the server's Soundprint analysis."))
             } else {
                 ProgressView().padding(.top, 80)
             }
         }
-        .navigationTitle("Muse & Stations")
+        .navigationTitle(app.museOn ? "Muse & Stations" : "Stations")
         .task { await load() }
     }
 

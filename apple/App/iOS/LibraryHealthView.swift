@@ -418,6 +418,7 @@ struct IntegrationsView: View {
     var body: some View {
         Form {
             if let error { ErrorBanner(message: error) }
+            #if !MARQUEE_APP_STORE
             Section {
                 TextField(text: $seerrURL) { Text(verbatim: "Address, e.g. http://192.168.1.20:5055") } // verbatim: a localized key showed the address as a blue link
                     .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -425,6 +426,7 @@ struct IntegrationsView: View {
             } header: {
                 Text("Seerr (requests)")
             }
+            #endif
             Section {
                 TextField(text: $bazarrURL) { Text(verbatim: "Address, e.g. http://192.168.1.20:6767") } // verbatim: a localized key showed the address as a blue link
                     .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()

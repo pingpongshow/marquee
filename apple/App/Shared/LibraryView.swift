@@ -143,7 +143,7 @@ struct LibraryGrid: View {
     }
 
     @ViewBuilder private var museLink: some View {
-        if [.movies, .shows, .anime, .videos].contains(library._type) {
+        if app.museOn, [.movies, .shows, .anime, .videos].contains(library._type) {
             // Muse for this library (USER-15).
             NavigationLink(value: Route.museVideo(library: libraryID)) { Label("Muse", systemImage: "sparkles") }
         }

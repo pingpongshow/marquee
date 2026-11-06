@@ -4765,6 +4765,8 @@ export interface components {
             ratingPrompt?: boolean;
             /** @description An admin turned In Town on (MUSIC-27). It's for the whole server, as this needs no sign-in: apps show its button and artist banners only when the signed-in user's restrictions.isKid isn't true too. */
             inTown?: boolean;
+            /** @description False when an admin turned Muse off (USER-15, MUSIC-5): apps hide it. Missing (an older server) means on. */
+            muse?: boolean;
         };
         Health: {
             /** @enum {string} */
@@ -5429,6 +5431,8 @@ export interface components {
             metadataLanguage?: string;
             /** @description Ask people to rate a movie or episode when they finish it (USER-19). Default off. */
             ratingPrompt?: boolean;
+            /** @description Muse for music, movies and shows (USER-15, MUSIC-5). Off hides it in every app, and its requests answer 503 with the code muse_off. Default on. */
+            muse?: boolean;
         };
         NetworkSettings: {
             /** @description CIDRs treated as the local network. Everything else (including Tailscale) is remote. */

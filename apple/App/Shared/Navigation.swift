@@ -11,6 +11,7 @@ enum Route: Hashable {
     /// All of an artist's top songs (MUSIC-24), from the artist page's More.
     case topSongs(artist: Int64, name: String)
     case downloads
+    #if !MARQUEE_APP_STORE
     case discover
     /// Live TV, listed with the libraries.
     case liveTV
@@ -26,6 +27,7 @@ enum Route: Hashable {
     case vodSeries(Int64)
     /// The shows on demand the person follows (new episodes saved automatically).
     case vodFollowing
+    #endif
     /// Every Continue Watching entry, library and on demand (Home's row's View more).
     case continueWatching
     /// A Home row in full (its See all), by hub id, titled as on Home.
@@ -92,6 +94,7 @@ private func routeView(_ route: Route) -> some View {
     #else
     case .downloads: EmptyView()
     #endif
+    #if !MARQUEE_APP_STORE
     case .discover: DiscoverView()
     case .liveTV: LiveTVView()
     case .liveTVMovies: VodPage()
@@ -100,6 +103,7 @@ private func routeView(_ route: Route) -> some View {
     case .vodMovie(let id): VodMovieView(id: id)
     case .vodSeries(let id): VodSeriesView(id: id)
     case .vodFollowing: VodFollowingView()
+    #endif
     case .continueWatching: ContinueWatchingView()
     case let .homeHub(id, title): HomeHubView(id: id, title: title)
     case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
@@ -139,7 +143,11 @@ private func settingsPage(_ page: SettingsPage) -> some View {
     case .editHome: HomeEditView()
     case .subtitleAppearance: SubtitleAppearanceView()
     #if !os(macOS)
+    #if !MARQUEE_APP_STORE
     case .requests: RequestApprovalsView()
+    #else
+    case .requests: EmptyView()
+    #endif
     case .users: UsersView()
     case .cinema: CinemaSettingsView()
     #else

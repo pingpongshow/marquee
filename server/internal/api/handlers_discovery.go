@@ -122,6 +122,9 @@ func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (M
 	if _, ok := session(ctx); !ok {
 		return MuseVideo401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
+	if !h.Settings.Get().General.Muse {
+		return MuseVideo503JSONResponse{ServiceUnavailableJSONResponse(errMuseOff)}, nil
+	}
 	b := req.Body
 	prompt := strings.TrimSpace(b.Prompt)
 	if len(prompt) < 2 || len(prompt) > 300 {

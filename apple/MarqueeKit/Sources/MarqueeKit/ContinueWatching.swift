@@ -20,6 +20,7 @@ public extension AppSession {
         return (page.entries, page.total)
     }
 
+#if !MARQUEE_APP_STORE
     /// Takes a film on demand, or an episode's whole show, off Continue Watching until it's played again.
     func removeVodFromContinueWatching(_ entry: ContinueEntry) async throws {
         if let m = entry.vodMovie {
@@ -57,6 +58,7 @@ public extension AppSession {
         default: throw MarqueeError("Couldn't remove it from Continue Watching.")
         }
     }
+#endif
 }
 
 public extension ContinueEntry {
@@ -67,6 +69,7 @@ public extension ContinueEntry {
         return vodEpisode?.seriesTitle ?? ""
     }
 
+#if !MARQUEE_APP_STORE
     /// The second line for one on demand: "VOD · 1985", "VOD · S1 · E3 · Pilot".
     var vodSubtitle: String {
         if let m = vodMovie { return (["VOD"] + [m.year.map(String.init)].compactMap { $0 }).joined(separator: " · ") }
@@ -80,6 +83,7 @@ public extension ContinueEntry {
         if let m = vodMovie { return "/api/v1/livetv/vod/movies/\(m.id)/image?kind=backdrop" }
         return vodEpisode?.stillUrl ?? seriesPosterUrl
     }
+#endif
 
     /// How far through (0…1) for the progress bar; nil when not started or the length is unknown.
     var progress: Double? {

@@ -62,6 +62,7 @@ struct VideoMuseView: View {
             VStack(alignment: .leading, spacing: 18) {
                 promptField
                 VideoMuseChips(muse: muse, libraryID: libraryID)
+                #if !MARQUEE_APP_STORE
                 if canVod {
                     Toggle(isOn: $includeVod) { Label("Include VOD", systemImage: "play.tv") }
                         #if !os(tvOS)
@@ -72,17 +73,20 @@ struct VideoMuseView: View {
                         .padding(.horizontal, sidePadding)
                         .accessibilityIdentifier("muse.includeVod")
                 }
+                #endif
                 VideoMuseResults(muse: muse)
             }
             .padding(.vertical)
         }
         .navigationTitle("Muse")
+        #if !MARQUEE_APP_STORE
         .task {
             guard libraryID == nil else { return }
             canVod = (try? await app.vodStatus())?.enabled == true
             muse.includeVod = canVod && includeVod
         }
         .onChange(of: includeVod) { muse.includeVod = canVod && includeVod }
+        #endif
     }
 
     private var promptField: some View {
@@ -151,7 +155,11 @@ struct VideoMuseResults: View {
                     }
                 }
                 .padding(.horizontal, sidePadding)
+                #if !MARQUEE_APP_STORE
                 let onVod = VodSuggestionHides.shared.visible(r.vod ?? [])
+                #else
+                let onVod: [Never] = []
+                #endif
                 if r.items.isEmpty {
                     ContentUnavailableView("Nothing matched", systemImage: "sparkles",
                                            description: Text(onVod.isEmpty ? "Try describing it another way." : "Nothing in your libraries matches that."))
@@ -174,6 +182,7 @@ struct VideoMuseResults: View {
                     }
                     .padding(.horizontal, sidePadding)
                 }
+                #if !MARQUEE_APP_STORE
                 if !onVod.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("On VOD").font(.headline).padding(.horizontal, sidePadding)
@@ -184,6 +193,7 @@ struct VideoMuseResults: View {
                     }
                     .accessibilityIdentifier("muse.onVod")
                 }
+                #endif
             }
         }
     }

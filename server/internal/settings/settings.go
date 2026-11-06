@@ -442,6 +442,8 @@ type General struct {
 	MetadataLanguage string `json:"metadataLanguage"`
 	// RatingPrompt asks people to rate a movie or episode when they finish it (USER-19).
 	RatingPrompt bool `json:"ratingPrompt"`
+	// Muse lets people describe music, movies and shows in words (USER-15, MUSIC-5). On by default.
+	Muse bool `json:"muse"`
 }
 
 type Network struct {
@@ -516,7 +518,7 @@ type Tasks struct {
 func Defaults() Settings {
 	return Settings{
 		Security: Security{PinSignIn: "local"},
-		General:  General{ServerName: "Marquee", MetadataLanguage: "en-US"},
+		General:  General{ServerName: "Marquee", MetadataLanguage: "en-US", Muse: true},
 		// A new background starts part way to the theme's own, so text on it stays readable.
 		Appearance: Appearance{BackgroundMode: "tile", BackgroundDim: 40},
 		Network: Network{

@@ -37,6 +37,21 @@ func TestDefaultAlertsOnNewServer(t *testing.T) {
 	}
 }
 
+// Servers updated from before the Muse switch keep Muse on.
+func TestMuseStaysOnForExistingServers(t *testing.T) {
+	d := openDB(t)
+	if _, err := d.Exec(`INSERT INTO settings(key, value) VALUES (?, ?)`, keyServer, `{"general":{"serverName":"Old","ratingPrompt":true}}`); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(context.Background(), d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g := s.Get().General; !g.Muse || g.ServerName != "Old" {
+		t.Errorf("general: %+v", g)
+	}
+}
+
 // Existing servers get the two alerts added once; an admin turning one off later keeps it
 // off across restarts.
 func TestAlertsUpgradeOnce(t *testing.T) {

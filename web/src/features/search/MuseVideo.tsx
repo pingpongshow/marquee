@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { ListPlus, Loader2, Sparkles } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
-import { librariesQuery } from "@/api/queries";
+import { librariesQuery, useMuseOn } from "@/api/queries";
 import { Alert, Button } from "@/components/ui";
 import { toast } from "@/components/Toast";
 import { Poster } from "../browse/Poster";
@@ -162,6 +162,8 @@ export function MuseVideo({ libraryId, initialPrompt = "" }: { libraryId?: numbe
 
 /** The sparkle button that opens Muse (Home and video library pages). */
 export function MuseButton({ libraryId }: { libraryId?: number }) {
+  const on = useMuseOn();
+  if (!on) return null;
   return (
     <Link
       to="/search"

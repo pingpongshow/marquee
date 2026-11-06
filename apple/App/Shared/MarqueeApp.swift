@@ -131,7 +131,9 @@ struct RootView: View {
         FavoriteStore.shared.reset()
         DislikeStore.shared.reset()
         WatchlistStore.shared.reset()
+        #if !MARQUEE_APP_STORE
         VodSuggestionHides.shared.reset()
+        #endif
         SearchText.shared.query = ""
         RatingPrompt.shared.pending = nil
     }

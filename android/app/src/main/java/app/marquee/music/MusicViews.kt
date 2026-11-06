@@ -146,6 +146,7 @@ fun rememberMusicDiscoverData(libraryId: Long): MusicDiscoverData? {
 @Composable
 fun MusicDiscover(libraryId: Long, d: MusicDiscoverData, onOpenPlaylist: ((Long) -> Unit)? = null) {
     val marquee = LocalMarquee.current
+    val museOn by marquee.muse.collectAsState()
     val music = LocalMusic.current
     val scope = rememberCoroutineScope()
     var prompt by remember { mutableStateOf("") }
@@ -157,8 +158,9 @@ fun MusicDiscover(libraryId: Long, d: MusicDiscoverData, onOpenPlaylist: ((Long)
     var savedMix by remember { mutableStateOf<app.marquee.api.models.Playlist?>(null) }
     val st = d.status
     if (st == null || !d.enabled) {
-        Text(if (st?.enabled == true) "Muse and stations start once Soundprint has analysed some of your music."
-            else "Muse and stations need the Soundprint analysis service, which isn't turned on.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val what = if (museOn) "Muse and stations" else "Stations"
+        Text(if (st?.enabled == true) "$what start once Soundprint has analysed some of your music."
+            else "$what need the Soundprint analysis service, which isn't turned on.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
 
@@ -188,7 +190,7 @@ fun MusicDiscover(libraryId: Long, d: MusicDiscoverData, onOpenPlaylist: ((Long)
         AnalysisNote(st)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (museOn) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Filled.AutoAwesome, null, tint = Gold)
                 Text("Muse", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -234,9 +236,10 @@ fun MusicDiscover(libraryId: Long, d: MusicDiscoverData, onOpenPlaylist: ((Long)
 /** How far Soundprint has got, while it's still listening (or that it isn't running). */
 @Composable
 fun AnalysisNote(st: MusicStatus) {
+    val museOn by LocalMarquee.current.muse.collectAsState()
     if (st.analyzed < st.total) Text(
         if (st.available) "Listening to your music: ${st.analyzed} of ${st.total} tracks analysed. Radios and mixes improve as it goes."
-        else "The Soundprint analysis service isn't running, so radios and Muse are unavailable.",
+        else "The Soundprint analysis service isn't running, so ${if (museOn) "radios and Muse are" else "radios are"} unavailable.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }

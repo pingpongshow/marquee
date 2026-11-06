@@ -92,6 +92,17 @@ final class MarqueeTVUITests: XCTestCase {
         XCTAssertTrue(homeShows())
     }
 
+    /// App Store builds leave out Live TV, VOD and Discover; every other build lists Live TV.
+    func testLiveTVOnlyOutsideAppStoreBuilds() throws {
+        try signIn()
+        XCTAssertTrue(app.buttons["Music"].firstMatch.waitForExistence(timeout: 10))
+        #if MARQUEE_APP_STORE
+        XCTAssertFalse(app.buttons["Live TV"].firstMatch.exists)
+        #else
+        XCTAssertTrue(app.buttons["Live TV"].firstMatch.waitForExistence(timeout: 15))
+        #endif
+    }
+
     /// While music plays a Now Playing bar runs along the bottom of every page: down from the page
     /// focuses it, selecting it opens Now Playing over the page, and Back returns to the page.
     func testNowPlayingBar() throws {

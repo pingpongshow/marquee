@@ -10,7 +10,7 @@ Paste these into App Store Connect. Character limits are in brackets.
 Watch and listen to your own movies, shows and music from your Marquee server, at home and away, with downloads for offline and a music player built around your library.
 
 **Keywords [100]:**
-media server,self-hosted,home theater,movies,music player,personal library,streaming,offline,NAS,DVR
+media server,self-hosted,home theater,movies,music player,personal library,streaming,offline,NAS
 
 **Support URL:** https://github.com/pingpongshow/marquee/issues
 **Marketing URL:** https://github.com/pingpongshow/marquee

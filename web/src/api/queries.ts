@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, session, unwrap } from "./client";
 import type { LibraryCreate, LibraryUpdate, MeUpdate, ServerSettingsUpdate, UserCreate, UserUpdate } from "./types";
 
@@ -7,6 +7,11 @@ export const systemInfoQuery = queryOptions({
   queryFn: () => unwrap(api.GET("/system/info")),
   staleTime: 30_000,
 });
+
+/** Whether to show Muse: on unless an admin turned it off (an older server doesn't say). */
+export function useMuseOn() {
+  return useQuery(systemInfoQuery).data?.muse !== false;
+}
 
 export const meQuery = queryOptions({
   queryKey: ["me"],
