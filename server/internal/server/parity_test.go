@@ -3,6 +3,8 @@ package server
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"marquee/internal/api"
@@ -72,6 +74,8 @@ func TestSmartCollectionsHomeLayoutCinema(t *testing.T) {
 	}
 	var hubs []api.Hub
 	h.do("GET", "/hubs/home", nil, &hubs)
+	// The decade row takes turns by the day, and the 90s one has films in it here.
+	hubs = slices.DeleteFunc(hubs, func(hub api.Hub) bool { return strings.HasPrefix(hub.Id, "decade-") })
 	if len(hubs) != 3 || hubs[0].Id != recent || hubs[1].Id != pin || len(hubs[1].Items) != 1 || hubs[2].Id != "top-rated" {
 		t.Fatalf("hubs: %+v", hubs)
 	}
