@@ -207,6 +207,7 @@ private fun Routes(nav: NavHostController) {
         composable(CONTINUE_ROUTE) { ContinueWatchingScreen(nav) }
         composable("libraries") { LibrariesScreen(nav) }
         composable("playlists") { PlaylistsScreen(nav) }
+        composable("playlists/folder/{id}", listOf(navArgument("id") { type = NavType.LongType })) { PlaylistsScreen(nav, it.arguments!!.getLong("id")) }
         composable("search") { SearchScreen(nav) }
         composable("settings") { SettingsScreen(nav) }
         composable("library/{id}?sort={sort}", listOf(navArgument("id") { type = NavType.LongType },

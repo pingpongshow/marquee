@@ -26,6 +26,8 @@ type Playlist struct {
 	OwnerName     string
 	SharedWithAll bool
 	ShareCount    int
+	// FolderID is the viewer's folder the playlist is in (MUSIC-28), 0 if none.
+	FolderID int64
 }
 
 type PlaylistEntry struct {
@@ -117,6 +119,9 @@ func (s *Store) scanPlaylists(ctx context.Context, acc Access, q string, args ..
 		if err != nil {
 			return nil, err
 		}
+	}
+	if err := s.fillPlaylistFolders(ctx, acc.UserID, out); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

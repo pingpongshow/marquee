@@ -57,6 +57,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -502,16 +505,27 @@ internal fun <T> positionAmong(items: List<T>, i: Int, match: (T) -> Boolean): I
     if (i !in items.indices || !match(items[i])) -1 else (0 until i).count { match(items[it]) }
 
 @Composable
-fun PlaylistsScreen(nav: NavHostController) {
+fun PlaylistsScreen(nav: NavHostController, folderId: Long? = null) {
     val marquee = LocalMarquee.current
     val context = androidx.compose.ui.platform.LocalContext.current
-    // Bumped after an invitation is answered, to load both lists again.
+    // Bumped after an invitation is answered or a playlist is filed, to load the lists again.
     var version by remember { mutableIntStateOf(0) }
+    val page = folderId?.let { "playlists-folder-$it" } ?: "playlists"
     // Kept while on the back stack, so coming back keeps the list's place.
-    val loaded by cachedLoad("playlists", version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists() } } }
+    val loaded by cachedLoad(page, version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists() } } }
     val lists = loaded?.getOrNull() ?: emptyList()
+    // The person's folders (MUSIC-28): those at the top level, then the playlists in none.
+    val loadedFolders by cachedLoad("$page-folders", version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistFolders() }.getOrNull() } }
+    val folders = loadedFolders ?: emptyList()
+    val folder = folders.firstOrNull { it.id == folderId }
+    // A playlist in a folder that's gone (or not loaded yet) shows at the top level.
+    fun shownIn(p: app.marquee.api.models.Playlist) = p.folderId?.takeIf { id -> folders.any { it.id == id } }
+    val shown = lists.filter { shownIn(it) == folderId }
+    val shownFolders = if (folderId == null) folders else emptyList()
     // Playlists people have shared with this person (MUSIC-24), to accept or decline.
-    val loadedInvites by cachedLoad("playlist-invites", version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistInvites() }.getOrNull() } }
+    val loadedInvites by cachedLoad("playlist-invites", version) {
+        if (folderId != null) emptyList() else withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistInvites() }.getOrNull() }
+    }
     // Answered here: gone at once, before the lists come back from the server.
     val answered = remember { mutableStateListOf<Long>() }
     val invites = (loadedInvites ?: emptyList()).filter { it.id !in answered }
@@ -523,9 +537,32 @@ fun PlaylistsScreen(nav: NavHostController) {
                 .onFailure { answered.remove(p.id); toast(context, "Couldn't answer “${p.title}”: ${serverMessage(it)}") }
         }
     }
-    var opened by rememberLastOpened("playlists")
+    var naming by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    // The playlist whose folder menu is open.
+    var filing by remember { mutableStateOf<Long?>(null) }
+    var opened by rememberLastOpened(page)
+    val first = shownFolders.firstOrNull()?.id ?: shown.firstOrNull()?.id
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp)) {
-        item { Text("Playlists", Modifier.padding(horizontal = sidePadding, vertical = 8.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        item {
+            Row(Modifier.fillMaxWidth().padding(horizontal = sidePadding, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(folder?.name ?: "Playlists", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, maxLines = 2)
+                if (folder != null) {
+                    OutlinedButton({ renaming = true }, Modifier.focusRing()) {
+                        Icon(Icons.Filled.Edit, null); Text("Rename", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
+                    }
+                    OutlinedButton({ deleting = true }, Modifier.focusRing()) {
+                        Icon(Icons.Filled.Delete, null); Text("Delete", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
+                    }
+                } else if (folderId == null) {
+                    OutlinedButton({ naming = true }, Modifier.focusRing()) {
+                        Icon(Icons.Filled.CreateNewFolder, null); Text("New folder", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
+                    }
+                }
+            }
+        }
         items(invites, key = { "invite${it.id}" }) { p ->
             val first = marquee.isTv && opened == null && p == invites.first()
             PlaylistInvite(p, first, { answer(p, accept = true) }, { answer(p, accept = false) })
@@ -534,15 +571,35 @@ fun PlaylistsScreen(nav: NavHostController) {
         when {
             loaded == null -> item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
             loaded?.isFailure == true -> item { Text("Couldn't load your playlists: ${serverMessage(loaded!!.exceptionOrNull()!!)}", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.error) }
-            lists.isEmpty() -> item {
+            folderId != null && loadedFolders != null && folder == null -> item { Text("This folder is gone.", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            folderId != null && shown.isEmpty() -> item {
+                Text("Nothing in this folder yet. Choose Folder on a playlist to put it here.", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            lists.isEmpty() && folders.isEmpty() -> item {
                 Text("No playlists yet. Choose Add to playlist on a movie, episode, album or song to start one.", Modifier.padding(sidePadding),
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        items(shownFolders, key = { "folder${it.id}" }) { f ->
+            val count = lists.count { it.folderId == f.id }
+            ListItem(
+                headlineContent = { Text(f.name) },
+                supportingContent = { Text(if (count == 1) "1 playlist" else "$count playlists") },
+                leadingContent = {
+                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.Folder, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
+                trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                modifier = Modifier.initialFocus(marquee.isTv && invites.isEmpty() && (if (opened != null) opened == -f.id else f.id == first))
+                    .focusCard({ opened = -f.id; nav.navigate("playlists/folder/${f.id}") }),
+            )
+        }
         // Video and music playlists, each under its own heading (USER-7), with their poster mosaics.
-        val (videos, music) = lists.partition { it.kind == PlaylistKind.VIDEO }
+        val (videos, music) = shown.partition { it.kind == PlaylistKind.VIDEO }
         listOf("Video playlists" to videos, "Music playlists" to music).filter { it.second.isNotEmpty() }.forEach { (heading, group) ->
-            if (videos.isNotEmpty()) item(key = heading) {
+            if (videos.isNotEmpty() || shownFolders.isNotEmpty()) item(key = heading) {
                 Text(heading, Modifier.padding(start = sidePadding, end = sidePadding, top = 16.dp, bottom = 4.dp).semantics { this.heading() },
                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
@@ -551,14 +608,43 @@ fun PlaylistsScreen(nav: NavHostController) {
                     headlineContent = { Text(p.title) },
                     supportingContent = { Text(listOfNotNull("${p.itemCount} ${if (p.kind == PlaylistKind.AUDIO) "tracks" else "videos"}", playlistSharing(p)).joinToString(" · ")) },
                     leadingContent = { PlaylistMosaic(p.imageIds, p.title, Modifier.size(56.dp)) },
-                    trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box {
+                                // TV: the D-pad can't reach it; holding OK on the row opens the same menu.
+                                if (!marquee.isTv) IconButton({ filing = p.id }, Modifier.focusRing()) { Icon(Icons.Filled.DriveFileMove, "Folder for ${p.title}") }
+                                PlaylistFolderMenu(p, filing == p.id, { filing = null }) { version++ }
+                            }
+                            Icon(Icons.Filled.ChevronRight, null)
+                        }
+                    },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                    modifier = Modifier.initialFocus(marquee.isTv && invites.isEmpty() && (if (opened != null) opened == p.id else p == lists.first()))
-                        .focusCard({ opened = p.id; nav.navigate("playlist/${p.id}") }),
+                    modifier = Modifier.initialFocus(marquee.isTv && invites.isEmpty() && (if (opened != null) opened == p.id else p.id == first))
+                        .focusCard({ opened = p.id; nav.navigate("playlist/${p.id}") }, onLongClick = { filing = p.id }),
                 )
             }
         }
     }
+    if (naming) FolderNameDialog("New folder", "", "Create", { naming = false }) { name ->
+        withContext(Dispatchers.IO) { runCatching { marquee.playlists.createPlaylistFolder(app.marquee.api.models.PlaylistFolderUpdate(name)) } }.onSuccess { version++ }
+    }
+    if (renaming && folder != null) FolderNameDialog("Rename folder", folder.name, "Rename", { renaming = false }) { name ->
+        withContext(Dispatchers.IO) { runCatching { marquee.playlists.renamePlaylistFolder(folder.id, app.marquee.api.models.PlaylistFolderUpdate(name)) } }.onSuccess { version++ }
+    }
+    if (deleting && folder != null) AlertDialog(onDismissRequest = { deleting = false },
+        title = { Text("Delete “${folder.name}”?") },
+        text = { Text("Its playlists aren't deleted: they go back to Playlists.") },
+        confirmButton = {
+            TextButton({
+                deleting = false
+                marquee.scope.launch {
+                    withContext(Dispatchers.IO) { runCatching { marquee.playlists.deletePlaylistFolder(folder.id) } }
+                        .onSuccess { withContext(Dispatchers.Main) { nav.popBackStack() } }
+                        .onFailure { toast(context, "Couldn't delete the folder: ${serverMessage(it)}") }
+                }
+            }, Modifier.focusRing()) { Text("Delete folder", color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = { TextButton({ deleting = false }, Modifier.focusRing()) { Text("Cancel") } })
 }
 
 /** "Shared by Sam" on a playlist someone shared, "Shared with 2" on your own that you did; else nothing. */
@@ -603,6 +689,11 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
     val entries = (loadedEntries ?: emptyList()).filter { it.entryId !in removed }
     val playlist by cachedLoad("playlist-$playlistId", version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.getPlaylist(playlistId) }.getOrNull() } }
     val title = playlist?.title ?: ""
+    // The folder it's in (MUSIC-28), named on its Folder button.
+    val folderName by cachedLoad("playlist-$playlistId-folder", version, playlist?.folderId) {
+        val id = playlist?.folderId ?: return@cachedLoad ""
+        withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistFolders().firstOrNull { it.id == id }?.name ?: "" }.getOrNull() }
+    }
     val context = androidx.compose.ui.platform.LocalContext.current
     // A smart playlist fills itself from its rules: nothing to remove by hand. Nor from one shared with this person (MUSIC-24).
     val editable = playlist != null && playlist?.rules == null && playlist?.readOnly != true
@@ -653,6 +744,7 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
                         }
                     }
                     PinToHomeButton("playlist-$playlistId")
+                    playlist?.let { p -> PlaylistFolderButton(p, folderName?.takeIf { p.folderId != null && it.isNotEmpty() }) { version++ } }
                     playlist?.let { p ->
                         if (p.readOnly == true) RemoveSharedPlaylistButton(p, nav)
                         else PlaylistMenu(p, nav, onChanged = { version++ })

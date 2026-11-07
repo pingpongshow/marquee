@@ -62,6 +62,8 @@ extension Components {
         public typealias SpeakerId = Swift.String
         /// - Remark: Generated from `#/components/parameters/PlaylistId`.
         public typealias PlaylistId = Swift.Int64
+        /// - Remark: Generated from `#/components/parameters/PlaylistFolderId`.
+        public typealias PlaylistFolderId = Swift.Int64
         /// - Remark: Generated from `#/components/parameters/BackupName`.
         public typealias BackupName = Swift.String
         /// - Remark: Generated from `#/components/parameters/LibraryId`.

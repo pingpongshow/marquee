@@ -13023,6 +13023,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Playlist/shareCount`.
             public var shareCount: Swift.Int?
+            /// The folder of yours it's in (MUSIC-28). Left out at the top level.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Playlist/folderId`.
+            public var folderId: Swift.Int64?
             /// Creates a new `Playlist`.
             ///
             /// - Parameters:
@@ -13038,6 +13042,7 @@ extension Components {
             ///   - ownerName: Whose playlist this is. Set on playlists shared with you.
             ///   - sharedWithAll: Your playlist is shared with everyone on the server.
             ///   - shareCount: How many people your playlist is offered to or shared with by name.
+            ///   - folderId: The folder of yours it's in (MUSIC-28). Left out at the top level.
             public init(
                 id: Swift.Int64,
                 title: Swift.String,
@@ -13050,7 +13055,8 @@ extension Components {
                 readOnly: Swift.Bool? = nil,
                 ownerName: Swift.String? = nil,
                 sharedWithAll: Swift.Bool? = nil,
-                shareCount: Swift.Int? = nil
+                shareCount: Swift.Int? = nil,
+                folderId: Swift.Int64? = nil
             ) {
                 self.id = id
                 self.title = title
@@ -13064,6 +13070,7 @@ extension Components {
                 self.ownerName = ownerName
                 self.sharedWithAll = sharedWithAll
                 self.shareCount = shareCount
+                self.folderId = folderId
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -13078,6 +13085,53 @@ extension Components {
                 case ownerName
                 case sharedWithAll
                 case shareCount
+                case folderId
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlaylistFolder`.
+        public struct PlaylistFolder: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlaylistFolder/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/PlaylistFolder/name`.
+            public var name: Swift.String
+            /// How many playlists are in it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistFolder/playlistCount`.
+            public var playlistCount: Swift.Int
+            /// Creates a new `PlaylistFolder`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - name:
+            ///   - playlistCount: How many playlists are in it.
+            public init(
+                id: Swift.Int64,
+                name: Swift.String,
+                playlistCount: Swift.Int
+            ) {
+                self.id = id
+                self.name = name
+                self.playlistCount = playlistCount
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case playlistCount
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlaylistFolderUpdate`.
+        public struct PlaylistFolderUpdate: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlaylistFolderUpdate/name`.
+            public var name: Swift.String
+            /// Creates a new `PlaylistFolderUpdate`.
+            ///
+            /// - Parameters:
+            ///   - name:
+            public init(name: Swift.String) {
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaylistShareTarget`.

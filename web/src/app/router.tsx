@@ -235,6 +235,9 @@ const homeRowRoute = createRoute({
 const playlistsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/playlists",
+  validateSearch: (s: Record<string, unknown>): { folder?: number } => ({
+    folder: typeof s.folder === "number" ? s.folder : undefined,
+  }),
   component: PlaylistsPage,
 });
 const playlistRoute = createRoute({

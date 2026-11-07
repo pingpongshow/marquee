@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { clsx } from "clsx";
-import { GripVertical, Pencil, Play, Share2, Shuffle, Trash2, X } from "lucide-react";
+import { FolderInput, GripVertical, Pencil, Play, Share2, Shuffle, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { api, imageUrl, unwrap } from "@/api/client";
 import { playlistItemsQuery, playlistQuery } from "@/api/queries";
@@ -17,6 +17,7 @@ import { PlaylistMosaic } from "./PlaylistMosaic";
 import { newShuffleSeed, seededShuffle } from "./order";
 import { PinToHomeButton } from "../home/EditHome";
 import { RulesEditor, rulesValid } from "./RulesEditor";
+import { MoveToFolderDialog } from "./Folders";
 import { RemoveSharedDialog, ShareDialog, SharedIcon, sharedByText, sharedText } from "./Sharing";
 import type { SmartRules } from "@/api/types";
 import { Sparkles } from "lucide-react";
@@ -39,6 +40,7 @@ export function PlaylistPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [filing, setFiling] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
   const [editingRules, setEditingRules] = useState<SmartRules | null>(null);
   const saveRules = useMutation({
@@ -179,6 +181,9 @@ export function PlaylistPage() {
                 <Share2 className="size-4" /> Share
               </Button>
             )}
+            <Button variant="ghost" onClick={() => setFiling(true)}>
+              <FolderInput className="size-4" /> Folder
+            </Button>
             {p.readOnly ? (
               <Button variant="ghost" onClick={() => setRemoving(true)}>
                 <Trash2 className="size-4" /> Remove
@@ -290,6 +295,7 @@ export function PlaylistPage() {
       >
         <p className="text-sm text-muted">“{p.title}” will be deleted. The media in it isn’t affected.</p>
       </Dialog>
+      {filing && <MoveToFolderDialog playlist={p} onClose={() => setFiling(false)} />}
       {sharing && <ShareDialog playlist={p} onClose={() => setSharing(false)} />}
       {removing && <RemoveSharedDialog playlist={p} onClose={() => setRemoving(false)} onRemoved={() => navigate({ to: "/playlists" })} />}
     </div>

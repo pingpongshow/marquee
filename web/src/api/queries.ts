@@ -225,6 +225,12 @@ export const playlistsQuery = (kind?: "video" | "audio") =>
     queryFn: () => unwrap(api.GET("/playlists", { params: { query: kind ? { kind } : {} } })),
   });
 
+export const playlistFoldersQuery = () =>
+  queryOptions({
+    queryKey: ["playlists", "folders"],
+    queryFn: () => unwrap(api.GET("/playlist-folders")),
+  });
+
 export const playlistQuery = (id: number) =>
   queryOptions({
     queryKey: ["playlists", id],

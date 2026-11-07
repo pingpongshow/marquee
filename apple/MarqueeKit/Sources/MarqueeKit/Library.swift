@@ -8,6 +8,7 @@ public typealias Playlist = Components.Schemas.Playlist
 public typealias PlaylistEntry = Components.Schemas.PlaylistEntry
 public typealias PlaylistSharing = Components.Schemas.PlaylistSharing
 public typealias PlaylistShareTarget = Components.Schemas.PlaylistShareTarget
+public typealias PlaylistFolder = Components.Schemas.PlaylistFolder
 public typealias ItemPage = Components.Schemas.ItemPage
 public typealias Person = Components.Schemas.PersonDetail
 public typealias SearchResults = Components.Schemas.SearchResults
@@ -253,6 +254,53 @@ public extension AppSession {
         switch try await api.removePlaylistShare(path: .init(playlistId: id)) {
         case .noContent, .notFound: return
         default: throw MarqueeError("Couldn't remove the playlist.")
+        }
+    }
+
+    // MARK: Playlist folders (MUSIC-28)
+
+    /// Your playlist folders, by name. Each playlist's `folderId` says which one it's in.
+    func playlistFolders() async throws -> [PlaylistFolder] {
+        try await api.listPlaylistFolders().ok.body.json
+    }
+
+    func createPlaylistFolder(name: String) async throws -> PlaylistFolder {
+        switch try await api.createPlaylistFolder(body: .json(.init(name: name))) {
+        case let .created(r): return try r.body.json
+        default: throw MarqueeError("Couldn't make the folder.")
+        }
+    }
+
+    func renamePlaylistFolder(_ id: Int64, name: String) async throws -> PlaylistFolder {
+        switch try await api.renamePlaylistFolder(path: .init(folderId: id), body: .json(.init(name: name))) {
+        case let .ok(r): return try r.body.json
+        case .notFound: throw MarqueeError("This folder is gone.")
+        default: throw MarqueeError("Couldn't rename the folder.")
+        }
+    }
+
+    /// Deletes a folder. Its playlists aren't deleted: they go back to the top level.
+    func deletePlaylistFolder(_ id: Int64) async throws {
+        switch try await api.deletePlaylistFolder(path: .init(folderId: id)) {
+        case .noContent, .notFound: return
+        default: throw MarqueeError("Couldn't delete the folder.")
+        }
+    }
+
+    /// Puts a playlist in a folder, taking it out of any other.
+    func addPlaylistToFolder(_ folder: Int64, playlist: Int64) async throws {
+        switch try await api.addPlaylistToFolder(path: .init(folderId: folder, playlistId: playlist)) {
+        case .noContent: return
+        case .notFound: throw MarqueeError("That folder or playlist is gone.")
+        default: throw MarqueeError("Couldn't move the playlist.")
+        }
+    }
+
+    /// Takes a playlist out of its folder, back to the top level.
+    func removePlaylistFromFolder(_ folder: Int64, playlist: Int64) async throws {
+        switch try await api.removePlaylistFromFolder(path: .init(folderId: folder, playlistId: playlist)) {
+        case .noContent, .notFound: return
+        default: throw MarqueeError("Couldn't take the playlist out of the folder.")
         }
     }
 

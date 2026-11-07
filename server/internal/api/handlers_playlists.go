@@ -12,7 +12,7 @@ import (
 func toAPIPlaylist(p items.Playlist) Playlist {
 	return Playlist{Id: p.ID, Title: p.Title, Kind: PlaylistKind(p.Kind), ItemCount: p.ItemCount, DurationMs: p.DurationMS,
 		ImageIds: p.ImageIDs, UpdatedAt: p.UpdatedAt, Rules: rulesToAPI(p.Rules), ReadOnly: nz(p.ReadOnly), OwnerName: nz(p.OwnerName),
-		SharedWithAll: nz(p.SharedWithAll), ShareCount: nz(p.ShareCount)}
+		SharedWithAll: nz(p.SharedWithAll), ShareCount: nz(p.ShareCount), FolderId: nz(p.FolderID)}
 }
 
 // The API and store rule types share their JSON shape.

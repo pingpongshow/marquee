@@ -1371,6 +1371,34 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /playlists/{playlistId}`.
     /// - Remark: Generated from `#/paths//playlists/{playlistId}/delete(deletePlaylist)`.
     func deletePlaylist(_ input: Operations.DeletePlaylist.Input) async throws -> Operations.DeletePlaylist.Output
+    /// Your playlist folders (MUSIC-28), by name.
+    ///
+    /// Folders are optional and your own. Each playlist, yours or one shared with you, is in one of your folders at most (its folderId); the rest are at the top level.
+    ///
+    /// - Remark: HTTP `GET /playlist-folders`.
+    /// - Remark: Generated from `#/paths//playlist-folders/get(listPlaylistFolders)`.
+    func listPlaylistFolders(_ input: Operations.ListPlaylistFolders.Input) async throws -> Operations.ListPlaylistFolders.Output
+    /// - Remark: HTTP `POST /playlist-folders`.
+    /// - Remark: Generated from `#/paths//playlist-folders/post(createPlaylistFolder)`.
+    func createPlaylistFolder(_ input: Operations.CreatePlaylistFolder.Input) async throws -> Operations.CreatePlaylistFolder.Output
+    /// - Remark: HTTP `PATCH /playlist-folders/{folderId}`.
+    /// - Remark: Generated from `#/paths//playlist-folders/{folderId}/patch(renamePlaylistFolder)`.
+    func renamePlaylistFolder(_ input: Operations.RenamePlaylistFolder.Input) async throws -> Operations.RenamePlaylistFolder.Output
+    /// Deletes the folder. Its playlists aren't deleted; they go back to the top level.
+    ///
+    /// - Remark: HTTP `DELETE /playlist-folders/{folderId}`.
+    /// - Remark: Generated from `#/paths//playlist-folders/{folderId}/delete(deletePlaylistFolder)`.
+    func deletePlaylistFolder(_ input: Operations.DeletePlaylistFolder.Input) async throws -> Operations.DeletePlaylistFolder.Output
+    /// Puts the playlist in this folder, taking it out of any other.
+    ///
+    /// - Remark: HTTP `PUT /playlist-folders/{folderId}/playlists/{playlistId}`.
+    /// - Remark: Generated from `#/paths//playlist-folders/{folderId}/playlists/{playlistId}/put(addPlaylistToFolder)`.
+    func addPlaylistToFolder(_ input: Operations.AddPlaylistToFolder.Input) async throws -> Operations.AddPlaylistToFolder.Output
+    /// Takes the playlist out of the folder, back to the top level.
+    ///
+    /// - Remark: HTTP `DELETE /playlist-folders/{folderId}/playlists/{playlistId}`.
+    /// - Remark: Generated from `#/paths//playlist-folders/{folderId}/playlists/{playlistId}/delete(removePlaylistFromFolder)`.
+    func removePlaylistFromFolder(_ input: Operations.RemovePlaylistFromFolder.Input) async throws -> Operations.RemovePlaylistFromFolder.Output
     /// Who your playlist is shared with (MUSIC-24).
     ///
     /// - Remark: HTTP `GET /playlists/{playlistId}/shares`.
@@ -4926,6 +4954,78 @@ extension APIProtocol {
         headers: Operations.DeletePlaylist.Input.Headers = .init()
     ) async throws -> Operations.DeletePlaylist.Output {
         try await deletePlaylist(Operations.DeletePlaylist.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Your playlist folders (MUSIC-28), by name.
+    ///
+    /// Folders are optional and your own. Each playlist, yours or one shared with you, is in one of your folders at most (its folderId); the rest are at the top level.
+    ///
+    /// - Remark: HTTP `GET /playlist-folders`.
+    /// - Remark: Generated from `#/paths//playlist-folders/get(listPlaylistFolders)`.
+    public func listPlaylistFolders(headers: Operations.ListPlaylistFolders.Input.Headers = .init()) async throws -> Operations.ListPlaylistFolders.Output {
+        try await listPlaylistFolders(Operations.ListPlaylistFolders.Input(headers: headers))
+    }
+    /// - Remark: HTTP `POST /playlist-folders`.
+    /// - Remark: Generated from `#/paths//playlist-folders/post(createPlaylistFolder)`.
+    public func createPlaylistFolder(
+        headers: Operations.CreatePlaylistFolder.Input.Headers = .init(),
+        body: Operations.CreatePlaylistFolder.Input.Body
+    ) async throws -> Operations.CreatePlaylistFolder.Output {
+        try await createPlaylistFolder(Operations.CreatePlaylistFolder.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `PATCH /playlist-folders/{folderId}`.
+    /// - Remark: Generated from `#/paths//playlist-folders/{folderId}/patch(renamePlaylistFolder)`.
+    public func renamePlaylistFolder(
+        path: Operations.RenamePlaylistFolder.Input.Path,
+        headers: Operations.RenamePlaylistFolder.Input.Headers = .init(),
+        body: Operations.RenamePlaylistFolder.Input.Body
+    ) async throws -> Operations.RenamePlaylistFolder.Output {
+        try await renamePlaylistFolder(Operations.RenamePlaylistFolder.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Deletes the folder. Its playlists aren't deleted; they go back to the top level.
+    ///
+    /// - Remark: HTTP `DELETE /playlist-folders/{folderId}`.
+    /// - Remark: Generated from `#/paths//playlist-folders/{folderId}/delete(deletePlaylistFolder)`.
+    public func deletePlaylistFolder(
+        path: Operations.DeletePlaylistFolder.Input.Path,
+        headers: Operations.DeletePlaylistFolder.Input.Headers = .init()
+    ) async throws -> Operations.DeletePlaylistFolder.Output {
+        try await deletePlaylistFolder(Operations.DeletePlaylistFolder.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Puts the playlist in this folder, taking it out of any other.
+    ///
+    /// - Remark: HTTP `PUT /playlist-folders/{folderId}/playlists/{playlistId}`.
+    /// - Remark: Generated from `#/paths//playlist-folders/{folderId}/playlists/{playlistId}/put(addPlaylistToFolder)`.
+    public func addPlaylistToFolder(
+        path: Operations.AddPlaylistToFolder.Input.Path,
+        headers: Operations.AddPlaylistToFolder.Input.Headers = .init()
+    ) async throws -> Operations.AddPlaylistToFolder.Output {
+        try await addPlaylistToFolder(Operations.AddPlaylistToFolder.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Takes the playlist out of the folder, back to the top level.
+    ///
+    /// - Remark: HTTP `DELETE /playlist-folders/{folderId}/playlists/{playlistId}`.
+    /// - Remark: Generated from `#/paths//playlist-folders/{folderId}/playlists/{playlistId}/delete(removePlaylistFromFolder)`.
+    public func removePlaylistFromFolder(
+        path: Operations.RemovePlaylistFromFolder.Input.Path,
+        headers: Operations.RemovePlaylistFromFolder.Input.Headers = .init()
+    ) async throws -> Operations.RemovePlaylistFromFolder.Output {
+        try await removePlaylistFromFolder(Operations.RemovePlaylistFromFolder.Input(
             path: path,
             headers: headers
         ))

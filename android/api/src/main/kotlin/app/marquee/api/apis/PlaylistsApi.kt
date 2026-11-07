@@ -32,6 +32,8 @@ import app.marquee.api.models.Error
 import app.marquee.api.models.MovePlaylistItemRequest
 import app.marquee.api.models.Playlist
 import app.marquee.api.models.PlaylistCreate
+import app.marquee.api.models.PlaylistFolder
+import app.marquee.api.models.PlaylistFolderUpdate
 import app.marquee.api.models.PlaylistItemPage
 import app.marquee.api.models.PlaylistKind
 import app.marquee.api.models.PlaylistShareTarget
@@ -216,6 +218,80 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
     }
 
     /**
+     * PUT /playlist-folders/{folderId}/playlists/{playlistId}
+     * 
+     * Puts the playlist in this folder, taking it out of any other.
+     * @param folderId 
+     * @param playlistId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun addPlaylistToFolder(folderId: kotlin.Long, playlistId: kotlin.Long) : Unit {
+        val localVarResponse = addPlaylistToFolderWithHttpInfo(folderId = folderId, playlistId = playlistId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /playlist-folders/{folderId}/playlists/{playlistId}
+     * 
+     * Puts the playlist in this folder, taking it out of any other.
+     * @param folderId 
+     * @param playlistId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun addPlaylistToFolderWithHttpInfo(folderId: kotlin.Long, playlistId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = addPlaylistToFolderRequestConfig(folderId = folderId, playlistId = playlistId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation addPlaylistToFolder
+     *
+     * @param folderId 
+     * @param playlistId 
+     * @return RequestConfig
+     */
+    fun addPlaylistToFolderRequestConfig(folderId: kotlin.Long, playlistId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/playlist-folders/{folderId}/playlists/{playlistId}".replace("{"+"folderId"+"}", encodeURIComponent(folderId.toString())).replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /playlists
      * 
      * 
@@ -290,6 +366,80 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
     }
 
     /**
+     * POST /playlist-folders
+     * 
+     * 
+     * @param playlistFolderUpdate 
+     * @return PlaylistFolder
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun createPlaylistFolder(playlistFolderUpdate: PlaylistFolderUpdate) : PlaylistFolder {
+        val localVarResponse = createPlaylistFolderWithHttpInfo(playlistFolderUpdate = playlistFolderUpdate)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlaylistFolder
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /playlist-folders
+     * 
+     * 
+     * @param playlistFolderUpdate 
+     * @return ApiResponse<PlaylistFolder?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun createPlaylistFolderWithHttpInfo(playlistFolderUpdate: PlaylistFolderUpdate) : ApiResponse<PlaylistFolder?> {
+        val localVariableConfig = createPlaylistFolderRequestConfig(playlistFolderUpdate = playlistFolderUpdate)
+
+        return request<PlaylistFolderUpdate, PlaylistFolder>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation createPlaylistFolder
+     *
+     * @param playlistFolderUpdate 
+     * @return RequestConfig
+     */
+    fun createPlaylistFolderRequestConfig(playlistFolderUpdate: PlaylistFolderUpdate) : RequestConfig<PlaylistFolderUpdate> {
+        val localVariableBody = playlistFolderUpdate
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/playlist-folders",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * DELETE /playlists/{playlistId}
      * 
      * 
@@ -353,6 +503,77 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/playlists/{playlistId}".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /playlist-folders/{folderId}
+     * 
+     * Deletes the folder. Its playlists aren&#39;t deleted; they go back to the top level.
+     * @param folderId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun deletePlaylistFolder(folderId: kotlin.Long) : Unit {
+        val localVarResponse = deletePlaylistFolderWithHttpInfo(folderId = folderId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /playlist-folders/{folderId}
+     * 
+     * Deletes the folder. Its playlists aren&#39;t deleted; they go back to the top level.
+     * @param folderId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun deletePlaylistFolderWithHttpInfo(folderId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = deletePlaylistFolderRequestConfig(folderId = folderId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation deletePlaylistFolder
+     *
+     * @param folderId 
+     * @return RequestConfig
+     */
+    fun deletePlaylistFolderRequestConfig(folderId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/playlist-folders/{folderId}".replace("{"+"folderId"+"}", encodeURIComponent(folderId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -499,6 +720,76 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/playlists/{playlistId}/shares".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /playlist-folders
+     * Your playlist folders (MUSIC-28), by name.
+     * Folders are optional and your own. Each playlist, yours or one shared with you, is in one of your folders at most (its folderId); the rest are at the top level.
+     * @return kotlin.collections.List<PlaylistFolder>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listPlaylistFolders() : kotlin.collections.List<PlaylistFolder> {
+        val localVarResponse = listPlaylistFoldersWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<PlaylistFolder>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /playlist-folders
+     * Your playlist folders (MUSIC-28), by name.
+     * Folders are optional and your own. Each playlist, yours or one shared with you, is in one of your folders at most (its folderId); the rest are at the top level.
+     * @return ApiResponse<kotlin.collections.List<PlaylistFolder>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listPlaylistFoldersWithHttpInfo() : ApiResponse<kotlin.collections.List<PlaylistFolder>?> {
+        val localVariableConfig = listPlaylistFoldersRequestConfig()
+
+        return request<Unit, kotlin.collections.List<PlaylistFolder>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listPlaylistFolders
+     *
+     * @return RequestConfig
+     */
+    fun listPlaylistFoldersRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/playlist-folders",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -890,6 +1181,80 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
     }
 
     /**
+     * DELETE /playlist-folders/{folderId}/playlists/{playlistId}
+     * 
+     * Takes the playlist out of the folder, back to the top level.
+     * @param folderId 
+     * @param playlistId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removePlaylistFromFolder(folderId: kotlin.Long, playlistId: kotlin.Long) : Unit {
+        val localVarResponse = removePlaylistFromFolderWithHttpInfo(folderId = folderId, playlistId = playlistId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /playlist-folders/{folderId}/playlists/{playlistId}
+     * 
+     * Takes the playlist out of the folder, back to the top level.
+     * @param folderId 
+     * @param playlistId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removePlaylistFromFolderWithHttpInfo(folderId: kotlin.Long, playlistId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = removePlaylistFromFolderRequestConfig(folderId = folderId, playlistId = playlistId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removePlaylistFromFolder
+     *
+     * @param folderId 
+     * @param playlistId 
+     * @return RequestConfig
+     */
+    fun removePlaylistFromFolderRequestConfig(folderId: kotlin.Long, playlistId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/playlist-folders/{folderId}/playlists/{playlistId}".replace("{"+"folderId"+"}", encodeURIComponent(folderId.toString())).replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * DELETE /playlists/{playlistId}/items/{entryId}
      * 
      * 
@@ -1027,6 +1392,83 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/me/playlist-shares/{playlistId}".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PATCH /playlist-folders/{folderId}
+     * 
+     * 
+     * @param folderId 
+     * @param playlistFolderUpdate 
+     * @return PlaylistFolder
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun renamePlaylistFolder(folderId: kotlin.Long, playlistFolderUpdate: PlaylistFolderUpdate) : PlaylistFolder {
+        val localVarResponse = renamePlaylistFolderWithHttpInfo(folderId = folderId, playlistFolderUpdate = playlistFolderUpdate)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlaylistFolder
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PATCH /playlist-folders/{folderId}
+     * 
+     * 
+     * @param folderId 
+     * @param playlistFolderUpdate 
+     * @return ApiResponse<PlaylistFolder?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun renamePlaylistFolderWithHttpInfo(folderId: kotlin.Long, playlistFolderUpdate: PlaylistFolderUpdate) : ApiResponse<PlaylistFolder?> {
+        val localVariableConfig = renamePlaylistFolderRequestConfig(folderId = folderId, playlistFolderUpdate = playlistFolderUpdate)
+
+        return request<PlaylistFolderUpdate, PlaylistFolder>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation renamePlaylistFolder
+     *
+     * @param folderId 
+     * @param playlistFolderUpdate 
+     * @return RequestConfig
+     */
+    fun renamePlaylistFolderRequestConfig(folderId: kotlin.Long, playlistFolderUpdate: PlaylistFolderUpdate) : RequestConfig<PlaylistFolderUpdate> {
+        val localVariableBody = playlistFolderUpdate
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PATCH,
+            path = "/playlist-folders/{folderId}".replace("{"+"folderId"+"}", encodeURIComponent(folderId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

@@ -45,6 +45,7 @@ import kotlinx.serialization.Contextual
  * @param ownerName Whose playlist this is. Set on playlists shared with you.
  * @param sharedWithAll Your playlist is shared with everyone on the server.
  * @param shareCount How many people your playlist is offered to or shared with by name.
+ * @param folderId The folder of yours it's in (MUSIC-28). Left out at the top level.
  */
 @Serializable
 
@@ -89,7 +90,11 @@ data class Playlist (
 
     /* How many people your playlist is offered to or shared with by name. */
     @SerialName(value = "shareCount")
-    val shareCount: kotlin.Int? = null
+    val shareCount: kotlin.Int? = null,
+
+    /* The folder of yours it's in (MUSIC-28). Left out at the top level. */
+    @SerialName(value = "folderId")
+    val folderId: kotlin.Long? = null
 
 ) {
 

@@ -31,6 +31,7 @@ export type Profile = S["Profile"];
 export type Device = S["Device"];
 export type SearchResults = S["SearchResults"];
 export type Playlist = S["Playlist"];
+export type PlaylistFolder = S["PlaylistFolder"];
 export type PlaylistKind = S["PlaylistKind"];
 export type PlaylistEntry = S["PlaylistEntry"];
 export type LibraryFilters = S["LibraryFilters"];

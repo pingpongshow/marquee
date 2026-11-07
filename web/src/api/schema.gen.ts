@@ -4048,6 +4048,66 @@ export interface paths {
         patch: operations["updatePlaylist"];
         trace?: never;
     };
+    "/playlist-folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your playlist folders (MUSIC-28), by name.
+         * @description Folders are optional and your own. Each playlist, yours or one shared with you, is in one of your folders at most (its folderId); the rest are at the top level.
+         */
+        get: operations["listPlaylistFolders"];
+        put?: never;
+        post: operations["createPlaylistFolder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/playlist-folders/{folderId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folderId: components["parameters"]["PlaylistFolderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Deletes the folder. Its playlists aren't deleted; they go back to the top level. */
+        delete: operations["deletePlaylistFolder"];
+        options?: never;
+        head?: never;
+        patch: operations["renamePlaylistFolder"];
+        trace?: never;
+    };
+    "/playlist-folders/{folderId}/playlists/{playlistId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folderId: components["parameters"]["PlaylistFolderId"];
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Puts the playlist in this folder, taking it out of any other. */
+        put: operations["addPlaylistToFolder"];
+        post?: never;
+        /** @description Takes the playlist out of the folder, back to the top level. */
+        delete: operations["removePlaylistFromFolder"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/playlists/{playlistId}/shares": {
         parameters: {
             query?: never;
@@ -7790,6 +7850,21 @@ export interface components {
             sharedWithAll?: boolean;
             /** @description How many people your playlist is offered to or shared with by name. */
             shareCount?: number;
+            /**
+             * Format: int64
+             * @description The folder of yours it's in (MUSIC-28). Left out at the top level.
+             */
+            folderId?: number;
+        };
+        PlaylistFolder: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @description How many playlists are in it. */
+            playlistCount: number;
+        };
+        PlaylistFolderUpdate: {
+            name: string;
         };
         PlaylistShareTarget: {
             /** Format: int64 */
@@ -8752,6 +8827,7 @@ export interface components {
         Limit: number;
         SpeakerId: string;
         PlaylistId: number;
+        PlaylistFolderId: number;
         BackupName: string;
         LibraryId: number;
     };
@@ -15976,6 +16052,150 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listPlaylistFolders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistFolder"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createPlaylistFolder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistFolderUpdate"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistFolder"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    deletePlaylistFolder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folderId: components["parameters"]["PlaylistFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    renamePlaylistFolder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folderId: components["parameters"]["PlaylistFolderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistFolderUpdate"];
+            };
+        };
+        responses: {
+            /** @description Renamed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistFolder"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addPlaylistToFolder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folderId: components["parameters"]["PlaylistFolderId"];
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Moved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removePlaylistFromFolder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folderId: components["parameters"]["PlaylistFolderId"];
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

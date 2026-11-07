@@ -8,6 +8,8 @@ enum Route: Hashable {
     case person(Int64)
     case playlist(Int64)
     case playlists
+    /// One of the person's playlist folders (MUSIC-28).
+    case playlistFolder(Int64)
     /// All of an artist's top songs (MUSIC-24), from the artist page's More.
     case topSongs(artist: Int64, name: String)
     case downloads
@@ -88,6 +90,7 @@ private func routeView(_ route: Route) -> some View {
     case .person(let id): PersonView(id: id)
     case .playlist(let id): PlaylistView(id: id)
     case .playlists: PlaylistsView()
+    case .playlistFolder(let id): PlaylistsView(folderID: id)
     case let .topSongs(artist, name): TopSongsView(artistID: artist, artistName: name)
     #if !os(tvOS)
     case .downloads: DownloadsView()

@@ -149,15 +149,36 @@ private struct PlaylistInviteRow: View {
 
 struct PlaylistsView: View {
     @Environment(AppSession.self) private var app
+    /// Shows the playlists in this folder of the person's (MUSIC-28); nil, the top level.
+    var folderID: Int64? = nil
     @State private var playlists: [Playlist] = []
     /// Playlists shared with this person, waiting for an answer (MUSIC-24).
     @State private var invites: [Playlist] = []
     @State private var loaded = false
     @State private var error: String?
+    @State private var naming = false
+    @State private var renaming = false
+    @State private var confirmingDelete = false
+    /// The playlist a new folder from its menu is for.
+    @State private var filing: Playlist?
+    @Environment(\.dismiss) private var dismiss
+
+    private var folders: PlaylistFolders { PlaylistFolders.shared }
+    private var folder: PlaylistFolder? { folders.folder(folderID) }
+
+    /// The folder a playlist shows in: one that's gone (or not loaded yet) leaves it at the top level.
+    private func shownFolder(_ p: Playlist) -> Int64? {
+        folders.folder(p.folderId)?.id
+    }
+
+    private var shown: [Playlist] { playlists.filter { shownFolder($0) == folderID } }
 
     var body: some View {
         ScrollView {
-            if !invites.isEmpty {
+            #if os(tvOS)
+            folderButtons.padding(.horizontal, sidePadding).padding(.top, sidePadding)
+            #endif
+            if folderID == nil, !invites.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Shared with you").font(.title2.bold())
                         .accessibilityAddTraits(.isHeader)
@@ -170,6 +191,17 @@ struct PlaylistsView: View {
             }
             // Video playlists first (movies and episodes, a few at most), then the music ones.
             LazyVGrid(columns: [GridItem(.adaptive(minimum: cell), spacing: 16, alignment: .top)], alignment: .leading, spacing: 20) {
+                if folderID == nil, !folders.list.isEmpty {
+                    Section {
+                        ForEach(folders.list, id: \.id) { f in
+                            PlaylistFolderCard(folder: f, count: playlists.filter { $0.folderId == f.id }.count, size: cell)
+                        }
+                    } header: {
+                        Text("Folders").font(.title2.bold()).frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("playlists.folders")
+                    }
+                }
                 section("Video Playlists", kind: .video)
                 section("Music Playlists", kind: .audio)
             }
@@ -184,7 +216,13 @@ struct PlaylistsView: View {
                 }
             } else if !loaded {
                 ProgressView().padding(.top, 60)
-            } else if playlists.isEmpty, invites.isEmpty {
+            } else if folderID != nil, shown.isEmpty {
+                ContentUnavailableView(folder == nil ? "This folder is gone" : "Nothing in this folder", systemImage: "folder",
+                                       description: Text(folder == nil ? "" : "Use Folder on a playlist to put it here."))
+                    #if os(tvOS)
+                    .focusable()
+                    #endif
+            } else if playlists.isEmpty, invites.isEmpty, folders.list.isEmpty {
                 ContentUnavailableView("No playlists", systemImage: "music.note.list", description: Text("Use “Add to Playlist” on any track, album, movie or episode."))
                     #if os(tvOS)
                     // Something to hold focus: with nothing focusable the TV's sidebar closed
@@ -193,7 +231,18 @@ struct PlaylistsView: View {
                     #endif
             }
         }
-        .navigationTitle("Playlists")
+        .navigationTitle(folder?.name ?? "Playlists")
+        #if !os(tvOS)
+        .toolbar { ToolbarItem(placement: .primaryAction) { folderButtons } }
+        #endif
+        .playlistFolderNamePrompt(isPresented: $naming, putting: filing)
+        .playlistFolderRenamePrompt(isPresented: $renaming, folder: folder)
+        .alert("Delete “\(folder?.name ?? "")”?", isPresented: $confirmingDelete) {
+            Button("Delete Folder", role: .destructive) { deleteFolder() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Its playlists aren't deleted: they go back to Playlists.")
+        }
         .task {
             if !loaded {
                 await load()
@@ -203,6 +252,33 @@ struct PlaylistsView: View {
         }
         .refreshable { await load() }
         .onChange(of: PlaylistChanges.shared.version) { Task { await load() } }
+    }
+
+    /// New Folder at the top level; Rename and Delete in a folder.
+    @ViewBuilder private var folderButtons: some View {
+        if let folder {
+            Menu {
+                Button("Rename Folder…", systemImage: "pencil") { renaming = true }
+                Button("Delete Folder…", systemImage: "trash", role: .destructive) { confirmingDelete = true }
+            } label: {
+                Label("Folder", systemImage: "folder")
+            }
+            .accessibilityIdentifier("folder.menu")
+            .accessibilityLabel("\(folder.name) folder")
+        } else if folderID == nil {
+            Button { filing = nil; naming = true } label: { Label("New Folder", systemImage: "folder.badge.plus") }
+                .accessibilityIdentifier("playlists.newFolder")
+        }
+    }
+
+    private func deleteFolder() {
+        guard let folderID else { return }
+        ActionError.run {
+            try await app.deletePlaylistFolder(folderID)
+            await folders.load(app)
+            PlaylistChanges.shared.changed()
+            dismiss()
+        }
     }
 
     private func accept(_ p: Playlist) {
@@ -235,13 +311,23 @@ struct PlaylistsView: View {
     }
 
     @ViewBuilder private func section(_ title: String, kind: Schemas.PlaylistKind) -> some View {
-        let list = playlists.filter { $0.kind == kind }
+        let all = shown
+        let list = all.filter { $0.kind == kind }
         if !list.isEmpty {
             Section {
-                ForEach(list, id: \.id) { p in PlaylistCard(playlist: p, size: cell) }
+                ForEach(list, id: \.id) { p in
+                    PlaylistCard(playlist: p, size: cell)
+                        .contextMenu {
+                            Menu {
+                                PlaylistFolderMenuItems(playlist: p) { filing = p; naming = true }
+                            } label: {
+                                Label(p.folderId == nil ? "Add to Folder" : "Move to Folder", systemImage: "folder")
+                            }
+                        }
+                }
             } header: {
-                // Headed only when both kinds are there.
-                if list.count != playlists.count {
+                // Headed only when both kinds are there, or there are folders above.
+                if list.count != all.count || (folderID == nil && !folders.list.isEmpty) {
                     Text(title).font(.title2.bold()).frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityAddTraits(.isHeader)
                         .accessibilityIdentifier("playlists.\(kind.rawValue)")
@@ -252,6 +338,7 @@ struct PlaylistsView: View {
 
     private func load() async {
         async let asked: Void = loadInvites()
+        async let filed: Void = folders.load(app)
         do {
             playlists = try await app.playlists()
             error = nil
@@ -260,6 +347,7 @@ struct PlaylistsView: View {
             self.error = error.localizedDescription
         }
         await asked
+        await filed
         loaded = true
     }
 
@@ -346,6 +434,7 @@ struct PlaylistView: View {
         .navigationTitle(playlist?.title ?? "Playlist")
         .task { if !loaded { await load() } }
         .refreshable { await load() }
+        .onChange(of: PlaylistChanges.shared.version) { Task { await load() } }
         #if !os(tvOS)
         .sheet(isPresented: $sharing) {
             if let playlist { PlaylistShareSheet(playlist: playlist) { Task { await load() } }.macSheetFrame() }
@@ -435,6 +524,7 @@ struct PlaylistView: View {
             }
             #endif
             PinToHomeButton(rowID: AppSession.pinnedRowID(playlist: id))
+            if let p = playlist { PlaylistFolderButton(playlist: p) }
             if playlist?.readOnly == true {
                 Button { confirmingRemove = true } label: { Label("Remove", systemImage: "minus.circle") }
                     .buttonStyle(.bordered)
@@ -463,7 +553,9 @@ struct PlaylistView: View {
             // The one playlist, not every playlist to find it.
             async let p = app.playlist(id)
             async let e = app.playlistItems(id)
+            async let filed: Void = PlaylistFolders.shared.load(app)
             (playlist, entries) = try await (p, e)
+            await filed
             error = nil
         } catch is CancellationError {
         } catch {
