@@ -12,15 +12,16 @@ import (
 
 // Filter picks files for the Large files list. Zero values don't filter.
 type Filter struct {
-	LibraryID      int64
-	Type           string   // movie, episode
-	MinSizeBytes   int64    // at least this big
-	MinBitrateKbps int      // at least this overall bitrate
-	Resolution     int      // 2160, 1080, 720 or 480 (SD): only this class
-	Codecs         []string // only these video codecs (ffprobe names: h264, mpeg2video, vc1, …)
-	HDR            *bool    // only HDR (true) or only SDR (false)
-	Optimized      *bool    // only files the optimizer replaced (true, to re-optimize) or only ones still to do: not optimized and not in the queue (false)
-	Sort           string   // size (default), bitrate, title
+	LibraryID       int64
+	Type            string   // movie, episode
+	MinSizeBytes    int64    // at least this big
+	MinBitrateKbps  int      // at least this overall bitrate
+	MinBytesPerHour int64    // at least this much file per hour of running time
+	Resolution      int      // 2160, 1080, 720 or 480 (SD): only this class
+	Codecs          []string // only these video codecs (ffprobe names: h264, mpeg2video, vc1, …)
+	HDR             *bool    // only HDR (true) or only SDR (false)
+	Optimized       *bool    // only files the optimizer replaced (true, to re-optimize) or only ones still to do: not optimized and not in the queue (false)
+	Sort            string   // size (default), bitrate, perHour, title, savings
 }
 
 // File is one file in the list.
@@ -41,6 +42,14 @@ type File struct {
 	JobState string
 	JobID    int64
 	info     FileInfo
+}
+
+// PerHour is how much file there is per hour of running time (0 when the length is unknown).
+func (f File) PerHour() float64 {
+	if f.DurationMS <= 0 {
+		return 0
+	}
+	return float64(f.Size) * 3_600_000 / float64(f.DurationMS)
 }
 
 // Page is a page of the list with totals for everything that matches.
@@ -81,6 +90,10 @@ func (flt Filter) where() (string, []any) {
 	if flt.MinBitrateKbps > 0 {
 		conds = append(conds, "COALESCE(f.bitrate_kbps, 0) >= ?")
 		args = append(args, flt.MinBitrateKbps)
+	}
+	if flt.MinBytesPerHour > 0 {
+		conds = append(conds, "COALESCE(f.duration_ms, 0) > 0 AND f.size * 3600000.0 / f.duration_ms >= ?")
+		args = append(args, flt.MinBytesPerHour)
 	}
 	if flt.Resolution > 0 {
 		conds = append(conds, resolutionSQL+" = ?")
@@ -204,6 +217,10 @@ func (s *Service) List(ctx context.Context, flt Filter, p settings.OptimizePrese
 		case "bitrate":
 			if x.BitrateKbps != y.BitrateKbps {
 				return x.BitrateKbps > y.BitrateKbps
+			}
+		case "perHour":
+			if px, py := x.PerHour(), y.PerHour(); px != py {
+				return px > py
 			}
 		case "title":
 			if x.Title != y.Title {

@@ -32,7 +32,7 @@ func adminOnly(ctx context.Context) int {
 	return 0
 }
 
-func optimizeFilter(libraryID *int64, typ *string, minGB, minMbps *float32, res *int, codecs []string, hdr, optimized *string) optimize.Filter {
+func optimizeFilter(libraryID *int64, typ *string, minGB, minMbps, minGBPerHour *float32, res *int, codecs []string, hdr, optimized *string) optimize.Filter {
 	var f optimize.Filter
 	if libraryID != nil {
 		f.LibraryID = *libraryID
@@ -45,6 +45,9 @@ func optimizeFilter(libraryID *int64, typ *string, minGB, minMbps *float32, res 
 	}
 	if minMbps != nil && *minMbps > 0 {
 		f.MinBitrateKbps = int(float64(*minMbps) * 1000)
+	}
+	if minGBPerHour != nil && *minGBPerHour > 0 {
+		f.MinBytesPerHour = int64(float64(*minGBPerHour) * 1e9)
 	}
 	if res != nil {
 		f.Resolution = *res
@@ -86,7 +89,7 @@ func (h *Handlers) ListLargeFiles(ctx context.Context, req ListLargeFilesRequest
 	if p.Codecs != nil {
 		codecs = strings.Split(*p.Codecs, ",")
 	}
-	f := optimizeFilter(p.LibraryId, (*string)(p.Type), p.MinSizeGb, p.MinBitrateMbps, (*int)(p.Resolution), codecs, (*string)(p.Hdr), (*string)(p.Optimized))
+	f := optimizeFilter(p.LibraryId, (*string)(p.Type), p.MinSizeGb, p.MinBitrateMbps, p.MinGbPerHour, (*int)(p.Resolution), codecs, (*string)(p.Hdr), (*string)(p.Optimized))
 	if p.Sort != nil {
 		f.Sort = string(*p.Sort)
 	}
@@ -136,7 +139,7 @@ func (h *Handlers) QueueOptimizeJobs(ctx context.Context, req QueueOptimizeJobsR
 			codecs = *fl.Codecs
 		}
 		var err error
-		ids, err = svc.Matching(ctx, optimizeFilter(fl.LibraryId, (*string)(fl.Type), fl.MinSizeGb, fl.MinBitrateMbps, (*int)(fl.Resolution), codecs, (*string)(fl.Hdr), (*string)(fl.Optimized)))
+		ids, err = svc.Matching(ctx, optimizeFilter(fl.LibraryId, (*string)(fl.Type), fl.MinSizeGb, fl.MinBitrateMbps, fl.MinGbPerHour, (*int)(fl.Resolution), codecs, (*string)(fl.Hdr), (*string)(fl.Optimized)))
 		if err != nil {
 			return nil, internal(ctx, "queueOptimizeJobs", err)
 		}

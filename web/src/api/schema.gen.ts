@@ -8582,6 +8582,7 @@ export interface components {
             type?: "movie" | "episode";
             minSizeGb?: number;
             minBitrateMbps?: number;
+            minGbPerHour?: number;
             /** @enum {integer} */
             resolution?: 2160 | 1080 | 720 | 480;
             codecs?: string[];
@@ -12430,6 +12431,8 @@ export interface operations {
                 minSizeGb?: number;
                 /** @description At least this overall bitrate. */
                 minBitrateMbps?: number;
+                /** @description At least this many GB (10^9 bytes) per hour of running time. */
+                minGbPerHour?: number;
                 /** @description Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD. */
                 resolution?: 2160 | 1080 | 720 | 480;
                 /** @description Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). */
@@ -12440,7 +12443,8 @@ export interface operations {
                 optimized?: "yes" | "no";
                 /** @description The preset the estimates are for (default: the default preset). */
                 presetId?: string;
-                sort?: "size" | "bitrate" | "title" | "savings";
+                /** @description perHour: the most GB per hour of running time first. */
+                sort?: "size" | "bitrate" | "perHour" | "title" | "savings";
                 offset?: components["parameters"]["Offset"];
                 limit?: components["parameters"]["Limit"];
             };

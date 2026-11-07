@@ -1019,6 +1019,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      enum class SortListLargeFiles(val value: kotlin.String) {
          @SerialName(value = "size") SIZE("size"),
          @SerialName(value = "bitrate") BITRATE("bitrate"),
+         @SerialName(value = "perHour") PER_HOUR("perHour"),
          @SerialName(value = "title") TITLE("title"),
          @SerialName(value = "savings") SAVINGS("savings");
 
@@ -1040,12 +1041,13 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * @param type  (optional)
      * @param minSizeGb At least this many GB (10^9 bytes). (optional)
      * @param minBitrateMbps At least this overall bitrate. (optional)
+     * @param minGbPerHour At least this many GB (10^9 bytes) per hour of running time. (optional)
      * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
      * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
      * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
      * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted. (optional)
      * @param presetId The preset the estimates are for (default: the default preset). (optional)
-     * @param sort  (optional, default to Sort.SIZE)
+     * @param sort perHour: the most GB per hour of running time first. (optional, default to Sort.SIZE)
      * @param offset  (optional, default to 0)
      * @param limit  (optional, default to 100)
      * @return LargeFilePage
@@ -1057,8 +1059,8 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listLargeFiles(libraryId: kotlin.Long? = null, type: TypeListLargeFiles? = null, minSizeGb: kotlin.Double? = null, minBitrateMbps: kotlin.Double? = null, resolution: ResolutionListLargeFiles? = null, codecs: kotlin.String? = null, hdr: HdrListLargeFiles? = null, optimized: OptimizedListLargeFiles? = null, presetId: kotlin.String? = null, sort: SortListLargeFiles? = SortListLargeFiles.SIZE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100) : LargeFilePage {
-        val localVarResponse = listLargeFilesWithHttpInfo(libraryId = libraryId, type = type, minSizeGb = minSizeGb, minBitrateMbps = minBitrateMbps, resolution = resolution, codecs = codecs, hdr = hdr, optimized = optimized, presetId = presetId, sort = sort, offset = offset, limit = limit)
+    fun listLargeFiles(libraryId: kotlin.Long? = null, type: TypeListLargeFiles? = null, minSizeGb: kotlin.Double? = null, minBitrateMbps: kotlin.Double? = null, minGbPerHour: kotlin.Double? = null, resolution: ResolutionListLargeFiles? = null, codecs: kotlin.String? = null, hdr: HdrListLargeFiles? = null, optimized: OptimizedListLargeFiles? = null, presetId: kotlin.String? = null, sort: SortListLargeFiles? = SortListLargeFiles.SIZE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100) : LargeFilePage {
+        val localVarResponse = listLargeFilesWithHttpInfo(libraryId = libraryId, type = type, minSizeGb = minSizeGb, minBitrateMbps = minBitrateMbps, minGbPerHour = minGbPerHour, resolution = resolution, codecs = codecs, hdr = hdr, optimized = optimized, presetId = presetId, sort = sort, offset = offset, limit = limit)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as LargeFilePage
@@ -1083,12 +1085,13 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * @param type  (optional)
      * @param minSizeGb At least this many GB (10^9 bytes). (optional)
      * @param minBitrateMbps At least this overall bitrate. (optional)
+     * @param minGbPerHour At least this many GB (10^9 bytes) per hour of running time. (optional)
      * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
      * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
      * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
      * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted. (optional)
      * @param presetId The preset the estimates are for (default: the default preset). (optional)
-     * @param sort  (optional, default to Sort.SIZE)
+     * @param sort perHour: the most GB per hour of running time first. (optional, default to Sort.SIZE)
      * @param offset  (optional, default to 0)
      * @param limit  (optional, default to 100)
      * @return ApiResponse<LargeFilePage?>
@@ -1097,8 +1100,8 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listLargeFilesWithHttpInfo(libraryId: kotlin.Long?, type: TypeListLargeFiles?, minSizeGb: kotlin.Double?, minBitrateMbps: kotlin.Double?, resolution: ResolutionListLargeFiles?, codecs: kotlin.String?, hdr: HdrListLargeFiles?, optimized: OptimizedListLargeFiles?, presetId: kotlin.String?, sort: SortListLargeFiles?, offset: kotlin.Int?, limit: kotlin.Int?) : ApiResponse<LargeFilePage?> {
-        val localVariableConfig = listLargeFilesRequestConfig(libraryId = libraryId, type = type, minSizeGb = minSizeGb, minBitrateMbps = minBitrateMbps, resolution = resolution, codecs = codecs, hdr = hdr, optimized = optimized, presetId = presetId, sort = sort, offset = offset, limit = limit)
+    fun listLargeFilesWithHttpInfo(libraryId: kotlin.Long?, type: TypeListLargeFiles?, minSizeGb: kotlin.Double?, minBitrateMbps: kotlin.Double?, minGbPerHour: kotlin.Double?, resolution: ResolutionListLargeFiles?, codecs: kotlin.String?, hdr: HdrListLargeFiles?, optimized: OptimizedListLargeFiles?, presetId: kotlin.String?, sort: SortListLargeFiles?, offset: kotlin.Int?, limit: kotlin.Int?) : ApiResponse<LargeFilePage?> {
+        val localVariableConfig = listLargeFilesRequestConfig(libraryId = libraryId, type = type, minSizeGb = minSizeGb, minBitrateMbps = minBitrateMbps, minGbPerHour = minGbPerHour, resolution = resolution, codecs = codecs, hdr = hdr, optimized = optimized, presetId = presetId, sort = sort, offset = offset, limit = limit)
 
         return request<Unit, LargeFilePage>(
             localVariableConfig
@@ -1112,17 +1115,18 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * @param type  (optional)
      * @param minSizeGb At least this many GB (10^9 bytes). (optional)
      * @param minBitrateMbps At least this overall bitrate. (optional)
+     * @param minGbPerHour At least this many GB (10^9 bytes) per hour of running time. (optional)
      * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
      * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
      * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
      * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted. (optional)
      * @param presetId The preset the estimates are for (default: the default preset). (optional)
-     * @param sort  (optional, default to Sort.SIZE)
+     * @param sort perHour: the most GB per hour of running time first. (optional, default to Sort.SIZE)
      * @param offset  (optional, default to 0)
      * @param limit  (optional, default to 100)
      * @return RequestConfig
      */
-    fun listLargeFilesRequestConfig(libraryId: kotlin.Long?, type: TypeListLargeFiles?, minSizeGb: kotlin.Double?, minBitrateMbps: kotlin.Double?, resolution: ResolutionListLargeFiles?, codecs: kotlin.String?, hdr: HdrListLargeFiles?, optimized: OptimizedListLargeFiles?, presetId: kotlin.String?, sort: SortListLargeFiles?, offset: kotlin.Int?, limit: kotlin.Int?) : RequestConfig<Unit> {
+    fun listLargeFilesRequestConfig(libraryId: kotlin.Long?, type: TypeListLargeFiles?, minSizeGb: kotlin.Double?, minBitrateMbps: kotlin.Double?, minGbPerHour: kotlin.Double?, resolution: ResolutionListLargeFiles?, codecs: kotlin.String?, hdr: HdrListLargeFiles?, optimized: OptimizedListLargeFiles?, presetId: kotlin.String?, sort: SortListLargeFiles?, offset: kotlin.Int?, limit: kotlin.Int?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -1137,6 +1141,9 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
                 }
                 if (minBitrateMbps != null) {
                     put("minBitrateMbps", listOf(minBitrateMbps.toString()))
+                }
+                if (minGbPerHour != null) {
+                    put("minGbPerHour", listOf(minGbPerHour.toString()))
                 }
                 if (resolution != null) {
                     put("resolution", listOf(resolution.toString()))

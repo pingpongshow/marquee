@@ -26431,6 +26431,10 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/optimize/files/GET/query/minBitrateMbps`.
                 public var minBitrateMbps: Swift.Double?
+                /// At least this many GB (10^9 bytes) per hour of running time.
+                ///
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/minGbPerHour`.
+                public var minGbPerHour: Swift.Double?
                 /// - Remark: Generated from `#/paths/optimize/files/GET/query/resolution`.
                 @frozen public enum ResolutionPayload: Int, Codable, Hashable, Sendable, CaseIterable {
                     case _2160 = 2160
@@ -26472,9 +26476,12 @@ public enum Operations {
                 @frozen public enum SortPayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case size = "size"
                     case bitrate = "bitrate"
+                    case perHour = "perHour"
                     case title = "title"
                     case savings = "savings"
                 }
+                /// perHour: the most GB per hour of running time first.
+                ///
                 /// - Remark: Generated from `#/paths/optimize/files/GET/query/sort`.
                 public var sort: Operations.ListLargeFiles.Input.Query.SortPayload?
                 /// - Remark: Generated from `#/paths/optimize/files/GET/query/offset`.
@@ -26488,12 +26495,13 @@ public enum Operations {
                 ///   - _type:
                 ///   - minSizeGb: At least this many GB (10^9 bytes).
                 ///   - minBitrateMbps: At least this overall bitrate.
+                ///   - minGbPerHour: At least this many GB (10^9 bytes) per hour of running time.
                 ///   - resolution: Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD.
                 ///   - codecs: Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9).
                 ///   - hdr: Only HDR (yes) or only SDR (no) files.
                 ///   - optimized: Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted.
                 ///   - presetId: The preset the estimates are for (default: the default preset).
-                ///   - sort:
+                ///   - sort: perHour: the most GB per hour of running time first.
                 ///   - offset:
                 ///   - limit:
                 public init(
@@ -26501,6 +26509,7 @@ public enum Operations {
                     _type: Operations.ListLargeFiles.Input.Query._TypePayload? = nil,
                     minSizeGb: Swift.Double? = nil,
                     minBitrateMbps: Swift.Double? = nil,
+                    minGbPerHour: Swift.Double? = nil,
                     resolution: Operations.ListLargeFiles.Input.Query.ResolutionPayload? = nil,
                     codecs: Swift.String? = nil,
                     hdr: Operations.ListLargeFiles.Input.Query.HdrPayload? = nil,
@@ -26514,6 +26523,7 @@ public enum Operations {
                     self._type = _type
                     self.minSizeGb = minSizeGb
                     self.minBitrateMbps = minBitrateMbps
+                    self.minGbPerHour = minGbPerHour
                     self.resolution = resolution
                     self.codecs = codecs
                     self.hdr = hdr

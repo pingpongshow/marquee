@@ -35,6 +35,7 @@ import kotlinx.serialization.Contextual
  * @param type 
  * @param minSizeGb 
  * @param minBitrateMbps 
+ * @param minGbPerHour 
  * @param resolution 
  * @param codecs 
  * @param hdr 
@@ -55,6 +56,9 @@ data class OptimizeFilter (
 
     @SerialName(value = "minBitrateMbps")
     val minBitrateMbps: kotlin.Double? = null,
+
+    @SerialName(value = "minGbPerHour")
+    val minGbPerHour: kotlin.Double? = null,
 
     @SerialName(value = "resolution")
     val resolution: OptimizeFilter.Resolution? = null,

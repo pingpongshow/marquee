@@ -16552,6 +16552,8 @@ extension Components {
             public var minSizeGb: Swift.Double?
             /// - Remark: Generated from `#/components/schemas/OptimizeFilter/minBitrateMbps`.
             public var minBitrateMbps: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/minGbPerHour`.
+            public var minGbPerHour: Swift.Double?
             /// - Remark: Generated from `#/components/schemas/OptimizeFilter/resolution`.
             @frozen public enum ResolutionPayload: Int, Codable, Hashable, Sendable, CaseIterable {
                 case _2160 = 2160
@@ -16588,6 +16590,7 @@ extension Components {
             ///   - _type:
             ///   - minSizeGb:
             ///   - minBitrateMbps:
+            ///   - minGbPerHour:
             ///   - resolution:
             ///   - codecs:
             ///   - hdr:
@@ -16597,6 +16600,7 @@ extension Components {
                 _type: Components.Schemas.OptimizeFilter._TypePayload? = nil,
                 minSizeGb: Swift.Double? = nil,
                 minBitrateMbps: Swift.Double? = nil,
+                minGbPerHour: Swift.Double? = nil,
                 resolution: Components.Schemas.OptimizeFilter.ResolutionPayload? = nil,
                 codecs: [Swift.String]? = nil,
                 hdr: Components.Schemas.OptimizeFilter.HdrPayload? = nil,
@@ -16606,6 +16610,7 @@ extension Components {
                 self._type = _type
                 self.minSizeGb = minSizeGb
                 self.minBitrateMbps = minBitrateMbps
+                self.minGbPerHour = minGbPerHour
                 self.resolution = resolution
                 self.codecs = codecs
                 self.hdr = hdr
@@ -16616,6 +16621,7 @@ extension Components {
                 case _type = "type"
                 case minSizeGb
                 case minBitrateMbps
+                case minGbPerHour
                 case resolution
                 case codecs
                 case hdr

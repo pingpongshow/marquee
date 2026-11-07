@@ -16733,6 +16733,13 @@ public struct Client: APIProtocol {
                     in: &request,
                     style: .form,
                     explode: true,
+                    name: "minGbPerHour",
+                    value: input.query.minGbPerHour
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
                     name: "resolution",
                     value: input.query.resolution
                 )

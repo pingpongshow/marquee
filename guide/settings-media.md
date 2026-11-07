@@ -468,16 +468,17 @@ Find files to convert, see the estimate, and queue them.
 | Type | Movies and episodes | Or **Movies** or **Episodes** only. |
 | At least (GB) | `10` | Only files at least this big. Empty = any size. |
 | Bitrate at least (Mb/s) | (empty) | Only files at or above this bitrate. |
+| At least (GB per hour) | (empty) | Only files with at least this much per hour of running time, whatever their length: at 2.5, a 2-hour film of 5 GB or more, or a 45-minute episode of 1.9 GB or more. |
 | Resolution | Any | 4K (2160p), 1080p, 720p or SD. |
 | HDR | HDR and SDR | Or **Only HDR** or **Only SDR**. |
 | Optimized before | Any | **Not optimized or queued yet** (what's still to do: leaves out optimized files and files already in the queue), or **Already optimized (re-optimize)** to queue optimized files again, for example with a smaller preset. |
 | Preset | The default preset | Used for the size estimates and for queueing. |
-| Sort | Biggest first | Or **Most to save first**, **Highest bitrate first** or **Title**. |
+| Sort | Biggest first | Or **Most to save first**, **Highest bitrate first**, **Most GB per hour first** or **Title**. |
 | Codecs | None (all) | Tap codecs (H.264, HEVC, MPEG-2, VC-1, MPEG-4, AV1, VP9) to show only those. Older codecs (MPEG-2, VC-1, H.264) shrink the most. |
 
 The bar above the list shows how many files match, their total size and about how big they'd be after. Tick files (or the box in the header for the whole page), or press **Select all … matching** for every match across all pages, then **Queue … files**.
 
-The list shows each file's size, resolution and codec (with HDR), bitrate, length and estimated size after, with the saving as a percentage.
+The list shows each file's size (with its GB per hour under it), resolution and codec (with HDR), bitrate, length and estimated size after, with the saving as a percentage.
 
 ### Queue tab
 

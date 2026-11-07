@@ -161,6 +161,10 @@ func TestListFilters(t *testing.T) {
 	eq("all, biggest first", list(Filter{}), big, vc1, mpeg2, small)
 	eq("min size", list(Filter{MinSizeBytes: 10 * gb}), big, vc1)
 	eq("min bitrate", list(Filter{MinBitrateKbps: 9000}), big, vc1, mpeg2)
+	// Every file here runs two hours: 30, 12.5, 4 and 1 GB an hour.
+	eq("GB per hour", list(Filter{MinBytesPerHour: 4 * gb}), big, vc1, mpeg2)
+	eq("GB per hour, higher", list(Filter{MinBytesPerHour: 5 * gb}), big, vc1)
+	eq("most per hour first", list(Filter{Sort: "perHour"}), big, vc1, mpeg2, small)
 	eq("1080p", list(Filter{Resolution: 1080}), vc1, mpeg2)
 	eq("4K", list(Filter{Resolution: 2160}), big)
 	eq("old codecs", list(Filter{Codecs: []string{"VC1", "mpeg2video"}}), vc1, mpeg2)

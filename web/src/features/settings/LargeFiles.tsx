@@ -167,11 +167,12 @@ type Filters = {
   type?: "movie" | "episode";
   minSizeGb?: number;
   minBitrateMbps?: number;
+  minGbPerHour?: number;
   resolution?: 2160 | 1080 | 720 | 480;
   codecs: string[];
   hdr?: "yes" | "no";
   optimized?: "yes" | "no";
-  sort: "size" | "bitrate" | "title" | "savings";
+  sort: "size" | "bitrate" | "perHour" | "title" | "savings";
 };
 
 function numberOrUndefined(v: string) {
@@ -194,6 +195,7 @@ function FilesTab({ config, onQueued }: { config: OptimizeConfig; onQueued: () =
     type: filters.type,
     minSizeGb: filters.minSizeGb,
     minBitrateMbps: filters.minBitrateMbps,
+    minGbPerHour: filters.minGbPerHour,
     resolution: filters.resolution,
     codecs: filters.codecs.length ? filters.codecs.join(",") : undefined,
     hdr: filters.hdr,
@@ -221,6 +223,7 @@ function FilesTab({ config, onQueued }: { config: OptimizeConfig; onQueued: () =
         type: filters.type,
         minSizeGb: filters.minSizeGb,
         minBitrateMbps: filters.minBitrateMbps,
+        minGbPerHour: filters.minGbPerHour,
         resolution: filters.resolution,
         codecs: filters.codecs.length ? filters.codecs : undefined,
         hdr: filters.hdr,
@@ -306,6 +309,19 @@ function FilesTab({ config, onQueued }: { config: OptimizeConfig; onQueued: () =
             />
           )}
         </Field>
+        <Field label="At least (GB per hour)">
+          {(id) => (
+            <Input
+              id={id}
+              type="number"
+              min={0}
+              step="any"
+              value={filters.minGbPerHour ?? ""}
+              placeholder="Any"
+              onChange={(e) => update({ minGbPerHour: numberOrUndefined(e.target.value) })}
+            />
+          )}
+        </Field>
         <Field label="Resolution">
           {(id) => (
             <Select id={id} value={filters.resolution ?? ""} onChange={(e) => update({ resolution: (e.target.value ? Number(e.target.value) : undefined) as Filters["resolution"] })}>
@@ -352,6 +368,7 @@ function FilesTab({ config, onQueued }: { config: OptimizeConfig; onQueued: () =
               <option value="size">Biggest first</option>
               <option value="savings">Most to save first</option>
               <option value="bitrate">Highest bitrate first</option>
+              <option value="perHour">Most GB per hour first</option>
               <option value="title">Title</option>
             </Select>
           )}
@@ -471,7 +488,10 @@ function FileRow({ file: f, checked, onToggle }: { file: LargeFile; checked: boo
           </div>
         )}
       </td>
-      <td className="px-3 py-2 text-right align-top tabular-nums">{size(f.size)}</td>
+      <td className="px-3 py-2 text-right align-top tabular-nums">
+        {size(f.size)}
+        {f.durationMs > 0 && <div className="text-xs whitespace-nowrap text-faint">{(f.size / 1e9 / (f.durationMs / 3_600_000)).toFixed(1)} GB/h</div>}
+      </td>
       <td className="px-3 py-2 align-top whitespace-nowrap">
         {resolutionLabel(f.width, f.height)} · {codecLabels[f.videoCodec] ?? f.videoCodec}
         {f.hdr && <span className="ml-1 text-xs text-accent">{f.hdr === "dolby_vision" ? "DV" : f.hdr.toUpperCase()}</span>}

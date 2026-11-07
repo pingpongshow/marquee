@@ -2627,12 +2627,13 @@ paths:
         - { name: type, in: query, schema: { type: string, enum: [movie, episode] } }
         - { name: minSizeGb, in: query, description: "At least this many GB (10^9 bytes).", schema: { type: number, minimum: 0 } }
         - { name: minBitrateMbps, in: query, description: "At least this overall bitrate.", schema: { type: number, minimum: 0 } }
+        - { name: minGbPerHour, in: query, description: "At least this many GB (10^9 bytes) per hour of running time.", schema: { type: number, minimum: 0 } }
         - { name: resolution, in: query, description: "Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD.", schema: { type: integer, enum: [2160, 1080, 720, 480] } }
         - { name: codecs, in: query, description: "Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9).", schema: { type: string } }
         - { name: hdr, in: query, description: "Only HDR (yes) or only SDR (no) files.", schema: { type: string, enum: ["yes", "no"] } }
         - { name: optimized, in: query, description: "Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted.", schema: { type: string, enum: ["yes", "no"] } }
         - { name: presetId, in: query, description: "The preset the estimates are for (default: the default preset).", schema: { type: string } }
-        - { name: sort, in: query, schema: { type: string, enum: [size, bitrate, title, savings], default: size } }
+        - { name: sort, in: query, description: "perHour: the most GB per hour of running time first.", schema: { type: string, enum: [size, bitrate, perHour, title, savings], default: size } }
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -9471,6 +9472,7 @@ components:
         type: { type: string, enum: [movie, episode] }
         minSizeGb: { type: number, minimum: 0 }
         minBitrateMbps: { type: number, minimum: 0 }
+        minGbPerHour: { type: number, minimum: 0 }
         resolution: { type: integer, enum: [2160, 1080, 720, 480] }
         codecs: { type: array, items: { type: string } }
         hdr: { type: string, enum: ["yes", "no"] }
