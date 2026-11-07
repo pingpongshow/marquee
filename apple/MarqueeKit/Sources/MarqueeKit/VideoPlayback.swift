@@ -394,7 +394,8 @@ public final class VideoPlayback {
         itemStatus = playerItem.observe(\.status) { [weak self] it, _ in
             guard it.status == .failed else { return }
             let message = it.error?.localizedDescription ?? "unknown error"
-            Task { @MainActor in await self?.failed(message, item: id) }
+            let detail = Self.failureDetail(it)
+            Task { @MainActor in await self?.failed(message, detail: detail, item: id) }
         }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: playerItem, queue: .main) { [weak self] _ in
@@ -405,13 +406,33 @@ public final class VideoPlayback {
         }
     }
 
+    /// What went wrong, in full, for the server's log: the short message is often a generic
+    /// CoreMedia code (-12927 says little), so the chain of underlying errors and the stream's
+    /// last error log entries (HTTP status, the player's own comment, the file it was reading).
+    nonisolated static func failureDetail(_ item: AVPlayerItem) -> String {
+        var parts: [String] = []
+        var next = item.error as NSError?
+        while let e = next, parts.count < 4 {
+            parts.append("\(e.domain) \(e.code)" + (e.localizedFailureReason.map { ": \($0)" } ?? ""))
+            next = e.userInfo[NSUnderlyingErrorKey] as? NSError
+        }
+        for ev in item.errorLog()?.events.suffix(3) ?? [] {
+            var s = "log \(ev.errorDomain) \(ev.errorStatusCode)"
+            if let c = ev.errorComment, !c.isEmpty { s += " \(c)" }
+            if let u = ev.uri { s += " (\(URL(string: u)?.lastPathComponent ?? u))" }
+            parts.append(s)
+        }
+        return parts.joined(separator: "; ")
+    }
+
     /// Reports the error to the server log and retries with a more conservative profile.
-    private func failed(_ message: String, item: ObjectIdentifier) async {
+    private func failed(_ message: String, detail: String, item: ObjectIdentifier) async {
         // A stream that has since been replaced (a restart, the next video) failing late.
         guard player.currentItem.map(ObjectIdentifier.init) == item else { return }
         if let s = session, let client = app.client {
             let pos = Int64(max(0, player.currentTime().seconds) * 1000)
-            _ = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: .error, error: "AVPlayer: \(message)")))
+            let report = detail.isEmpty ? "AVPlayer: \(message)" : "AVPlayer: \(message) [\(detail)]"
+            _ = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: .error, error: report)))
         }
         guard fallback < 2, let id = session?.itemId else {
             errorMessage = "This video can't be played on this device (\(message))."
