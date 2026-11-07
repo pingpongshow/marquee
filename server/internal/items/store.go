@@ -368,25 +368,45 @@ func (s *Store) Search(ctx context.Context, acc Access, query string, perType in
 }
 
 // SearchFavorites is Search, limited to the person's favourites when favOnly is set.
+// Titles with every word come first, then titles with any of them, so "willy wonka"
+// still finds "Wonka".
 func (s *Store) SearchFavorites(ctx context.Context, acc Access, query string, perType int, favOnly bool) ([]SearchGroup, error) {
-	match := ftsQuery(query)
-	if match == "" {
+	words := searchWords(query)
+	if len(words) == 0 {
 		return []SearchGroup{}, nil
 	}
 	ac, aargs := acc.clause()
 	if favOnly {
 		ac += ` AND ` + favoriteCond(acc.UserID, "i")
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+` FROM items_fts f JOIN items i ON i.id = f.rowid
+	find := func(match string) ([]Summary, error) {
+		rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+` FROM items_fts f JOIN items i ON i.id = f.rowid
 		LEFT JOIN items p ON p.id = i.parent_id LEFT JOIN items g ON g.id = i.grandparent_id
 		WHERE items_fts MATCH ? AND i.extra_type IS NULL AND i.type IN ('movie','show','episode','artist','album','track','video') AND `+ac+`
 		ORDER BY bm25(items_fts, 10.0, 5.0, 1.0, 4.0) LIMIT 400`, append([]any{match}, aargs...)...)
+		if err != nil {
+			return nil, err
+		}
+		return collect(rows)
+	}
+	all, err := find(ftsQuery(words, " "))
 	if err != nil {
 		return nil, err
 	}
-	all, err := collect(rows)
-	if err != nil {
-		return nil, err
+	if any := significantWords(words); len(words) > 1 && len(any) > 0 {
+		more, err := find(ftsQuery(any, " OR "))
+		if err != nil {
+			return nil, err
+		}
+		seen := map[int64]bool{}
+		for _, it := range all {
+			seen[it.ID] = true
+		}
+		for _, it := range more {
+			if !seen[it.ID] {
+				all = append(all, it)
+			}
+		}
 	}
 	byType := map[string][]Summary{}
 	for _, it := range all {
@@ -403,14 +423,34 @@ func (s *Store) SearchFavorites(ctx context.Context, acc Access, query string, p
 	return out, nil
 }
 
-// ftsQuery turns user input into an FTS5 prefix query: every word must match the start
-// of a word in the title ("matr reload" → "matr"* "reload"*).
-func ftsQuery(q string) string {
-	var terms []string
-	for _, w := range strings.FieldsFunc(q, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
-		terms = append(terms, `"`+w+`"*`)
+func searchWords(q string) []string {
+	return strings.FieldsFunc(q, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+}
+
+// searchStopWords are too common to find a title on their own.
+var searchStopWords = map[string]bool{"the": true, "a": true, "an": true, "and": true, "of": true, "in": true, "on": true,
+	"to": true, "for": true, "at": true, "by": true, "with": true, "from": true, "le": true, "la": true, "les": true, "el": true, "de": true}
+
+// significantWords drops stop words and single letters, which would match half the library.
+func significantWords(words []string) []string {
+	var out []string
+	for _, w := range words {
+		if len([]rune(w)) > 1 && !searchStopWords[strings.ToLower(w)] {
+			out = append(out, w)
+		}
 	}
-	return strings.Join(terms, " ")
+	return out
+}
+
+// ftsQuery turns words into an FTS5 prefix query, each word matching the start of a word
+// in the title: joined by " " every word must match ("matr reload" → "matr"* "reload"*),
+// joined by " OR " any of them.
+func ftsQuery(words []string, join string) string {
+	terms := make([]string, len(words))
+	for i, w := range words {
+		terms[i] = `"` + w + `"*`
+	}
+	return strings.Join(terms, join)
 }
 
 // Get returns full item detail. File paths are included only when withPaths is set (admins).
