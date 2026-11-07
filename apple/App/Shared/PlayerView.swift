@@ -83,6 +83,13 @@ struct PlayerView: View {
             Button("") { close() }.keyboardShortcut(.cancelAction).opacity(0)
         }
         #endif
+        // A library copy started from a page on demand that can't be played (its file is gone,
+        // or every fallback failed): close, and that page plays the stream on demand instead.
+        .onChange(of: playback?.errorMessage) { _, message in
+            guard message != nil, request.vodFallback, let p = playback, (p.session?.itemId ?? request.itemID) == request.itemID else { return }
+            presenter.failedLibraryItem = request.itemID
+            close()
+        }
         .task {
             music.pause() // a video takes over from the music
             Task { await app.refreshInfo() } // the rating request switch may have changed (USER-19)

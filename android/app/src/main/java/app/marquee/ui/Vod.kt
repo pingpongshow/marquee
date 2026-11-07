@@ -595,7 +595,7 @@ fun VodMovieScreen(nav: NavHostController, movieId: Long) {
                         // The library's copy comes first; the stream on demand stays a tap away.
                         val library = m.libraryItemId
                         if (library != null) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Button({ nav.navigate("player/$library") }, Modifier.focusRing().initialFocus(marquee.isTv)) {
+                            Button({ nav.navigate("player/$library?vm=${m.id}") }, Modifier.focusRing().initialFocus(marquee.isTv)) {
                                 Icon(Icons.Filled.PlayArrow, null)
                                 Text("Play from library", Modifier.padding(start = 6.dp))
                             }

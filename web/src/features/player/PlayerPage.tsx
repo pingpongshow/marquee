@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams, useSearch } from "@tanstack/react-router";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { lazy, Suspense, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { itemQuery } from "@/api/queries";
 import type { ItemDetail, ItemSummary } from "@/api/types";
+import { toast } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
 
 // hls.js is large; load the player only when something is played.
@@ -19,7 +20,18 @@ const loading = (
 
 export function PlayerPage() {
   const { itemId } = useParams({ from: "/play/$itemId" });
-  const { t, pl, sh, f, g } = useSearch({ from: "/play/$itemId" });
+  const { t, pl, sh, f, g, vm, vs, ve } = useSearch({ from: "/play/$itemId" });
+  const navigate = useNavigate();
+  // Started from a film or episode on demand that the library has: if the library's copy
+  // can't be played (gone, or it fails), the stream on demand plays instead.
+  const onDemand =
+    vm || (vs && ve)
+      ? () => {
+          toast("The library's copy couldn't be played, so this plays on VOD.");
+          if (vm) navigate({ to: "/vod/$movieId/play", params: { movieId: String(vm) }, replace: true });
+          else navigate({ to: "/vod/shows/$seriesId/play/$episodeId", params: { seriesId: String(vs), episodeId: String(ve) }, replace: true });
+        }
+      : undefined;
   return (
     <Suspense fallback={loading}>
       {/* Keyed by item so Up Next starts a fresh player (and its own trailers). */}
@@ -31,6 +43,7 @@ export function PlayerPage() {
         shuffleSeed={sh}
         fileId={f}
         groupId={g}
+        onUnplayable={onDemand}
       />
     </Suspense>
   );
@@ -58,6 +71,7 @@ function PlayerFlow({
   shuffleSeed,
   fileId,
   groupId,
+  onUnplayable,
 }: {
   itemId: number;
   startMs?: number;
@@ -65,6 +79,7 @@ function PlayerFlow({
   shuffleSeed?: number;
   fileId?: number;
   groupId?: string;
+  onUnplayable?: () => void;
 }) {
   const item = useQuery(itemQuery(itemId));
   // Decided once, when the item first loads: later refetches (progress) mustn't change it.
@@ -114,6 +129,7 @@ function PlayerFlow({
       shuffleSeed={shuffleSeed}
       fileId={fileId}
       groupId={groupId}
+      onUnplayable={onUnplayable}
     />
   );
 }

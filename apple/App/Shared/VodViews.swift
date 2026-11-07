@@ -658,6 +658,15 @@ struct VodMovieView: View {
         .fullScreenCover(item: $playing, onDismiss: { Task { await load() } }) { t in
             VodPlayerView(target: t)
         }
+        // The library's copy couldn't be played: the stream on demand, once its player has gone.
+        .onChange(of: video.failedLibraryItem) { _, failed in
+            guard let failed, let m = movie, failed == m.info.libraryItemId else { return }
+            video.failedLibraryItem = nil
+            Task {
+                try? await Task.sleep(for: .milliseconds(800))
+                playing = VodPlayTarget(movie: m, startMs: nil)
+            }
+        }
     }
 
     private func page(_ m: VodMovieDetail) -> some View {
@@ -737,7 +746,7 @@ struct VodMovieView: View {
         return HeaderActions {
             // The library's copy comes first; the stream on demand stays a tap away.
             if let item = m.info.libraryItemId {
-                Button { video.play(item) } label: { Label("Play from Library", systemImage: "play.fill") }
+                Button { video.play(item, vodFallback: true) } label: { Label("Play from Library", systemImage: "play.fill") }
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("vod.playLibrary")
                 Button { playing = VodPlayTarget(movie: m, startMs: nil) } label: {

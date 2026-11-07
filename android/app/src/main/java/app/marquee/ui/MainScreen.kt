@@ -218,13 +218,29 @@ private fun Routes(nav: NavHostController) {
         composable("topsongs/{id}", listOf(navArgument("id") { type = NavType.LongType })) { TopSongsScreen(nav, it.arguments!!.getLong("id")) }
         composable("playlist/{id}", listOf(navArgument("id") { type = NavType.LongType })) { PlaylistScreen(nav, it.arguments!!.getLong("id")) }
         composable(
-            "player/{id}?start={start}&group={group}",
+            "player/{id}?start={start}&group={group}&vm={vm}&vs={vs}&ve={ve}",
             listOf(
                 navArgument("id") { type = NavType.LongType },
                 navArgument("start") { type = NavType.LongType; defaultValue = -1L },
                 navArgument("group") { type = NavType.StringType; nullable = true; defaultValue = null },
+                // The same film (vm) or episode (vs, ve) on demand: played instead if the library's copy can't be.
+                navArgument("vm") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("vs") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("ve") { type = NavType.LongType; defaultValue = -1L },
             ),
-        ) { PlayerScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getLong("start").takeIf { s -> s >= 0 }, it.arguments!!.getString("group")) }
+        ) {
+            val a = it.arguments!!
+            val start = a.getLong("start").takeIf { s -> s >= 0 }
+            val vm = a.getLong("vm")
+            val vs = a.getLong("vs")
+            val ve = a.getLong("ve")
+            val onDemand = when {
+                vm >= 0 -> "vodplay/$vm"
+                vs >= 0 && ve >= 0 -> "vodepplay/$vs/$ve" + (start?.let { s -> "?start=$s" } ?: "")
+                else -> null
+            }
+            PlayerScreen(nav, a.getLong("id"), start, a.getString("group"), onDemand)
+        }
         composable("downloads") { DownloadsScreen(nav) }
         composable("smartdownloads") { SmartDownloadsScreen(nav) }
         composable("vodfollows") { VodFollowsScreen(nav) }
@@ -285,13 +301,29 @@ private fun OfflineRoutes(nav: NavHostController) {
         composable("offlinealbum/{id}", listOf(navArgument("id") { type = NavType.LongType })) { OfflineAlbumScreen(it.arguments!!.getLong("id")) }
         composable("offlineplaylist/{id}", listOf(navArgument("id") { type = NavType.LongType })) { OfflinePlaylistScreen(nav, it.arguments!!.getLong("id")) }
         composable(
-            "player/{id}?start={start}&group={group}",
+            "player/{id}?start={start}&group={group}&vm={vm}&vs={vs}&ve={ve}",
             listOf(
                 navArgument("id") { type = NavType.LongType },
                 navArgument("start") { type = NavType.LongType; defaultValue = -1L },
                 navArgument("group") { type = NavType.StringType; nullable = true; defaultValue = null },
+                // The same film (vm) or episode (vs, ve) on demand: played instead if the library's copy can't be.
+                navArgument("vm") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("vs") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("ve") { type = NavType.LongType; defaultValue = -1L },
             ),
-        ) { PlayerScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getLong("start").takeIf { s -> s >= 0 }, it.arguments!!.getString("group")) }
+        ) {
+            val a = it.arguments!!
+            val start = a.getLong("start").takeIf { s -> s >= 0 }
+            val vm = a.getLong("vm")
+            val vs = a.getLong("vs")
+            val ve = a.getLong("ve")
+            val onDemand = when {
+                vm >= 0 -> "vodplay/$vm"
+                vs >= 0 && ve >= 0 -> "vodepplay/$vs/$ve" + (start?.let { s -> "?start=$s" } ?: "")
+                else -> null
+            }
+            PlayerScreen(nav, a.getLong("id"), start, a.getString("group"), onDemand)
+        }
         composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }) }
         composable("settings") { SettingsScreen(nav) }
         composable("downloads") { DownloadsScreen(nav) }

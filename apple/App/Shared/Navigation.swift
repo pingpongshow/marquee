@@ -180,6 +180,10 @@ struct VideoRequest: Identifiable, Hashable {
     var order: [Int64]?
     /// A watch-together group to join.
     var groupID: String?
+    /// Started from a film or episode on demand that the library has: if the library's copy
+    /// can't be played, the player closes and reports it (`failedLibraryItem`) so the page
+    /// plays the stream on demand instead.
+    var vodFallback = false
     var id: String { "\(itemID)-\(startMs ?? -1)-\(playlistID ?? 0)-\(groupID ?? "")" }
 }
 
@@ -187,7 +191,12 @@ struct VideoRequest: Identifiable, Hashable {
 @MainActor @Observable
 final class VideoPresenter {
     var request: VideoRequest?
-    func play(_ itemID: Int64, startMs: Int64? = nil, playlistID: Int64? = nil, order: [Int64]? = nil, group: String? = nil) {
-        request = VideoRequest(itemID: itemID, startMs: startMs, playlistID: playlistID, order: order, groupID: group)
+    /// A library copy that couldn't be played, for the page on demand that started it.
+    var failedLibraryItem: Int64?
+    func play(_ itemID: Int64, startMs: Int64? = nil, playlistID: Int64? = nil, order: [Int64]? = nil, group: String? = nil,
+              vodFallback: Bool = false) {
+        failedLibraryItem = nil
+        request = VideoRequest(itemID: itemID, startMs: startMs, playlistID: playlistID, order: order, groupID: group,
+                               vodFallback: vodFallback)
     }
 }

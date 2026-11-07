@@ -154,7 +154,7 @@ private const val offsetStep = 100
  */
 @OptIn(UnstableApi::class)
 @Composable
-fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: String? = null) {
+fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: String? = null, onDemandRoute: String? = null) {
     val marquee = LocalMarquee.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -290,7 +290,9 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             }
             .onFailure { e ->
                 val limit = app.marquee.core.TimeLimitRules.reason(e)
-                if (limit != null) timeUp(limit) else error = serverMessage(e, "Couldn't start playback")
+                if (limit != null) timeUp(limit)
+                else if (onDemandRoute != null) playOnDemand(nav, context, onDemandRoute)
+                else error = serverMessage(e, "Couldn't start playback")
             }
     }
 
@@ -445,6 +447,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             override fun onPlayerError(e: androidx.media3.common.PlaybackException) {
                 // A trailer that won't play is skipped rather than holding up the movie.
                 if (roll >= 0) { nextRoll(); return }
+                if (onDemandRoute != null) { playOnDemand(nav, context, onDemandRoute); return }
                 error = "This video can't be played on this device (${e.errorCodeName})."
             }
         }
@@ -1044,4 +1047,12 @@ internal fun VideoWindow() {
             }
         }
     }
+}
+
+/** The library's copy of a film or episode on demand couldn't be played: the stream on demand
+ *  instead, in place of this player. */
+private fun playOnDemand(nav: NavHostController, context: android.content.Context, route: String) {
+    android.widget.Toast.makeText(context, "The library's copy couldn't be played, so this plays on VOD.", android.widget.Toast.LENGTH_LONG).show()
+    nav.popBackStack()
+    nav.navigate(route)
 }

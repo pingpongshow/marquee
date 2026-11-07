@@ -557,7 +557,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
                 <>
                   <Button
                     variant="primary"
-                    onClick={() => navigate({ to: "/play/$itemId", params: { itemId: String(m.libraryItemId) } })}
+                    onClick={() => navigate({ to: "/play/$itemId", params: { itemId: String(m.libraryItemId) }, search: { vm: m.id } })}
                   >
                     <Play className="size-4 fill-current" /> Play from library
                   </Button>

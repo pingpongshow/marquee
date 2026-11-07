@@ -22,12 +22,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  api,
-  session as authSession,
-  trickplaySheetUrl,
-  unwrap,
-} from "@/api/client";
+import { api, ApiError, session as authSession, trickplaySheetUrl, unwrap } from "@/api/client";
 import { itemQuery, meQuery, systemInfoQuery } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
 import type {
@@ -183,6 +178,7 @@ export function VideoPlayer({
   fileId,
   groupId,
   preroll,
+  onUnplayable,
 }: {
   itemId: number;
   startMs?: number;
@@ -192,9 +188,16 @@ export function VideoPlayer({
   fileId?: number;
   groupId?: string;
   preroll?: Preroll;
+  /** Called instead of showing the error when this can't be played (another source can play it). */
+  onUnplayable?: () => void;
 }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  // Read when it's needed, so a new function from the page doesn't restart the stream.
+  const unplayableRef = useRef(onUnplayable);
+  useEffect(() => {
+    unplayableRef.current = onUnplayable;
+  });
   const item = useQuery(itemQuery(itemId));
   const me = useQuery(meQuery);
   const trickplay = useQuery({
@@ -369,7 +372,11 @@ export function VideoPlayer({
         sessionRef.current = s;
         setSess(s);
       } catch (e) {
-        if (!cancelled) setError((e as Error).message);
+        if (cancelled) return;
+        // Not when a kid's time is up: that applies to the stream on demand as well.
+        const elsewhere = unplayableRef.current;
+        if (elsewhere && !(e instanceof ApiError && e.code === "time_limit")) elsewhere();
+        else setError((e as Error).message);
       }
     })();
     return () => {
@@ -398,6 +405,8 @@ export function VideoPlayer({
           v && v.currentTime > 1 ? Math.round(v.currentTime * 1000) : restartAt,
         );
         setFallback((f) => f + 1);
+      } else if (unplayableRef.current) {
+        unplayableRef.current();
       } else {
         setError(`This video can't be played in this browser (${message}).`);
       }

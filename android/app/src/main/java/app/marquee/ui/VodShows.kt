@@ -188,7 +188,7 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
     fun play(e: VodEpisode, from: Long? = null) {
         val start = from?.let { "?start=$it" } ?: ""
         val library = e.libraryItemId
-        nav.navigate(if (library != null) "player/$library$start" else "vodepplay/${s.id}/${e.id}$start")
+        nav.navigate(if (library != null) "player/$library?vs=${s.id}&ve=${e.id}" + (from?.let { "&start=$it" } ?: "") else "vodepplay/${s.id}/${e.id}$start")
     }
     fun change(apply: () -> Unit, undo: () -> Unit, call: suspend () -> Unit) {
         apply()

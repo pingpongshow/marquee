@@ -102,6 +102,7 @@ Each page has:
 - **Filters:** watched state (Unwatched, In progress, Watched), genre, decade, minimum rating, **In my library** (yes or no) and source. Active filters show as chips you can clear one by one.
 - A poster grid. Titles your library already has get a **green border** (*In your library*).
 - **The library's copy comes first.** On the page of a film your library has, the main button is **Play from library**, which plays your library's copy and picks up where you left off there. **Play on VOD** is next to it if you'd rather stream it. A show your library has offers **Open in library**, and each episode the library has plays from the library (marked *Plays from your library*); the others play on demand. This only counts libraries you can see.
+- **The stream on demand as a backup.** If the library's copy can't be played (its file has gone, or it fails to play on that device), the film or episode plays on VOD instead, with a note saying so. A library copy whose file has gone also stops counting within a couple of minutes, so the page then offers VOD first. This applies to films and episodes opened from Your Watchlist too.
 
 Your category, sort and filters are remembered for each page.
 

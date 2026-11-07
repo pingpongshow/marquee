@@ -74,7 +74,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
   // An episode the library has plays from the library (resuming there); others on demand.
   const play = (e: VodEpisode, t?: number) =>
     e.libraryItemId
-      ? navigate({ to: "/play/$itemId", params: { itemId: String(e.libraryItemId) }, search: { t } })
+      ? navigate({ to: "/play/$itemId", params: { itemId: String(e.libraryItemId) }, search: { t, vs: s.id, ve: e.id } })
       : navigate({
           to: "/vod/shows/$seriesId/play/$episodeId",
           params: { seriesId: String(s.id), episodeId: String(e.id) },

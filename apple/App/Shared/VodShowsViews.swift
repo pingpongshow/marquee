@@ -98,6 +98,8 @@ struct VodSeriesView: View {
     @State private var show: VodSeriesDetail?
     @State private var error: String?
     @State private var playing: VodPlayTarget?
+    /// An episode started from the library's copy, to play on demand if that can't be played.
+    @State private var fromLibrary: (episode: VodEpisode, startMs: Int64?)?
     /// The season picked (nil = the next episode's, else the first).
     @State private var season: Int?
     /// Watched changes shown at once, before the server confirms (by episode id; the show's under 0).
@@ -131,6 +133,16 @@ struct VodSeriesView: View {
         .onChange(of: HomeChanges.shared.version) { Task { await load() } }
         .fullScreenCover(item: $playing, onDismiss: { Task { await load() } }) { t in
             VodPlayerView(target: t)
+        }
+        // The library's copy couldn't be played: the episode on demand, once its player has gone.
+        .onChange(of: video.failedLibraryItem) { _, failed in
+            guard let failed, let tried = fromLibrary, failed == tried.episode.libraryItemId else { return }
+            video.failedLibraryItem = nil
+            fromLibrary = nil
+            Task {
+                try? await Task.sleep(for: .milliseconds(800))
+                playing = VodPlayTarget(episode: tried.episode, startMs: tried.startMs)
+            }
         }
     }
 
@@ -223,7 +235,8 @@ struct VodSeriesView: View {
     /// An episode the library has plays from the library (resuming there); others on demand.
     private func play(_ e: VodEpisode, startMs: Int64?) {
         if let item = e.libraryItemId {
-            video.play(item, startMs: startMs)
+            fromLibrary = (e, startMs)
+            video.play(item, startMs: startMs, vodFallback: true)
         } else {
             playing = VodPlayTarget(episode: e, startMs: startMs)
         }
