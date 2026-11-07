@@ -267,6 +267,11 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 
 	// Transcode.
 	d.Method = Transcode
+	// Converted video is always 8-bit, which can't carry HDR: tone map it even for an HDR
+	// display. Left tagged PQ/BT.2020, AVPlayer and Safari refuse it (CoreMedia -12927).
+	if v.HDR != "" {
+		d.ToneMap = true
+	}
 	d.VideoCodec = "h264"
 	if l.PreferHEVC && has(p.HLSVideoCodecs, "hevc") {
 		d.VideoCodec = "hevc"

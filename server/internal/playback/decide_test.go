@@ -83,6 +83,19 @@ func TestHDROnSDRDisplayToneMaps(t *testing.T) {
 	}
 }
 
+// Ali G: Who Iz I? on an HDR Mac and Apple TV: HDR10 HEVC over the quality limit is
+// converted, and the 8-bit result must be tone mapped (left tagged PQ, AVPlayer refused it).
+func TestHDRConvertedForHDRDisplayToneMaps(t *testing.T) {
+	m := archer()
+	m.Video.HDR = "hdr10"
+	if d := Decide(m, appleTV, Limits{MaxKbps: 2000}); d.Method != Transcode || !d.ToneMap {
+		t.Fatalf("%+v", d)
+	}
+	if d := Decide(m, appleTV, Limits{}); d.ToneMap {
+		t.Fatalf("an HDR display that can take the video as it is keeps HDR: %+v", d)
+	}
+}
+
 func TestMusic(t *testing.T) {
 	flac := Media{Container: "flac", BitrateKbps: 1000, Audio: &AudioStream{Codec: "flac", Channels: 2}}
 	if d := Decide(flac, chrome, Limits{}); d.Method != DirectPlay {
