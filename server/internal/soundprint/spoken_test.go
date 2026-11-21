@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"marquee/internal/db"
@@ -46,33 +48,73 @@ func TestSpokenLanguagePass(t *testing.T) {
 	sf := exec(`INSERT INTO media_files (version_id, library_id, path, size, mtime, available) VALUES (?, ?, '/m/song.flac', 1, 1, 1)`, sv, music)
 	exec(`INSERT INTO streams (file_id, stream_index, kind, codec) VALUES (?, 0, 'audio', 'flac')`, sf)
 
-	var asked []SpokenItem
+	// A stand-in FFmpeg: a second of silence for any file but a broken one.
+	ff := filepath.Join(dir, "ffmpeg")
+	os.WriteFile(ff, []byte("#!/bin/sh\ncase \"$*\" in *broken*) echo 'Invalid data' >&2; exit 1;; esac\nhead -c 32000 /dev/zero\n"), 0o755)
+	broken := exec(`INSERT INTO items (library_id, type, title, sort_title) VALUES (?, 'movie', 'Broken', 'Broken')`, lib)
+	bv := exec(`INSERT INTO media_versions (item_id) VALUES (?)`, broken)
+	bf := exec(`INSERT INTO media_files (version_id, library_id, path, size, mtime, available) VALUES (?, ?, '/m/broken.mkv', 1, 1, 1)`, bv, lib)
+	exec(`INSERT INTO streams (file_id, stream_index, kind, codec) VALUES (?, 1, 'audio', 'aac')`, bf)
+
+	type sentItem struct {
+		ID    string
+		Clips []string
+	}
+	var asked []sentItem
+	sidecarFails := false
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req struct{ Items []SpokenItem }
+		if r.URL.Path != "/spoken_language_clips" {
+			http.NotFound(w, r)
+			return
+		}
+		var req struct{ Items []sentItem }
 		json.NewDecoder(r.Body).Decode(&req)
 		asked = append(asked, req.Items...)
 		out := struct {
 			Model   string         `json:"model"`
 			Results []SpokenResult `json:"results"`
-		}{Model: "whisper#1"}
+		}{Model: "whisper#3"}
 		for _, it := range req.Items {
-			res := SpokenResult{Path: it.Path, Stream: it.Stream}
-			if it.Stream == 1 {
-				res.Language, res.Confidence, res.Heard = "fr", 0.98, 4
+			res := SpokenResult{ID: it.ID}
+			switch {
+			case sidecarFails:
+				res.Error = "model wouldn't load"
+			case len(asked)-len(req.Items) == 0 && it.ID == "0": // the first track sent: the film's stream 1
+				res.Language, res.Confidence, res.Heard, res.Agree = "fr", 0.98, 3, 3
 			}
 			out.Results = append(out.Results, res)
 		}
 		json.NewEncoder(w).Encode(out)
 	}))
 	defer srv.Close()
-	s := &Service{DB: d, Client: &Client{BaseURL: srv.URL}, Enabled: func() bool { return true }}
-	h := Health{Speech: "whisper#1"}
+	s := &Service{DB: d, FFmpeg: ff, Client: &Client{BaseURL: srv.URL}, Enabled: func() bool { return true }}
+	h := Health{Speech: "whisper#3"}
+
+	// A sidecar that fails every track: the run stops with its error and keeps nothing.
+	sidecarFails = true
+	if _, err := s.spokenPass(ctx, h); err == nil || !strings.Contains(err.Error(), "model wouldn't load") {
+		t.Fatalf("sidecar failure: %v", err)
+	}
+	var kept int
+	d.QueryRow(`SELECT COUNT(*) FROM spoken_languages WHERE file_id = ?`, f).Scan(&kept)
+	if kept != 0 {
+		t.Fatalf("kept %d after the sidecar failed", kept)
+	}
+	sidecarFails = false
+	asked = nil
 
 	if _, err := s.spokenPass(ctx, h); err != nil {
 		t.Fatal(err)
 	}
-	if len(asked) != 2 || asked[0].Stream != 1 || asked[1].Stream != 3 || asked[0].Path != "/m/film.mkv" {
+	// The film's two unknown tracks were sent, cut by the server (three stretches each); the
+	// broken file wasn't sent but is kept as heard; music isn't asked.
+	if len(asked) != 2 || len(asked[0].Clips) == 0 {
 		t.Fatalf("asked %+v", asked)
+	}
+	var brokenKept int
+	d.QueryRow(`SELECT COUNT(*) FROM spoken_languages WHERE file_id = ? AND language IS NULL`, bf).Scan(&brokenKept)
+	if brokenKept != 1 {
+		t.Fatal("an unreadable file should be kept as heard")
 	}
 	lang := func(index int) (string, bool) {
 		var l sql.NullString
@@ -116,10 +158,10 @@ func TestSpokenLanguagePass(t *testing.T) {
 	if len(asked) != 2 {
 		t.Fatalf("changed file not heard again: %+v", asked)
 	}
-	// An older sidecar without speech: nothing asked.
+	// An older sidecar (one that can't take the server's stretches): nothing asked.
 	asked = nil
 	exec(`DELETE FROM spoken_languages`)
-	s.spokenPass(ctx, Health{})
+	s.spokenPass(ctx, Health{Speech: "whisper#2"})
 	if len(asked) != 0 {
 		t.Fatal("asked an older sidecar")
 	}

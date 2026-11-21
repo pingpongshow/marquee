@@ -1,9 +1,13 @@
 package soundprint
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
+	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -18,10 +22,9 @@ import (
 // for a detected language to be used.
 const SpokenConfidence = 0.7
 
-// SpokenResult is one audio stream's detected language (ISO 639-1, "" when nothing clear).
+// SpokenResult is one track's detected language (ISO 639-1, "" when nothing clear).
 type SpokenResult struct {
-	Path       string  `json:"path"`
-	Stream     int     `json:"stream"`
+	ID         string  `json:"id"`
 	Language   string  `json:"language"`
 	Confidence float64 `json:"confidence"`
 	Heard      int     `json:"heard"`
@@ -29,35 +32,107 @@ type SpokenResult struct {
 	Error      string  `json:"error"`
 }
 
-// SpokenItem is an audio stream to hear: the file and the stream's index in it.
-type SpokenItem struct {
-	Path   string `json:"path"`
-	Stream int    `json:"stream"`
+// SpokenClips is one track's stretches to hear: 16-bit little-endian mono PCM at SpeechRate.
+type SpokenClips struct {
+	ID    string   `json:"id"`
+	Clips [][]byte `json:"clips"` // sent as base64
 }
 
-// SpokenLanguage hears up to 16 audio streams.
-func (c *Client) SpokenLanguage(ctx context.Context, items []SpokenItem) (string, []SpokenResult, error) {
+// SpokenLanguage hears up to 16 tracks' stretches, cut by the server so the sidecar needn't see
+// the files (it's given only the music folder).
+func (c *Client) SpokenLanguage(ctx context.Context, items []SpokenClips) (string, []SpokenResult, error) {
 	var out struct {
 		Model   string         `json:"model"`
 		Results []SpokenResult `json:"results"`
 	}
-	err := c.post(ctx, "/spoken_language", map[string]any{"items": items}, &out)
+	err := c.post(ctx, "/spoken_language_clips", map[string]any{"items": items}, &out)
 	return out.Model, out.Results, err
 }
 
+// What the sidecar hears of a track: three stretches of speechClip seconds at these shares of
+// its length (fewer when it's short), at SpeechRate. The same as soundprint/speech.py.
+const (
+	SpeechRate = 16000
+	speechClip = 20.0
+)
+
+var speechSpots = []float64{0.25, 0.5, 0.75}
+
+func speechStarts(durationSec float64) []float64 {
+	if durationSec <= speechClip {
+		return []float64{0}
+	}
+	if durationSec <= speechClip*float64(len(speechSpots)) {
+		var out []float64
+		for i := 0; float64(i+1)*speechClip <= durationSec; i++ {
+			out = append(out, float64(i)*speechClip)
+		}
+		return out
+	}
+	out := make([]float64, len(speechSpots))
+	for i, f := range speechSpots {
+		out[i] = max(0, durationSec*f-speechClip/2)
+	}
+	return out
+}
+
+// speechVersion is the sidecar's spoken-language analysis version ("model#3" → 3): from 3 it
+// takes stretches the server sends.
+func speechVersion(id string) int {
+	i := strings.LastIndexByte(id, '#')
+	if i < 0 {
+		return 0
+	}
+	n, _ := strconv.Atoi(id[i+1:])
+	return n
+}
+
+// cutSpeech cuts a track's stretches with FFmpeg: one audio stream of the file, mono, at
+// SpeechRate. Stretches that can't be read are left out; an error only when none could be.
+func (s *Service) cutSpeech(ctx context.Context, path string, stream int, durationMS int64) ([][]byte, error) {
+	var clips [][]byte
+	var lastErr error
+	for _, start := range speechStarts(float64(durationMS) / 1000) {
+		cctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+		cmd := exec.CommandContext(cctx, s.FFmpeg, "-nostdin", "-v", "error", "-ss", strconv.FormatFloat(start, 'f', 2, 64),
+			"-t", strconv.FormatFloat(speechClip, 'f', 2, 64), "-i", path, "-map", "0:"+strconv.Itoa(stream),
+			"-vn", "-ac", "1", "-ar", strconv.Itoa(SpeechRate), "-f", "s16le", "pipe:1")
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		out, err := cmd.Output()
+		cancel()
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if err != nil {
+			lastErr = fmt.Errorf("%v: %s", err, strings.TrimSpace(stderr.String()))
+			continue
+		}
+		if len(out) > 0 {
+			clips = append(clips, out)
+		}
+	}
+	if len(clips) == 0 && lastErr != nil {
+		return nil, lastErr
+	}
+	return clips, nil
+}
+
 // spokenPass hears the audio tracks of films, episodes and videos that have no language and
-// haven't been heard by this model since their file last changed.
+// haven't been heard by this model since their file last changed. Failures of the sidecar
+// itself aren't kept (the tracks are tried again next run); a file FFmpeg can't read is kept as
+// heard with no language, until it changes.
 func (s *Service) spokenPass(ctx context.Context, h Health) (string, error) {
-	if h.Speech == "" {
+	if speechVersion(h.Speech) < 3 || s.FFmpeg == "" {
 		return "", nil
 	}
 	type todo struct {
-		fileID, size, mtime int64
-		index               int
-		path                string
+		fileID, size, mtime, durationMS int64
+		index                           int
+		path                            string
 	}
 	var list []todo
-	rows, err := s.DB.QueryContext(ctx, `SELECT f.id, f.size, f.mtime, st.stream_index, f.path FROM streams st
+	rows, err := s.DB.QueryContext(ctx, `SELECT f.id, f.size, f.mtime, COALESCE(f.duration_ms, 0), st.stream_index, f.path FROM streams st
 		JOIN media_files f ON f.id = st.file_id AND f.available = 1
 		JOIN media_versions v ON v.id = f.version_id
 		JOIN items i ON i.id = v.item_id AND i.type IN ('movie', 'episode', 'video') AND i.extra_type IS NULL
@@ -70,20 +145,29 @@ func (s *Service) spokenPass(ctx context.Context, h Health) (string, error) {
 	}
 	for rows.Next() {
 		var t todo
-		if err := rows.Scan(&t.fileID, &t.size, &t.mtime, &t.index, &t.path); err != nil {
+		if err := rows.Scan(&t.fileID, &t.size, &t.mtime, &t.durationMS, &t.index, &t.path); err != nil {
 			rows.Close()
 			return "", err
 		}
 		list = append(list, t)
 	}
 	rows.Close()
-	if err != nil || len(list) == 0 {
-		return "", err
+	if len(list) == 0 {
+		return "", nil
 	}
 	s.setPhase("Hearing which language audio tracks are in", len(list))
 	start := time.Now()
-	found, unclear, failed := 0, 0, 0
-	const batch = 8
+	found, unclear, unreadable, failed := 0, 0, 0, 0
+	firstErr := ""
+	record := func(t todo, lang string, confidence float64, model string) error {
+		_, err := s.DB.ExecContext(ctx, `INSERT INTO spoken_languages (file_id, stream_index, size, mtime, language, confidence, model)
+			VALUES (?, ?, ?, ?, NULLIF(?, ''), ?, ?)
+			ON CONFLICT (file_id, stream_index) DO UPDATE SET size = excluded.size, mtime = excluded.mtime, language = excluded.language,
+			confidence = excluded.confidence, model = excluded.model, checked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+			t.fileID, t.index, t.size, t.mtime, lang, confidence, model)
+		return err
+	}
+	const batch = 4
 	for i := 0; i < len(list); i += batch {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
@@ -92,47 +176,76 @@ func (s *Service) spokenPass(ctx context.Context, h Health) (string, error) {
 			break
 		}
 		chunk := list[i:min(i+batch, len(list))]
-		items := make([]SpokenItem, len(chunk))
-		for j, t := range chunk {
-			items[j] = SpokenItem{Path: t.path, Stream: t.index}
-		}
-		model, results, err := s.Client.SpokenLanguage(ctx, items)
-		if err != nil {
-			return "", fmt.Errorf("spoken language after %d tracks: %w", i, err)
-		}
-		for j, r := range results {
-			if j >= len(chunk) {
-				break
+		var items []SpokenClips
+		var sent []todo
+		for _, t := range chunk {
+			clips, err := s.cutSpeech(ctx, t.path, t.index, t.durationMS)
+			if ctx.Err() != nil {
+				return "", ctx.Err()
 			}
-			t := chunk[j]
-			lang := ""
-			switch {
-			case r.Error != "":
-				failed++ // kept with no language, so it isn't retried every run
-			case r.Language != "" && r.Confidence >= SpokenConfidence:
-				lang = SpokenCode(r.Language)
-			default:
-				unclear++
-			}
-			if _, err := s.DB.ExecContext(ctx, `INSERT INTO spoken_languages (file_id, stream_index, size, mtime, language, confidence, model)
-				VALUES (?, ?, ?, ?, NULLIF(?, ''), ?, ?)
-				ON CONFLICT (file_id, stream_index) DO UPDATE SET size = excluded.size, mtime = excluded.mtime, language = excluded.language,
-				confidence = excluded.confidence, model = excluded.model, checked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
-				t.fileID, t.index, t.size, t.mtime, lang, r.Confidence, model); err != nil {
-				return "", err
-			}
-			if lang != "" {
-				if _, err := s.DB.ExecContext(ctx, `UPDATE streams SET language = ?, language_detected = 1
-					WHERE file_id = ? AND stream_index = ? AND kind = 'audio' AND COALESCE(language, '') IN ('', 'und')`, lang, t.fileID, t.index); err != nil {
+			if err != nil {
+				unreadable++
+				if firstErr == "" {
+					firstErr = "reading " + t.path + ": " + err.Error()
+				}
+				if err := record(t, "", 0, h.Speech); err != nil {
 					return "", err
 				}
-				found++
+				continue
+			}
+			items = append(items, SpokenClips{ID: strconv.Itoa(len(items)), Clips: clips})
+			sent = append(sent, t)
+		}
+		if len(items) > 0 {
+			model, results, err := s.Client.SpokenLanguage(ctx, items)
+			if err != nil {
+				return "", fmt.Errorf("spoken language after %d of %d tracks: %w", i, len(list), err)
+			}
+			batchFailed, sidecarErr := 0, ""
+			for j, r := range results {
+				if j >= len(sent) {
+					break
+				}
+				t := sent[j]
+				switch {
+				case r.Error != "":
+					failed++
+					batchFailed++
+					sidecarErr = r.Error
+					if firstErr == "" {
+						firstErr = "Soundprint: " + r.Error
+					}
+					continue // not kept: tried again next run
+				case r.Language != "" && r.Agree >= 2 && r.Confidence >= SpokenConfidence:
+					lang := SpokenCode(r.Language)
+					if err := record(t, lang, r.Confidence, model); err != nil {
+						return "", err
+					}
+					if _, err := s.DB.ExecContext(ctx, `UPDATE streams SET language = ?, language_detected = 1
+						WHERE file_id = ? AND stream_index = ? AND kind = 'audio' AND COALESCE(language, '') IN ('', 'und')`, lang, t.fileID, t.index); err != nil {
+						return "", err
+					}
+					found++
+				default:
+					unclear++
+					if err := record(t, "", r.Confidence, model); err != nil {
+						return "", err
+					}
+				}
+			}
+			// The sidecar failed every track it was sent: stop rather than run through the rest.
+			if batchFailed == len(sent) {
+				slog.Warn("spoken languages stopped", "error", sidecarErr)
+				return "", fmt.Errorf("Soundprint couldn't hear the audio tracks: %s", sidecarErr)
 			}
 		}
 		s.setDone(min(i+batch, len(list)))
 	}
-	slog.Info("spoken languages heard", "tracks", len(list), "found", found, "unclear", unclear, "failed", failed,
-		"took", time.Since(start).Round(time.Second))
+	slog.Info("spoken languages heard", "tracks", len(list), "found", found, "unclear", unclear, "unreadable", unreadable,
+		"failed", failed, "took", time.Since(start).Round(time.Second))
+	if firstErr != "" {
+		slog.Warn("spoken languages: some tracks couldn't be heard", "first", firstErr)
+	}
 	if found == 0 {
 		return "", nil
 	}

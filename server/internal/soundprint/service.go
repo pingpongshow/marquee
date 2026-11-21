@@ -24,6 +24,9 @@ type Service struct {
 	DB     *sql.DB
 	Client *Client
 	Index  *Index
+	// FFmpeg cuts the stretches of films' and episodes' audio the sidecar hears for their
+	// language (PLAY-19); empty = not heard.
+	FFmpeg string
 	// Enabled reports the Music → Soundprint analysis setting.
 	Enabled func() bool
 	// Learn reports the "learn from skips and ratings" setting (nil = off): Avoid then uses

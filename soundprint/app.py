@@ -21,6 +21,7 @@ The models load on first use and unload after IDLE_UNLOAD_MINUTES (default 5) wi
 requests, so the GPU is free while nothing is being analysed. /health never loads them.
 """
 
+import base64
 import logging
 import os
 import subprocess
@@ -61,7 +62,7 @@ FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 DOC_MODEL_ID = env("DOC_MODEL", "BAAI/bge-base-en-v1.5")
 # A multilingual Whisper (not a ".en" one): base tells languages apart well, small better.
 SPEECH_MODEL_ID = env("SPEECH_MODEL", "openai/whisper-base")
-SPEECH_ID = f"{SPEECH_MODEL_ID}#2"
+SPEECH_ID = f"{SPEECH_MODEL_ID}#3"
 # bge wants this instruction on short queries (not on the documents they search).
 DOC_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 
@@ -386,38 +387,71 @@ def speech_clips(path: str, stream: int):
     return [c for c in clips if speech.loud_enough(c)]
 
 
+def hear(clips):
+    """Whisper's verdict on a track's stretches (mono float32 at speech.SR): (language, share,
+    stretches heard, stretches agreeing). Quiet stretches and those without speech are left out."""
+    clips = [c for c in clips if speech.loud_enough(c)]
+    odds = []
+    if clips:
+        with gpu_lock, torch.inference_mode():
+            m, proc, langs, no_speech = whisper.get()
+            feats = proc.feature_extractor(clips, sampling_rate=speech.SR, return_tensors="pt").input_features.to(device)
+            if device == "cuda":
+                feats = feats.half()
+            start = torch.full((feats.shape[0], 1), m.generation_config.decoder_start_token_id, device=device)
+            logits = m(input_features=feats, decoder_input_ids=start).logits[:, -1, :].float()
+            silent = torch.softmax(logits, dim=-1)[:, no_speech].cpu().numpy()
+            ids = torch.tensor(list(langs.values()), device=device)
+            probs = torch.softmax(logits[:, ids], dim=-1).cpu().numpy()
+        names = list(langs.keys())
+        # Stretches with speech only: music and effects would otherwise get a language.
+        odds = [{names[j]: float(p[j]) for j in np.argsort(p)[-5:]}
+                for p, ns in zip(probs, silent) if ns < speech.NO_SPEECH]
+    return speech.combine(odds)
+
+
+def verdict(lang, share, heard, agree):
+    return {"language": lang or "", "confidence": round(share, 4), "heard": heard, "agree": agree}
+
+
 @app.post("/spoken_language")
 def spoken_language(req: SpeechRequest):
-    """The language each audio stream is spoken in, from three short stretches of it: the
-    language at least two of them agree on, with its averaged share of Whisper's odds (0–1).
-    No language when nothing could be heard (a silent or music-only track) or the stretches
-    don't agree."""
+    """The language each audio stream is spoken in, read from files this service can see (see
+    /spoken_language_clips for audio the server sends)."""
     if len(req.items) > 16:
         raise HTTPException(400, "at most 16 items per request")
     jobs = [decoders.submit(speech_clips, it.path, it.stream) for it in req.items]
     results = []
     for it, job in zip(req.items, jobs):
         try:
-            clips = job.result()
-            odds = []
-            if clips:
-                with gpu_lock, torch.inference_mode():
-                    m, proc, langs, no_speech = whisper.get()
-                    feats = proc.feature_extractor(clips, sampling_rate=speech.SR, return_tensors="pt").input_features.to(device)
-                    if device == "cuda":
-                        feats = feats.half()
-                    start = torch.full((feats.shape[0], 1), m.generation_config.decoder_start_token_id, device=device)
-                    logits = m(input_features=feats, decoder_input_ids=start).logits[:, -1, :].float()
-                    silent = torch.softmax(logits, dim=-1)[:, no_speech].cpu().numpy()
-                    ids = torch.tensor(list(langs.values()), device=device)
-                    probs = torch.softmax(logits[:, ids], dim=-1).cpu().numpy()
-                names = list(langs.keys())
-                # Stretches with speech only: music and effects would otherwise get a language.
-                odds = [{names[j]: float(p[j]) for j in np.argsort(p)[-5:]}
-                        for p, ns in zip(probs, silent) if ns < speech.NO_SPEECH]
-            lang, share, heard, agree = speech.combine(odds)
-            results.append({"path": it.path, "stream": it.stream, "language": lang or "", "confidence": round(share, 4),
-                            "heard": heard, "agree": agree})
+            results.append({"path": it.path, "stream": it.stream, **verdict(*hear(job.result()))})
         except Exception as e:  # noqa: BLE001 — report per item, keep the batch going
             results.append({"path": it.path, "stream": it.stream, "error": str(e)[:300]})
+    return {"model": SPEECH_ID, "results": results}
+
+
+class ClipsItem(BaseModel):
+    id: str
+    clips: list[str]  # base64 of 16-bit little-endian mono PCM at speech.SR
+
+
+class ClipsRequest(BaseModel):
+    items: list[ClipsItem]
+
+
+@app.post("/spoken_language_clips")
+def spoken_language_clips(req: ClipsRequest):
+    """The language each track is spoken in, from short stretches of it the server cut and sent
+    (so films and episodes needn't be mounted here): the language at least two stretches agree
+    on, with its averaged share of Whisper's odds (0–1). No language when nothing could be heard
+    (a silent or music-only track) or the stretches don't agree."""
+    if len(req.items) > 16:
+        raise HTTPException(400, "at most 16 items per request")
+    results = []
+    for it in req.items:
+        try:
+            clips = [np.frombuffer(base64.b64decode(c), dtype="<i2").astype(np.float32) / 32768.0 for c in it.clips[:5]]
+            results.append({"id": it.id, **verdict(*hear(clips))})
+        except Exception as e:  # noqa: BLE001 — report per item, keep the batch going
+            results.append({"id": it.id, "error": str(e)[:300]})
     return {"model": SPEECH_ID, "results": results}

@@ -351,7 +351,7 @@ func run() error {
 		Description: "Groups movies into their film series (TMDB collections), including movies matched before collections existed.",
 		Run:         meta.SyncCollections})
 	// Music intelligence (M6.5): the Soundprint sidecar embeds tracks; the index serves radios etc.
-	soundprintSvc := &soundprint.Service{DB: database, Client: &soundprint.Client{BaseURL: envOr("MARQUEE_SOUNDPRINT_URL", envOr("MARQUEE_SONIC_URL", "http://127.0.0.1:32501"))},
+	soundprintSvc := &soundprint.Service{DB: database, FFmpeg: cfg.FFmpegPath, Client: &soundprint.Client{BaseURL: envOr("MARQUEE_SOUNDPRINT_URL", envOr("MARQUEE_SONIC_URL", "http://127.0.0.1:32501"))},
 		Index: soundprint.NewIndex(), Enabled: func() bool { return store.Get().Music.SoundprintAnalysis },
 		Learn: func() bool { return store.Get().AI.LearnFromBehaviour }, Model: func() string { return store.Get().Music.SoundModel }}
 	if err := soundprintSvc.Index.Load(ctx, database); err != nil {
