@@ -78,6 +78,7 @@ public final class MusicPlayer {
             // sidebar, the bars along the bottom) redraws when it changes, not at every top-up.
             let c = queue.current
             if c != current || c?.dj != current?.dj { current = c }
+            scheduleSave()
         }
     }
     public private(set) var source: Source?
@@ -219,6 +220,11 @@ public final class MusicPlayer {
     /// UI tests: the first preloaded track's server session is ended at once, as when the
     /// server dropped it, so the player has to load it again.
     @ObservationIgnored private var killNextPreload = ProcessInfo.processInfo.arguments.contains("-marquee-test-dead-preload")
+    /// A queue put back from the device (`restoreSavedQueue`): where the current track carries
+    /// on from when play is pressed (nothing is loaded until then).
+    @ObservationIgnored private var resumeAt: Double?
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private var lastPositionSave = Date.distantPast
 
     public init(app: AppSession) {
         self.app = app
@@ -245,6 +251,18 @@ public final class MusicPlayer {
             MainActor.assumeIsolated { self?.itemFailed(id) }
         }
         setUpRemoteCommands()
+        #if os(iOS) || os(tvOS)
+        // Going to the background: where the music is goes on the device, in case the system
+        // ends the app before it's opened again.
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.saveTask?.cancel()
+                self.saveQueueNow()
+                self.savePosition()
+            }
+        }
+        #endif
         equalizer.onChange = { [weak self] in
             guard let self else { return }
             for item in self.player.items() { Task { await self.applyLevel(item) } }
@@ -287,6 +305,7 @@ public final class MusicPlayer {
                 self.time = t.seconds.isFinite ? max(0, t.seconds) : 0
                 if let d = self.player.currentItem?.duration.seconds, d.isFinite, d > 0 { self.duration = d }
                 if Date().timeIntervalSince(self.lastReport) > 15, self.playing { self.report("playing") }
+                if Date().timeIntervalSince(self.lastPositionSave) > 10, self.playing { self.savePosition() }
                 self.notePlayedThrough()
                 // Full volume whenever no crossfade is running (one never leaves it silent).
                 if self.fadeTask == nil, self.fader == nil, self.player.volume != self.appVolume { self.player.volume = self.appVolume }
@@ -495,8 +514,14 @@ public final class MusicPlayer {
             if remoteQueueEnded { rebuild() } else { remote.resume() }
             return
         }
-        // The queue played to the end (or the track failed): start the current entry again.
-        if player.currentItem == nil, queue.current != nil { startFailures = 0; rebuild(); return }
+        // The queue played to the end (or the track failed): start the current entry again; a
+        // queue put back from the device carries on where it stopped.
+        if player.currentItem == nil, queue.current != nil {
+            startFailures = 0
+            let at = resumeAt ?? 0
+            rebuild(at: at)
+            return
+        }
         userPaused = false
         activateAudioSession()
         player.play()
@@ -508,10 +533,13 @@ public final class MusicPlayer {
         userPaused = true
         cancelFade()
         player.pause()
+        savePosition()
     }
 
     public func seek(_ seconds: Double) {
         if let remote { remote.seek(seconds); time = seconds; return }
+        // A queue put back from the device, not loaded yet: it starts from here.
+        if player.currentItem == nil, resumeAt != nil { resumeAt = seconds }
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
         time = seconds
         updateNowPlaying()
@@ -673,6 +701,7 @@ public final class MusicPlayer {
     /// Replaces everything in the player with the current entry and what follows it.
     /// `autoplay` false loads it paused; `load` false only clears the player (the queue ended).
     private func rebuild(at start: Double = 0, autoplay: Bool = true, load: Bool = true) {
+        resumeAt = nil
         // A room picked before anything played takes it from the first note.
         if remote == nil, load, willPlayHere?() == true { return }
         cancelFade()
@@ -1330,6 +1359,110 @@ public final class MusicPlayer {
         let pos = Int64(max(0, player.currentTime().seconds) * 1000)
         let st: Schemas.PlaybackProgress.StatePayload = state == "playing" ? .playing : .paused
         Task { _ = try? await client.reportPlayback(path: .init(sessionId: s.session), body: .json(.init(positionMs: pos, state: st))) }
+    }
+
+    // MARK: - Carrying on after the app closes
+
+    /// What's saved on the device: the queue and what it came from, for one person on one server.
+    private struct SavedMusic: Codable, Sendable {
+        var owner: String
+        var queue: PlayQueue.Saved
+        var sourceTitle: String?
+        var sourceRadio: RadioRequest?
+        var sourceContext: String?
+        var sourceStation: Bool
+    }
+
+    /// Who the saved music belongs to: the server and the person signed in.
+    private var saveOwner: String? {
+        guard let base = app.baseURL, let me = app.me?.id else { return nil }
+        return "\(base.absoluteString)|\(me)"
+    }
+
+    private static var savedQueueFile: URL {
+        #if os(tvOS)
+        // The TV has no lasting storage of its own for apps; its caches usually stay.
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        #else
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        #endif
+        return dir.appendingPathComponent("music-queue.json")
+    }
+
+    private static let positionKey = "marquee.musicPosition"
+
+    /// Saves the queue a moment after it changes (several changes at once save once).
+    private func scheduleSave() {
+        guard queue.current != nil else { return }
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            self?.saveQueueNow()
+        }
+    }
+
+    /// The queue to the device (written off the main thread). An empty queue isn't saved: it
+    /// was stopped by signing out or switching profile, and the person's music waits for them.
+    private func saveQueueNow() {
+        guard let owner = saveOwner, queue.current != nil else { return }
+        let saved = SavedMusic(owner: owner, queue: queue.saved, sourceTitle: source?.title, sourceRadio: source?.radio,
+                               sourceContext: source?.context, sourceStation: source?.isStation ?? false)
+        let file = Self.savedQueueFile
+        Task.detached(priority: .utility) {
+            guard let data = try? JSONEncoder().encode(saved) else { return }
+            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: file, options: .atomic)
+        }
+        savePosition()
+    }
+
+    /// Where in the current track it is (small, so it's saved often).
+    private func savePosition() {
+        guard let owner = saveOwner, let entry = queue.current, remote == nil else { return }
+        lastPositionSave = Date()
+        let at = resumeAt ?? time
+        UserDefaults.standard.set(["owner": owner, "item": entry.item.id, "index": queue.index, "time": at] as [String: Any],
+                                  forKey: Self.positionKey)
+    }
+
+    /// Puts back the music that was playing or paused when the app last closed, paused where
+    /// it stopped, so play carries on from there. Nothing happens when something is already in
+    /// the queue, or the saved music is someone else's.
+    public func restoreSavedQueue() {
+        guard queue.current == nil, remote == nil, let owner = saveOwner else { return }
+        let file = Self.savedQueueFile
+        Task {
+            let saved: SavedMusic? = await Task.detached(priority: .userInitiated) {
+                guard let data = try? Data(contentsOf: file) else { return nil }
+                return try? JSONDecoder().decode(SavedMusic.self, from: data)
+            }.value
+            guard let saved, saved.owner == owner, saveOwner == owner, queue.current == nil, remote == nil else { return }
+            var restored = PlayQueue(saved: saved.queue)
+            var at = 0.0
+            if let pos = UserDefaults.standard.dictionary(forKey: Self.positionKey), pos["owner"] as? String == owner {
+                let index = pos["index"] as? Int ?? restored.index
+                let item = (pos["item"] as? NSNumber)?.int64Value
+                if restored.entries.indices.contains(index), item == nil || restored.entries[index].item.id == item {
+                    restored.setIndex(index)
+                    at = pos["time"] as? Double ?? 0
+                }
+            }
+            guard let entry = restored.current else { return }
+            newSource(saved.sourceTitle.map {
+                Source(title: $0, radio: saved.sourceRadio, context: saved.sourceContext, generated: saved.sourceStation)
+            })
+            queue = restored
+            let length = Double(entry.item.durationMs ?? 0) / 1000
+            // Within the last few seconds: the next play starts the track again.
+            if length > 0, at > length - 5 { at = 0 }
+            resumeAt = at
+            time = at
+            duration = length
+            playing = false
+            userPaused = true
+            updateNowPlaying()
+        }
     }
 
     // MARK: - System integration

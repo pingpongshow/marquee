@@ -17,7 +17,7 @@ public struct PlayQueue: Sendable, Equatable {
         public var playContext: String? { dj != nil ? "dj" : context }
         public static func == (a: Entry, b: Entry) -> Bool { a.id == b.id }
     }
-    public enum Repeat: Sendable { case off, all, one }
+    public enum Repeat: String, Sendable, Codable { case off, all, one }
 
     public private(set) var entries: [Entry] = []
     public private(set) var index = -1
@@ -203,5 +203,46 @@ public struct PlayQueue: Sendable, Equatable {
             if seen.insert(e.item.id).inserted { latest.append(e.item.id) }
         }
         return latest.reversed()
+    }
+
+    // MARK: - Saving
+
+    /// The queue as saved on the device, so music can carry on where it stopped after the app
+    /// was closed (or the system ended it while it was in the background).
+    public struct Saved: Codable, Sendable {
+        struct SavedEntry: Codable, Sendable {
+            var item: Item
+            var dj: String?
+            var context: String?
+            var fromStation: Bool
+        }
+        var entries: [SavedEntry]
+        var index: Int
+        var shuffled: Bool
+        var repeatMode: Repeat
+        /// The unshuffled order while shuffled, as positions in `entries`.
+        var original: [Int]?
+    }
+
+    public var saved: Saved {
+        let pos = Dictionary(entries.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return Saved(entries: entries.map { .init(item: $0.item, dj: $0.dj, context: $0.context, fromStation: $0.fromStation) },
+                     index: index, shuffled: shuffled, repeatMode: repeatMode,
+                     original: original.map { $0.compactMap { pos[$0.id] } })
+    }
+
+    public init(saved: Saved) {
+        entries = saved.entries.enumerated().map { i, e in
+            Entry(id: i + 1, item: e.item, dj: e.dj, context: e.context, fromStation: e.fromStation)
+        }
+        nextKey = entries.count + 1
+        index = entries.indices.contains(saved.index) ? saved.index : (entries.isEmpty ? -1 : 0)
+        repeatMode = saved.repeatMode
+        shuffled = saved.shuffled
+        if let o = saved.original, o.count == entries.count {
+            original = o.compactMap { entries.indices.contains($0) ? entries[$0] : nil }
+        } else if shuffled {
+            original = entries
+        }
     }
 }

@@ -317,3 +317,20 @@ private func ids(_ q: PlayQueue) -> [Int64] { q.entries.map(\.item.id) }
     #expect(MusicPlayer.Source(title: "Radio", radio: RadioRequest(seed: .item, itemId: 1, limit: 50)).isStation)
     #expect(MusicPlayer.Source(title: "A Journey", generated: true).isStation)
 }
+
+@Test func savedQueueComesBackAsItWas() throws {
+    var q = PlayQueue()
+    q.load((1...5).map(track), start: 1)
+    q.toggleShuffle()
+    q.cycleRepeat()
+    let data = try JSONEncoder().encode(q.saved)
+    var back = PlayQueue(saved: try JSONDecoder().decode(PlayQueue.Saved.self, from: data))
+    #expect(ids(back) == ids(q))
+    #expect(back.current?.item.id == q.current?.item.id)
+    #expect(back.repeatMode == .all)
+    #expect(back.shuffled)
+    // Turning shuffle off goes back to the original order.
+    back.toggleShuffle()
+    #expect(ids(back) == [1, 2, 3, 4, 5])
+    #expect(back.current?.item.id == 2)
+}
