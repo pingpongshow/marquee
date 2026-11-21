@@ -32,6 +32,8 @@ struct PlayerView: View {
     @State private var timing: TimingKind?
     /// Set when the player closes: a stream that finishes starting after that is stopped again.
     @State private var life = PlayerLife()
+    /// What the thumbs up and down go on (USER-21): the film, or the episode's show.
+    @State private var thumbs: ThumbTarget?
     #if os(iOS)
     @State private var casting = false
     @State private var castError: String?
@@ -48,7 +50,7 @@ struct PlayerView: View {
                 // On the TV the player's transport bar keeps focus: it goes while Up Next or the
                 // time limit is up, so the remote reaches their buttons.
                 if !(isTV && (upNext != nil || p.timeLimitReason != nil)) {
-                    PlayerController(playback: p, together: together, onNext: playNext,
+                    PlayerController(playback: p, together: together, onNext: playNext, thumbs: controllerThumbs,
                                      trailer: trailerIndex == nil ? nil : TrailerActions(skip: nextTrailer, skipAll: skipTrailers),
                                      chrome: chromeModel)
                         .ignoresSafeArea()
@@ -139,6 +141,8 @@ struct PlayerView: View {
             together?.leave()
             Task { await playback?.stop() }
         }
+        // The thumbs follow what's playing (the next episode's show may be another).
+        .task(id: playingID) { await loadThumbs() }
         .onChange(of: playback?.finished) { _, done in
             guard done == true, playback?.timeLimitReason == nil else { return }
             if trailerIndex != nil { nextTrailer(); return }
@@ -217,6 +221,7 @@ struct PlayerView: View {
             }
             Spacer()
             if trailerIndex == nil {
+                if let t = thumbs { thumbButtons(t) }
                 if together?.group == nil { optionsMenu(p) }
                 #if os(iOS)
                 CastButton(tint: .white).frame(width: 28, height: 28).modifier(PlayerBubbleBackground())
@@ -228,6 +233,26 @@ struct PlayerView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
+    }
+    #endif
+
+    #if !os(tvOS)
+    /// Thumbs up and down on the film, or the episode's show (USER-21): liked steers suggestions;
+    /// a thumbs down means it isn't suggested any more (it stays in the library).
+    private func thumbButtons(_ t: ThumbTarget) -> some View {
+        let up = t.isLiked, down = t.isDisliked
+        return HStack(spacing: 8) {
+            Button { t.toggleLike(app: app) } label: {
+                PlayerBubble(systemImage: up ? "hand.thumbsup.fill" : "hand.thumbsup")
+            }
+            .accessibilityLabel(up ? "Take back thumbs up on \(t.title)" : "Thumbs up \(t.title)")
+            .accessibilityIdentifier("player.like")
+            Button { t.toggleDislike(app: app, music: music) } label: {
+                PlayerBubble(systemImage: down ? "hand.thumbsdown.fill" : "hand.thumbsdown")
+            }
+            .accessibilityLabel(down ? "Take back thumbs down on \(t.title)" : "Thumbs down \(t.title)")
+            .accessibilityIdentifier("player.dislike")
+        }
     }
     #endif
 
@@ -484,6 +509,22 @@ struct PlayerView: View {
         }
     }
 
+    /// The film or episode playing (trailers included), whose thumbs show.
+    private var playingID: Int64? { playback?.item?.base.id }
+
+    private func loadThumbs() async {
+        guard let item = playback?.item?.base else { return }
+        let target = await ThumbTarget.load(for: item, app: app)
+        if playingID == item.id { thumbs = target }
+    }
+
+    /// The thumbs for the TV's transport bar, with what they do (none while a trailer plays).
+    private var controllerThumbs: PlayerThumbs? {
+        guard trailerIndex == nil, let t = thumbs else { return nil }
+        let app = app, music = music
+        return PlayerThumbs(target: t, like: { t.toggleLike(app: app) }, dislike: { t.toggleDislike(app: app, music: music) })
+    }
+
     /// The overlay's visibility model (iPhone/iPad only; the TV has no overlay buttons).
     private var chromeModel: PlayerChrome? {
         #if !os(tvOS)
@@ -714,6 +755,8 @@ struct PlayerController: UIViewControllerRepresentable {
     let playback: VideoPlayback
     var together: WatchTogether?
     let onNext: () -> Void
+    /// The thumbs up and down (USER-21): on the TV, in the transport bar's menus.
+    var thumbs: PlayerThumbs?
     /// Set while a cinema trailer plays.
     var trailer: TrailerActions?
     /// The overlay buttons' visibility, kept in step with taps, play/pause and PiP.
@@ -768,7 +811,7 @@ struct PlayerController: UIViewControllerRepresentable {
         let signature = menuSignature
         if context.coordinator.menuSignature != signature {
             context.coordinator.menuSignature = signature
-            vc.transportBarCustomMenuItems = trailer != nil ? [] : speedMenu() + timingMenus() + audioMenu() + togetherMenu()
+            vc.transportBarCustomMenuItems = trailer != nil ? [] : thumbsMenu() + speedMenu() + timingMenus() + audioMenu() + togetherMenu()
         }
         #endif
     }
@@ -802,11 +845,25 @@ struct PlayerController: UIViewControllerRepresentable {
         return [trailer != nil ? "T" : "", "\(playback.speed)", "\(playback.subtitleOffsetMs)", "\(playback.audioOffsetMs)",
                 playback.offlineTitle == nil ? "" : "off", audio.joined(separator: ","), "\(playback.session?.audioStreamId ?? -1)",
                 playback.nightMode ? "night" : "",
-                together == nil ? "" : "t", group].joined(separator: "|")
+                together == nil ? "" : "t", group,
+                thumbs.map { "\($0.target.id)\($0.target.isLiked)\($0.target.isDisliked)" } ?? ""].joined(separator: "|")
     }
     #endif
 
     #if os(tvOS)
+    /// Thumbs up and down for the film or the episode's show (USER-21), first in the bar.
+    private func thumbsMenu() -> [UIMenuElement] {
+        guard let thumbs else { return [] }
+        let up = thumbs.target.isLiked, down = thumbs.target.isDisliked
+        let like = thumbs.like, dislike = thumbs.dislike
+        return [
+            UIAction(title: up ? "Liked" : "Thumbs Up", subtitle: thumbs.target.title,
+                     image: UIImage(systemName: up ? "hand.thumbsup.fill" : "hand.thumbsup"), state: up ? .on : .off) { _ in like() },
+            UIAction(title: "Thumbs Down", subtitle: thumbs.target.title,
+                     image: UIImage(systemName: down ? "hand.thumbsdown.fill" : "hand.thumbsdown"), state: down ? .on : .off) { _ in dislike() },
+        ]
+    }
+
     /// Watch together from the Siri Remote's transport bar.
     private func togetherMenu() -> [UIMenuElement] {
         guard let t = together else { return [] }
@@ -978,3 +1035,11 @@ struct CastingPanel: View {
     }
 }
 #endif
+
+/// The player's thumbs (USER-21) as the TV's transport bar takes them: what they're on and what
+/// pressing each does.
+struct PlayerThumbs {
+    let target: ThumbTarget
+    let like: () -> Void
+    let dislike: () -> Void
+}

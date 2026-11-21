@@ -36,9 +36,11 @@ import app.marquee.api.models.PlaylistFolder
 import app.marquee.api.models.PlaylistFolderUpdate
 import app.marquee.api.models.PlaylistItemPage
 import app.marquee.api.models.PlaylistKind
+import app.marquee.api.models.PlaylistMerge
 import app.marquee.api.models.PlaylistShareTarget
 import app.marquee.api.models.PlaylistSharing
 import app.marquee.api.models.PlaylistSharingUpdate
+import app.marquee.api.models.SetPlaylistItemsRequest
 import app.marquee.api.models.UpdatePlaylistRequest
 
 import kotlinx.serialization.SerialName
@@ -1103,6 +1105,80 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
     }
 
     /**
+     * POST /playlists/merge
+     * Combine playlists (MUSIC-29): yours, ones shared with you and smart ones (as they are now), in the order given, into a new playlist of yours or the end of one you have. They must all be music or all video.
+     * 
+     * @param playlistMerge 
+     * @return Playlist
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun mergePlaylists(playlistMerge: PlaylistMerge) : Playlist {
+        val localVarResponse = mergePlaylistsWithHttpInfo(playlistMerge = playlistMerge)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Playlist
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /playlists/merge
+     * Combine playlists (MUSIC-29): yours, ones shared with you and smart ones (as they are now), in the order given, into a new playlist of yours or the end of one you have. They must all be music or all video.
+     * 
+     * @param playlistMerge 
+     * @return ApiResponse<Playlist?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun mergePlaylistsWithHttpInfo(playlistMerge: PlaylistMerge) : ApiResponse<Playlist?> {
+        val localVariableConfig = mergePlaylistsRequestConfig(playlistMerge = playlistMerge)
+
+        return request<PlaylistMerge, Playlist>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation mergePlaylists
+     *
+     * @param playlistMerge 
+     * @return RequestConfig
+     */
+    fun mergePlaylistsRequestConfig(playlistMerge: PlaylistMerge) : RequestConfig<PlaylistMerge> {
+        val localVariableBody = playlistMerge
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/playlists/merge",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * PATCH /playlists/{playlistId}/items/{entryId}
      * Move an entry to just after another one (or to the top when afterEntryId is absent).
      * 
@@ -1469,6 +1545,83 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.PATCH,
             path = "/playlist-folders/{folderId}".replace("{"+"folderId"+"}", encodeURIComponent(folderId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /playlists/{playlistId}/items
+     * Reorder and remove entries in one go (MUSIC-29): the entries listed stay, in that order, and the others you can see are removed. Entries in libraries you can&#39;t see stay, after the ones listed. Not for smart playlists.
+     * 
+     * @param playlistId 
+     * @param setPlaylistItemsRequest 
+     * @return Playlist
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun setPlaylistItems(playlistId: kotlin.Long, setPlaylistItemsRequest: SetPlaylistItemsRequest) : Playlist {
+        val localVarResponse = setPlaylistItemsWithHttpInfo(playlistId = playlistId, setPlaylistItemsRequest = setPlaylistItemsRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Playlist
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /playlists/{playlistId}/items
+     * Reorder and remove entries in one go (MUSIC-29): the entries listed stay, in that order, and the others you can see are removed. Entries in libraries you can&#39;t see stay, after the ones listed. Not for smart playlists.
+     * 
+     * @param playlistId 
+     * @param setPlaylistItemsRequest 
+     * @return ApiResponse<Playlist?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun setPlaylistItemsWithHttpInfo(playlistId: kotlin.Long, setPlaylistItemsRequest: SetPlaylistItemsRequest) : ApiResponse<Playlist?> {
+        val localVariableConfig = setPlaylistItemsRequestConfig(playlistId = playlistId, setPlaylistItemsRequest = setPlaylistItemsRequest)
+
+        return request<SetPlaylistItemsRequest, Playlist>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setPlaylistItems
+     *
+     * @param playlistId 
+     * @param setPlaylistItemsRequest 
+     * @return RequestConfig
+     */
+    fun setPlaylistItemsRequestConfig(playlistId: kotlin.Long, setPlaylistItemsRequest: SetPlaylistItemsRequest) : RequestConfig<SetPlaylistItemsRequest> {
+        val localVariableBody = setPlaylistItemsRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/playlists/{playlistId}/items".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

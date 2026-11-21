@@ -87,7 +87,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * PUT /items/{itemId}/dislike
-     * Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you&#39;ve since favourited the song or rated it 3.5 stars or more.
+     * Give a song, film or show your thumbs down (MUSIC-25, USER-21). A song: radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. A film or show: it&#39;s no longer suggested to you (it&#39;s marked Not interested too), though it stays in its library; an episode&#39;s goes on its show. It takes back your favourite, your thumbs up and a rating of 3.5 stars or more; giving any of them later takes back the thumbs down. One made offline and sent later is ignored if you&#39;ve since favourited it or rated it 3.5 stars or more.
      * 
      * @param itemId 
      * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
@@ -119,7 +119,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * PUT /items/{itemId}/dislike
-     * Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you&#39;ve since favourited the song or rated it 3.5 stars or more.
+     * Give a song, film or show your thumbs down (MUSIC-25, USER-21). A song: radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. A film or show: it&#39;s no longer suggested to you (it&#39;s marked Not interested too), though it stays in its library; an episode&#39;s goes on its show. It takes back your favourite, your thumbs up and a rating of 3.5 stars or more; giving any of them later takes back the thumbs down. One made offline and sent later is ignored if you&#39;ve since favourited it or rated it 3.5 stars or more.
      * 
      * @param itemId 
      * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
@@ -236,6 +236,85 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/items/{itemId}/favorite".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /items/{itemId}/like
+     * Give a song, film or show your thumbs up (USER-21): you liked it, without making it a favourite. Films and shows you liked steer your recommendations, and songs your radios and mixes. It takes back your thumbs down; a thumbs down later takes it back. An episode&#39;s goes on its show.
+     * 
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun addLike(itemId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = addLikeWithHttpInfo(itemId = itemId, at = at)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /items/{itemId}/like
+     * Give a song, film or show your thumbs up (USER-21): you liked it, without making it a favourite. Films and shows you liked steer your recommendations, and songs your radios and mixes. It takes back your thumbs down; a thumbs down later takes it back. An episode&#39;s goes on its show.
+     * 
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun addLikeWithHttpInfo(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = addLikeRequestConfig(itemId = itemId, at = at)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation addLike
+     *
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return RequestConfig
+     */
+    fun addLikeRequestConfig(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/items/{itemId}/like".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -3222,7 +3301,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * DELETE /items/{itemId}/dislike
-     * Take back your thumbs down on a song (MUSIC-25).
+     * Take back your thumbs down on a song, film or show (MUSIC-25, USER-21); an episode&#39;s goes to its show.
      * 
      * @param itemId 
      * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
@@ -3254,7 +3333,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * DELETE /items/{itemId}/dislike
-     * Take back your thumbs down on a song (MUSIC-25).
+     * Take back your thumbs down on a song, film or show (MUSIC-25, USER-21); an episode&#39;s goes to its show.
      * 
      * @param itemId 
      * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
@@ -3597,6 +3676,85 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/items/{itemId}/commercials/remove".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /items/{itemId}/like
+     * Take back your thumbs up (USER-21); an episode&#39;s goes to its show.
+     * 
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removeLike(itemId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = removeLikeWithHttpInfo(itemId = itemId, at = at)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /items/{itemId}/like
+     * Take back your thumbs up (USER-21); an episode&#39;s goes to its show.
+     * 
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removeLikeWithHttpInfo(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = removeLikeRequestConfig(itemId = itemId, at = at)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removeLike
+     *
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return RequestConfig
+     */
+    fun removeLikeRequestConfig(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/items/{itemId}/like".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

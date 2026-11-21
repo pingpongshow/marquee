@@ -13282,6 +13282,57 @@ extension Components {
                 case rules
             }
         }
+        /// Which playlists to combine and where (MUSIC-29). Give intoId to add them to the end of one of your playlists, or a title for a new one.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PlaylistMerge`.
+        public struct PlaylistMerge: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlaylistMerge/sourceIds`.
+            public var sourceIds: [Swift.Int64]
+            /// One of your playlists (not a smart one) to add them to the end of. Left out, a new playlist is made.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistMerge/intoId`.
+            public var intoId: Swift.Int64?
+            /// The new playlist's title; the first source's when left out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistMerge/title`.
+            public var title: Swift.String?
+            /// Leave out what's already in the playlist or came from an earlier source, so each song or video is in it once.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistMerge/skipDuplicates`.
+            public var skipDuplicates: Swift.Bool?
+            /// Delete the sources afterwards (yours only: shared ones stay).
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistMerge/deleteSources`.
+            public var deleteSources: Swift.Bool?
+            /// Creates a new `PlaylistMerge`.
+            ///
+            /// - Parameters:
+            ///   - sourceIds:
+            ///   - intoId: One of your playlists (not a smart one) to add them to the end of. Left out, a new playlist is made.
+            ///   - title: The new playlist's title; the first source's when left out.
+            ///   - skipDuplicates: Leave out what's already in the playlist or came from an earlier source, so each song or video is in it once.
+            ///   - deleteSources: Delete the sources afterwards (yours only: shared ones stay).
+            public init(
+                sourceIds: [Swift.Int64],
+                intoId: Swift.Int64? = nil,
+                title: Swift.String? = nil,
+                skipDuplicates: Swift.Bool? = nil,
+                deleteSources: Swift.Bool? = nil
+            ) {
+                self.sourceIds = sourceIds
+                self.intoId = intoId
+                self.title = title
+                self.skipDuplicates = skipDuplicates
+                self.deleteSources = deleteSources
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sourceIds
+                case intoId
+                case title
+                case skipDuplicates
+                case deleteSources
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/PlaylistItemPage`.
         public struct PlaylistItemPage: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/PlaylistItemPage/items`.
@@ -14715,10 +14766,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/favorite`.
             public var favorite: Swift.Bool?
-            /// A song the user gave a thumbs down (MUSIC-25). Absent or false when they didn't.
+            /// A song, film or show the user gave a thumbs down (MUSIC-25, USER-21). Absent or false when they didn't.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/disliked`.
             public var disliked: Swift.Bool?
+            /// A song, film or show the user gave a thumbs up (USER-21). Absent or false when they didn't.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/liked`.
+            public var liked: Swift.Bool?
             /// Set for extras (LIB-8).
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/extraType`.
@@ -14794,7 +14849,8 @@ extension Components {
             ///   - userRating: The user's rating, 0–10 (10 = loved).
             ///   - watchlisted: On the user's watchlist (USER-8).
             ///   - favorite: One of the user's favourites (the heart). Absent or false when it isn't.
-            ///   - disliked: A song the user gave a thumbs down (MUSIC-25). Absent or false when they didn't.
+            ///   - disliked: A song, film or show the user gave a thumbs down (MUSIC-25, USER-21). Absent or false when they didn't.
+            ///   - liked: A song, film or show the user gave a thumbs up (USER-21). Absent or false when they didn't.
             ///   - extraType: Set for extras (LIB-8).
             ///   - releaseType: Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
             ///   - audioFormat:
@@ -14831,6 +14887,7 @@ extension Components {
                 watchlisted: Swift.Bool? = nil,
                 favorite: Swift.Bool? = nil,
                 disliked: Swift.Bool? = nil,
+                liked: Swift.Bool? = nil,
                 extraType: Components.Schemas.ItemSummary.ExtraTypePayload? = nil,
                 releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload? = nil,
                 audioFormat: Components.Schemas.AudioFormat? = nil,
@@ -14867,6 +14924,7 @@ extension Components {
                 self.watchlisted = watchlisted
                 self.favorite = favorite
                 self.disliked = disliked
+                self.liked = liked
                 self.extraType = extraType
                 self.releaseType = releaseType
                 self.audioFormat = audioFormat
@@ -14904,6 +14962,7 @@ extension Components {
                 case watchlisted
                 case favorite
                 case disliked
+                case liked
                 case extraType
                 case releaseType
                 case audioFormat

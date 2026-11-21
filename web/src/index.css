@@ -115,6 +115,21 @@ body {
   }
 }
 
+/* A wrong PIN: the dots shake once. */
+@keyframes pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.pin-shake {
+  animation: pin-shake 0.32s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pin-shake {
+    animation: none;
+  }
+}
+
 /* Year in Music story pages (MUSIC-22): each page rises in as it appears. */
 @keyframes recap-in {
   from {

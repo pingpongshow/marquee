@@ -72,6 +72,9 @@ struct MarqueeApp: App {
                 .onChange(of: scenePhase) { old, new in if old != new, new == .active { runSmart() } }
                 .onChange(of: app.me?.id) { runSmart() }
                 #endif
+                // The music that was playing or paused when the app last closed comes back,
+                // paused where it stopped (once the person signed in is known).
+                .onChange(of: app.me?.id, initial: true) { if app.me != nil { music.restoreSavedQueue() } }
                 .preferredColorScheme(.dark)
         }
     }
@@ -130,6 +133,7 @@ struct RootView: View {
         RatingStore.shared.reset()
         FavoriteStore.shared.reset()
         DislikeStore.shared.reset()
+        LikeStore.shared.reset()
         WatchlistStore.shared.reset()
         #if !MARQUEE_APP_STORE
         VodSuggestionHides.shared.reset()

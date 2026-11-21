@@ -152,6 +152,13 @@ public extension AppSession {
         try await OfflineSync.shared.submit(.dislike(id, on))
     }
 
+    /// Gives a song, film or show this person's thumbs up, or takes it back (USER-21); an
+    /// episode's goes on its show. Kept to send later when the server can't be reached (USER-18).
+    @discardableResult
+    func setLiked(_ id: Int64, _ on: Bool) async throws -> Bool {
+        try await OfflineSync.shared.submit(.like(id, on))
+    }
+
     func watchlist() async throws -> [Item] { try await api.getWatchlist().ok.body.json }
 
     /// Not interested (USER-16): stops suggesting a movie or show to this person (on), or
@@ -209,6 +216,32 @@ public extension AppSession {
 
     func createPlaylist(title: String, kind: Schemas.PlaylistKind, items: [Int64]) async throws -> Playlist {
         try await api.createPlaylist(body: .json(.init(title: title, kind: kind, itemIds: items))).created.body.json
+    }
+
+    // MARK: Editing and combining playlists (MUSIC-29)
+
+    /// Saves a playlist's new order in one go: the entries listed stay, in that order, and the
+    /// rest are removed (the editor's sort, drag, remove duplicates and delete).
+    @discardableResult
+    func setPlaylistItems(_ playlist: Int64, entryIDs: [Int64]) async throws -> Playlist {
+        switch try await api.setPlaylistItems(path: .init(playlistId: playlist), body: .json(.init(entryIds: entryIDs))) {
+        case let .ok(ok): return try ok.body.json
+        case let .badRequest(r): throw MarqueeError((try? r.body.json.message) ?? "This playlist can't be changed.")
+        case .notFound: throw MarqueeError("This playlist is gone.")
+        default: throw MarqueeError("Couldn't save the playlist.")
+        }
+    }
+
+    /// Combines playlists, in the order given, into a new one (`title`) or the end of one of
+    /// this person's (`into`). Returns the playlist they went into.
+    func mergePlaylists(_ sources: [Int64], into: Int64?, title: String?, skipDuplicates: Bool, deleteSources: Bool) async throws -> Playlist {
+        let body = Schemas.PlaylistMerge(sourceIds: sources, intoId: into, title: title, skipDuplicates: skipDuplicates, deleteSources: deleteSources)
+        switch try await api.mergePlaylists(body: .json(body)) {
+        case let .ok(ok): return try ok.body.json
+        case let .badRequest(r): throw MarqueeError((try? r.body.json.message) ?? "Those playlists can't be combined.")
+        case .notFound: throw MarqueeError("One of those playlists is gone.")
+        default: throw MarqueeError("Couldn't combine the playlists.")
+        }
     }
 
     // MARK: Sharing playlists (MUSIC-24)

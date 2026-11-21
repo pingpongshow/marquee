@@ -25,21 +25,40 @@ type Seed struct {
 // (10/7), so a favourite counts for more than the highest star rating.
 const favoriteWeight = 2.0
 
+// likedRating is what a thumbs up counts for as a seed (USER-21): a liked title, as if it
+// were rated 4 stars, below a favourite.
+const likedRating = 8.0
+
 // withFavorites puts uid's favourite movies and shows (most recent first) ahead of seeds,
-// marking seeds that are favourites; at most limit favourites are added.
+// marking seeds that are favourites, then the ones they gave a thumbs up (USER-21); at most
+// limit of each are added.
 func (s *Store) withFavorites(ctx context.Context, uid int64, seeds []Seed, limit int) ([]Seed, error) {
 	favs, err := s.favoriteVideos(ctx, uid, limit)
-	if err != nil || len(favs) == 0 {
+	if err != nil {
 		return seeds, err
 	}
+	liked, err := s.likedVideos(ctx, uid, limit)
+	if err != nil {
+		return seeds, err
+	}
+	if len(favs) == 0 && len(liked) == 0 {
+		return seeds, nil
+	}
 	isFav := map[int64]bool{}
-	out := make([]Seed, 0, len(favs)+len(seeds))
+	out := make([]Seed, 0, len(favs)+len(liked)+len(seeds))
 	for _, id := range favs {
 		isFav[id] = true
 		out = append(out, Seed{ID: id, Favorite: true})
 	}
+	isLiked := map[int64]bool{}
+	for _, id := range liked {
+		if !isFav[id] {
+			isLiked[id] = true
+			out = append(out, Seed{ID: id, Rating: likedRating, Finished: true})
+		}
+	}
 	for _, sd := range seeds {
-		if isFav[sd.ID] {
+		if isFav[sd.ID] || isLiked[sd.ID] {
 			continue
 		}
 		out = append(out, sd)
@@ -62,6 +81,7 @@ func (s *Store) recentSeeds(ctx context.Context, uid int64, days, limit int) ([]
 			SELECT g.id, g.type, x.last_viewed_at, g.leaf_count FROM user_item_state x
 				JOIN items e ON e.id = x.item_id AND e.type = 'episode' JOIN items g ON g.id = e.grandparent_id AND g.extra_type IS NULL
 				WHERE x.user_id = ?1 AND x.play_count > 0 AND x.last_viewed_at >= ?2) w
+		WHERE NOT EXISTS (SELECT 1 FROM user_item_state d WHERE d.user_id = ?1 AND d.item_id = w.id AND d.disliked_at IS NOT NULL)
 		GROUP BY w.id ORDER BY MAX(w.at) DESC LIMIT ?3`, []any{uid, since, limit}, func(r *sql.Rows) error {
 		var sd Seed
 		if err := r.Scan(&sd.ID, &sd.WatchedAt, &sd.Rating, &sd.Finished); err != nil {

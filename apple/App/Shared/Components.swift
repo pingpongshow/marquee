@@ -342,6 +342,14 @@ final class WatchStore {
 
     /// Another person signed in: their own watched state shows, not these marks.
     func reset() { marks = [:] }
+
+    /// Back in the app after a while: what's watched may have changed on another device, so
+    /// the server's state shows again (these marks have all been saved or put back), and pages
+    /// showing an item load it again.
+    func serverMayHaveChanged() {
+        if !marks.isEmpty { marks = [:] }
+        saves += 1
+    }
 }
 
 /// A row's own rating that can be changed in place: small stars when rated, a faint outline
@@ -597,16 +605,33 @@ struct AvatarView: View {
     }
 }
 
-/// Four-digit PIN entry.
+/// Four-digit PIN entry: compact, each key counts the moment it's touched, the fourth digit
+/// sends it, and a refused PIN shakes the dots, clears them and says why underneath. Digits
+/// typed on a keyboard work too (iPad, Mac); on the TV the keypad starts on 5, the shortest
+/// way to any key with the remote.
 struct PinPad: View {
     var disabled = false
+    /// Why the last PIN was refused, shown under the dots.
+    var error: String? = nil
+    /// Bumped by each refused PIN: the dots shake and clear for the next try.
+    var failures = 0
     let onComplete: (String) -> Void
     @State private var digits = ""
+    @State private var shake: CGFloat = 0
+    #if !os(tvOS)
+    @FocusState private var typing: Bool
+    #else
+    @FocusState private var focusedKey: String?
+    #endif
 
     var body: some View {
         pad
-            #if os(macOS)
-            // A Mac has number keys.
+            .onChange(of: failures) {
+                digits = ""
+                withAnimation(.linear(duration: 0.4)) { shake += 1 }
+            }
+            #if !os(tvOS)
+            // A keyboard's number keys (iPad, Mac).
             .focusable()
             .focusEffectDisabled()
             .focused($typing)
@@ -620,48 +645,129 @@ struct PinPad: View {
             #endif
     }
 
-    #if os(macOS)
-    @FocusState private var typing: Bool
-    #endif
-
     private var pad: some View {
-        VStack(spacing: 20) {
-            HStack(spacing: 14) {
-                ForEach(0..<4, id: \.self) { i in
-                    Circle().fill(i < digits.count ? Color.primary : Color.secondary.opacity(0.3)).frame(width: 14, height: 14)
+        VStack(spacing: isTV ? 28 : 18) {
+            VStack(spacing: 8) {
+                HStack(spacing: isTV ? 22 : 16) {
+                    ForEach(0..<4, id: \.self) { i in
+                        Circle()
+                            .fill(i < digits.count ? Color.marqueeGold : Color.clear)
+                            .overlay(Circle().strokeBorder(i < digits.count ? Color.marqueeGold : Color.secondary.opacity(0.6), lineWidth: 1.5))
+                            .frame(width: dotSize, height: dotSize)
+                    }
                 }
+                .modifier(Shake(amount: shake))
+                .overlay(alignment: .trailing) {
+                    if disabled { ProgressView().controlSize(.small).offset(x: isTV ? 50 : 34) }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(digits.count) of 4 digits entered")
+                Text(error ?? " ")
+                    .font(isTV ? .callout : .footnote)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .frame(minHeight: isTV ? 34 : 18)
+                    .accessibilityIdentifier("pin.error")
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(keySize), spacing: 16), count: 3), spacing: 16) {
-                ForEach(["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"], id: \.self) { k in
-                    if k.isEmpty {
-                        Color.clear.frame(width: keySize, height: keySize)
-                    } else {
-                        Button { press(k) } label: {
-                            Text(k).font(.title2.weight(.medium)).frame(width: keySize, height: keySize)
-                                .background(Circle().fill(Color.secondary.opacity(0.18)))
+            Grid(horizontalSpacing: keySpacing, verticalSpacing: keySpacing) {
+                ForEach([["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["", "0", "⌫"]], id: \.self) { row in
+                    GridRow {
+                        ForEach(row, id: \.self) { k in
+                            if k.isEmpty { Color.clear.frame(width: keySize, height: keySize) } else { key(k) }
                         }
-                        .buttonStyle(.plain)
-                        .disabled(disabled)
                     }
                 }
             }
         }
+        #if os(tvOS)
+        .focusSection()
+        .defaultFocus($focusedKey, "5")
+        #endif
+    }
+
+    @ViewBuilder private func key(_ k: String) -> some View {
+        let label = Group {
+            if k == "⌫" {
+                Image(systemName: "delete.left").font(isTV ? .title3 : .title3)
+            } else {
+                Text(k).font(isTV ? .title2.weight(.medium) : .title2.weight(.regular)).monospacedDigit()
+            }
+        }
+        #if os(tvOS)
+        Button { press(k) } label: {
+            label.frame(width: keySize, height: keySize)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.circle)
+        .focused($focusedKey, equals: k)
+        .disabled(disabled)
+        .accessibilityLabel(k == "⌫" ? "Delete" : k)
+        #else
+        Button { press(k) } label: { label.frame(width: keySize, height: keySize) }
+            .buttonStyle(PinKeyStyle(isDelete: k == "⌫"))
+            .disabled(disabled || (k == "⌫" && digits.isEmpty))
+            .accessibilityLabel(k == "⌫" ? "Delete" : k)
+            .accessibilityIdentifier("pin.\(k == "⌫" ? "delete" : k)")
+        #endif
     }
 
     #if os(tvOS)
-    private let keySize: CGFloat = 90
+    private let keySize: CGFloat = 84
+    private let keySpacing: CGFloat = 22
+    private let dotSize: CGFloat = 18
     #else
-    private let keySize: CGFloat = 70
+    private let keySize: CGFloat = 58
+    private let keySpacing: CGFloat = 14
+    private let dotSize: CGFloat = 13
     #endif
 
     private func press(_ k: String) {
+        guard !disabled else { return }
         if k == "⌫" { if !digits.isEmpty { digits.removeLast() }; return }
         guard digits.count < 4 else { return }
         digits += k
-        if digits.count == 4 {
-            let pin = digits
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { digits = ""; onComplete(pin) }
-        }
+        // The fourth digit sends it at once; the dots stay filled while it's checked.
+        if digits.count == 4 { onComplete(digits) }
+    }
+}
+
+#if !os(tvOS)
+/// A PIN key: acts on the touch itself, not the lift, so quick taps all count (a plain button in
+/// a scroll view or sheet waited, and taps in a row were lost), with a quick highlight.
+private struct PinKeyStyle: PrimitiveButtonStyle {
+    var isDelete = false
+    @State private var down = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.primary)
+            .background(Circle().fill(isDelete ? Color.clear : Color.secondary.opacity(down ? 0.45 : 0.16)))
+            .contentShape(Circle())
+            .scaleEffect(down ? 0.94 : 1)
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !down {
+                        down = true
+                        configuration.trigger()
+                    }
+                }
+                .onEnded { _ in down = false })
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { configuration.trigger() }
+    }
+}
+#endif
+
+/// A side-to-side shake (a refused PIN).
+private struct Shake: GeometryEffect {
+    var amount: CGFloat
+    var animatableData: CGFloat {
+        get { amount }
+        set { amount = newValue }
+    }
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        ProjectionTransform(CGAffineTransform(translationX: 10 * sin(amount * .pi * 6), y: 0))
     }
 }
 

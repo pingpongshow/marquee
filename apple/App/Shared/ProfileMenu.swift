@@ -24,11 +24,14 @@ struct ProfilesPage: View {
     @State private var password = ""
     @State private var busy = false
     @State private var error: String?
+    /// Bumped by each refused PIN: the pad shakes and clears.
+    @State private var pinFailures = 0
 
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
-                if let error { ErrorBanner(message: error) }
+                // A refused PIN shows on the pad itself.
+                if let error, !(target != nil && target?.requires != .password) { ErrorBanner(message: error) }
                 if let target {
                     entry(target)
                 } else {
@@ -118,7 +121,10 @@ struct ProfilesPage: View {
                 .disabled(busy || password.isEmpty)
         } else {
             Text("Enter \(p.displayName)'s PIN").font(.headline)
-            PinPad(disabled: busy) { pin in switchTo(p, pin: pin) }
+            PinPad(disabled: busy, error: error, failures: pinFailures) { pin in
+                error = nil
+                switchTo(p, pin: pin)
+            }
         }
         Button("Cancel") {
             target = nil
@@ -153,6 +159,7 @@ struct ProfilesPage: View {
                 onSwitched?()
             } catch {
                 self.error = error.localizedDescription
+                if pin != nil { pinFailures += 1 }
             }
         }
     }

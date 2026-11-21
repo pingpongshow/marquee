@@ -161,6 +161,8 @@ struct PlaylistsView: View {
     @State private var confirmingDelete = false
     /// The playlist a new folder from its menu is for.
     @State private var filing: Playlist?
+    /// Combine Playlists is open (MUSIC-29).
+    @State private var combining = false
     @Environment(\.dismiss) private var dismiss
 
     private var folders: PlaylistFolders { PlaylistFolders.shared }
@@ -233,7 +235,16 @@ struct PlaylistsView: View {
         }
         .navigationTitle(folder?.name ?? "Playlists")
         #if !os(tvOS)
-        .toolbar { ToolbarItem(placement: .primaryAction) { folderButtons } }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { folderButtons }
+            if folderID == nil, playlists.count >= 2 {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { combining = true } label: { Label("Combine Playlists", systemImage: "arrow.triangle.merge") }
+                        .accessibilityIdentifier("playlists.combine")
+                }
+            }
+        }
+        .sheet(isPresented: $combining) { CombinePlaylistsSheet(playlists: playlists).macSheetFrame() }
         #endif
         .playlistFolderNamePrompt(isPresented: $naming, putting: filing)
         .playlistFolderRenamePrompt(isPresented: $renaming, folder: folder)
@@ -376,6 +387,8 @@ struct PlaylistView: View {
     @State private var confirmingRemove = false
     #if !os(tvOS)
     @State private var sharing = false
+    /// The editor is open (MUSIC-29).
+    @State private var editing = false
     #endif
 
     var body: some View {
@@ -438,6 +451,9 @@ struct PlaylistView: View {
         #if !os(tvOS)
         .sheet(isPresented: $sharing) {
             if let playlist { PlaylistShareSheet(playlist: playlist) { Task { await load() } }.macSheetFrame() }
+        }
+        .sheet(isPresented: $editing) {
+            if let playlist { PlaylistEditSheet(playlist: playlist, entries: entries) { Task { await load() } }.macSheetFrame() }
         }
         #endif
         .alert("Remove “\(playlist?.title ?? "")”?", isPresented: $confirmingRemove) {
@@ -517,6 +533,11 @@ struct PlaylistView: View {
         } secondary: {
             #if !os(tvOS)
             PlaylistDownloadButton(id: id)
+            if let p = playlist, p.readOnly != true, p.rules == nil, !entries.isEmpty {
+                Button { editing = true } label: { Label("Edit", systemImage: "pencil") }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("playlist.edit")
+            }
             if let p = playlist, p.readOnly != true {
                 Button { sharing = true } label: { Label("Share", systemImage: "person.2") }
                     .buttonStyle(.bordered)
@@ -702,6 +723,275 @@ struct PlaylistDownloadButton: View {
         } else {
             Button { Task { await downloads.syncPlaylist(id) } } label: { Label("Download", systemImage: "arrow.down.circle") }
                 .buttonStyle(.bordered)
+        }
+    }
+}
+#endif
+
+#if !os(tvOS)
+// MARK: - Editing and combining playlists (MUSIC-29)
+
+/// The playlist editor: select several to delete, drag to reorder, sort, take out duplicates,
+/// then Save sends the new order in one go. Nothing changes until then; Cancel leaves it as it
+/// was. For the person's own playlists (not smart ones, which fill themselves).
+struct PlaylistEditSheet: View {
+    @Environment(AppSession.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    let playlist: Playlist
+    let saved: () -> Void
+    @State private var entries: [PlaylistEntry]
+    @State private var selection = Set<Int64>()
+    @State private var saving = false
+    @State private var error: String?
+    private let original: [Int64]
+
+    init(playlist: Playlist, entries: [PlaylistEntry], saved: @escaping () -> Void) {
+        self.playlist = playlist
+        self.saved = saved
+        _entries = State(initialValue: entries)
+        original = entries.map(\.entryId)
+    }
+
+    private var changed: Bool { entries.map(\.entryId) != original }
+
+    /// Entries that repeat one earlier in the list.
+    private var duplicateIDs: Set<Int64> {
+        var seen = Set<Int64>(), out = Set<Int64>()
+        for e in entries where !seen.insert(e.item.id).inserted { out.insert(e.entryId) }
+        return out
+    }
+
+    var body: some View {
+        NavigationStack {
+            List(selection: $selection) {
+                ForEach(entries, id: \.entryId) { e in
+                    row(e).tag(e.entryId)
+                }
+                .onMove { entries.move(fromOffsets: $0, toOffset: $1) }
+                .onDelete { entries.remove(atOffsets: $0) }
+            }
+            #if os(iOS)
+            .environment(\.editMode, .constant(.active))
+            #endif
+            .navigationTitle("Edit Playlist")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                        .disabled(!changed || saving)
+                        .accessibilityIdentifier("playlistEdit.save")
+                }
+                #if os(iOS)
+                ToolbarItemGroup(placement: .bottomBar) { tools }
+                #else
+                ToolbarItemGroup(placement: .primaryAction) { tools }
+                #endif
+            }
+            .overlay { if saving { ProgressView().controlSize(.large) } }
+            .alert("Couldn't save the playlist", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(error ?? "")
+            }
+        }
+        .interactiveDismissDisabled(changed)
+    }
+
+    @ViewBuilder private var tools: some View {
+        Button(role: .destructive) {
+            entries.removeAll { selection.contains($0.entryId) }
+            selection = []
+        } label: {
+            Label(selection.isEmpty ? "Delete" : "Delete \(selection.count)", systemImage: "trash")
+                .labelStyle(.titleAndIcon)
+        }
+        .disabled(selection.isEmpty)
+        .accessibilityIdentifier("playlistEdit.delete")
+        Spacer()
+        Button(selection.count == entries.count && !entries.isEmpty ? "Select None" : "Select All") {
+            selection = selection.count == entries.count ? [] : Set(entries.map(\.entryId))
+        }
+        Spacer()
+        Menu {
+            Section("Sort") {
+                Button("Title", systemImage: "textformat") { sort { $0.item.title } }
+                Button("Artist", systemImage: "music.mic") { sort { $0.item.artistCredit ?? $0.item.grandparentTitle ?? "" } }
+                Button("Album", systemImage: "square.stack") { sort { $0.item.parentTitle ?? "" } }
+                Button("Date Added, Oldest First", systemImage: "calendar") { entries.sort { $0.entryId < $1.entryId } }
+                Button("Date Added, Newest First", systemImage: "calendar") { entries.sort { $0.entryId > $1.entryId } }
+                Button("Reverse", systemImage: "arrow.up.arrow.down") { entries.reverse() }
+                Button("Shuffle", systemImage: "shuffle") { entries.shuffle() }
+            }
+            let dupes = duplicateIDs
+            Button("Remove \(dupes.count) Duplicate\(dupes.count == 1 ? "" : "s")", systemImage: "square.on.square.dashed") {
+                entries.removeAll { dupes.contains($0.entryId) }
+                selection.subtract(dupes)
+            }
+            .disabled(dupes.isEmpty)
+        } label: {
+            Label("Arrange", systemImage: "arrow.up.arrow.down.circle")
+        }
+        .accessibilityIdentifier("playlistEdit.arrange")
+    }
+
+    private func row(_ e: PlaylistEntry) -> some View {
+        HStack(spacing: 12) {
+            ArtworkView(item: e.item, shape: e.item._type == .track ? .square : .wide, width: 44)
+                .frame(width: e.item._type == .track ? 36 : 64)
+            VStack(alignment: .leading) {
+                Text(e.item.title).lineLimit(1)
+                Text(e.item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+    }
+
+    /// A stable sort by a text key, ignoring case and accents ("The" isn't skipped).
+    private func sort(_ key: (PlaylistEntry) -> String) {
+        let keyed = entries.enumerated().map { (key: key($0.element), at: $0.offset, entry: $0.element) }
+        entries = keyed.sorted {
+            let c = $0.key.compare($1.key, options: [.caseInsensitive, .diacriticInsensitive, .numeric])
+            return c == .orderedSame ? $0.at < $1.at : c == .orderedAscending
+        }.map(\.entry)
+    }
+
+    private func save() {
+        saving = true
+        let ids = entries.map(\.entryId)
+        Task {
+            defer { saving = false }
+            do {
+                try await app.setPlaylistItems(playlist.id, entryIDs: ids)
+                PlaylistChanges.shared.changed()
+                saved()
+                dismiss()
+            } catch is CancellationError {
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+}
+
+/// Combines playlists (MUSIC-29), such as several Christmas ones into one: picked in order, into
+/// a new playlist or the end of one of the person's own, with or without duplicates, and the
+/// originals kept or deleted (only their own; shared ones stay).
+struct CombinePlaylistsSheet: View {
+    @Environment(AppSession.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    let playlists: [Playlist]
+    /// Picked, in the order they'll go in.
+    @State private var picked: [Int64] = []
+    /// One of the person's playlists to add them to; nil makes a new one.
+    @State private var into: Int64?
+    @State private var title = ""
+    @State private var skipDuplicates = true
+    @State private var deleteSources = false
+    @State private var working = false
+    @State private var error: String?
+
+    private var kind: Schemas.PlaylistKind? { picked.first.flatMap { id in playlists.first { $0.id == id }?.kind } }
+
+    /// The person's own, non-smart playlists of the picked kind: where they can go.
+    private var destinations: [Playlist] {
+        playlists.filter { $0.readOnly != true && $0.rules == nil && (kind == nil || $0.kind == kind) }
+    }
+
+    private var ready: Bool {
+        let sources = picked.filter { $0 != into }
+        return into == nil ? sources.count >= 2 && !title.trimmingCharacters(in: .whitespaces).isEmpty : !sources.isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    ForEach(playlists, id: \.id) { p in
+                        let at = picked.firstIndex(of: p.id)
+                        let allowed = kind == nil || p.kind == kind
+                        Button {
+                            if let at { picked.remove(at: at) } else { picked.append(p.id) }
+                            if title.isEmpty, picked.count == 1 { title = p.title }
+                            if let into, !destinations.contains(where: { $0.id == into }) { self.into = nil }
+                        } label: {
+                            HStack {
+                                Image(systemName: at == nil ? "circle" : "\(at! + 1).circle.fill")
+                                    .foregroundStyle(at == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.marqueeGold))
+                                    .font(.title3)
+                                VStack(alignment: .leading) {
+                                    Text(p.title).lineLimit(1)
+                                    Text("\(p.itemCount) items\(p.readOnly == true ? " · shared by \(p.ownerName ?? "someone")" : "")")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: p.kind == .audio ? "music.note.list" : "film").foregroundStyle(.secondary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!allowed && at == nil)
+                        .accessibilityAddTraits(at == nil ? [] : .isSelected)
+                    }
+                } header: {
+                    Text("Playlists to combine, in order")
+                } footer: {
+                    Text("Music and video playlists can't be combined.")
+                }
+                Section("Into") {
+                    Picker("Into", selection: $into) {
+                        Text("A new playlist").tag(Int64?.none)
+                        ForEach(destinations, id: \.id) { Text($0.title).tag(Optional($0.id)) }
+                    }
+                    if into == nil {
+                        TextField("New playlist's title", text: $title)
+                            .accessibilityIdentifier("combine.title")
+                    }
+                }
+                Section {
+                    Toggle("Leave out duplicates", isOn: $skipDuplicates)
+                    Toggle("Delete the originals", isOn: $deleteSources)
+                } footer: {
+                    Text("Only your own playlists are deleted: ones shared with you stay.")
+                }
+            }
+            .navigationTitle("Combine Playlists")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Combine") { combine() }
+                        .disabled(!ready || working)
+                        .accessibilityIdentifier("combine.go")
+                }
+            }
+            .overlay { if working { ProgressView().controlSize(.large) } }
+            .alert("Couldn't combine the playlists", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(error ?? "")
+            }
+        }
+    }
+
+    private func combine() {
+        working = true
+        let sources = picked.filter { $0 != into }
+        let name = title.trimmingCharacters(in: .whitespaces)
+        Task {
+            defer { working = false }
+            do {
+                _ = try await app.mergePlaylists(sources, into: into, title: into == nil ? name : nil,
+                                                 skipDuplicates: skipDuplicates, deleteSources: deleteSources)
+                PlaylistChanges.shared.changed()
+                dismiss()
+            } catch is CancellationError {
+            } catch {
+                self.error = error.localizedDescription
+            }
         }
     }
 }

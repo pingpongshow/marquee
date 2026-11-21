@@ -56,7 +56,7 @@ class OfflineSync(context: Context, private val marquee: Marquee) {
     /** Bumped after queued changes were sent, so Now Playing and pages show the server's truth. */
     val syncs: StateFlow<Int> = _syncs
 
-    /** Thumbs downs made offline and not yet sent, shown again after a restart. */
+    /** Thumbs downs and ups made offline and not yet sent, shown again after a restart. */
     fun showWaitingDislikes() {
         val s = marquee.server?.id ?: return
         val u = marquee.userId ?: return
@@ -80,6 +80,8 @@ class OfflineSync(context: Context, private val marquee: Marquee) {
     fun watchlist(item: Long, on: Boolean) = change(item, PendingChange.Kind.Watchlist) { it.copy(on = on) }
     fun favorite(item: Long, on: Boolean) = change(item, PendingChange.Kind.Favorite) { it.copy(on = on) }
     fun dislike(item: Long, on: Boolean) = change(item, PendingChange.Kind.Dislike) { it.copy(on = on) }
+    /** A thumbs up (USER-21). */
+    fun like(item: Long, on: Boolean) = change(item, PendingChange.Kind.Like) { it.copy(on = on) }
     /** Your own comment; empty deletes it. */
     fun comment(item: Long, text: String) = change(item, PendingChange.Kind.Comment) { it.copy(comment = text) }
     /** Someone else's comment (admins). */
@@ -161,6 +163,7 @@ class OfflineSync(context: Context, private val marquee: Marquee) {
             PendingChange.Kind.Watchlist -> if (c.on) items.addToWatchlist(c.item, at) else items.removeFromWatchlist(c.item, at)
             PendingChange.Kind.Favorite -> if (c.on) items.addFavorite(c.item, at) else items.removeFavorite(c.item, at)
             PendingChange.Kind.Dislike -> if (c.on) items.addDislike(c.item, at) else items.removeDislike(c.item, at)
+            PendingChange.Kind.Like -> if (c.on) items.addLike(c.item, at) else items.removeLike(c.item, at)
             PendingChange.Kind.Comment -> c.reviewUser?.let { items.deleteReview(c.item, it, at) }
                 ?: items.setReview(c.item, SetReviewRequest(c.comment.orEmpty(), at))
             PendingChange.Kind.Progress -> marquee.playback.syncProgress(c.item, SyncProgressRequest(c.positionMs, c.watched, at))

@@ -202,6 +202,8 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
                 // The heart (USER-12), from the track's current state.
                 app.marquee.ui.FavoriteButton(n.id, n.title, music.favorite.collectAsState().value ?: n.favorite,
                     Modifier.testTag("now-playing-favorite"))
+                // Thumbs up and down (USER-21): liked steers radios and mixes; disliked keeps it out of them.
+                app.marquee.ui.LikeButton(n.id, n.title, music.liked.collectAsState().value, Modifier.testTag("now-playing-like"))
                 app.marquee.ui.DislikeButton(n.id, n.title, dislikedOnServer, Modifier.testTag("now-playing-dislike"))
                 // What needs the server goes while offline; the rating and heart above are queued.
                 if (!offline) {

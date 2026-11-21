@@ -196,8 +196,12 @@ fun ProfileSwitcher(nav: NavHostController, onDismiss: () -> Unit) {
     if (confirmSignOut) SignOutDialog(onDismiss = { confirmSignOut = false }, onSignedOut = onDismiss)
     asking?.let { p ->
         val pin = profileNeeds(p, isAdmin) == Profile.Requires.PIN
-        SecretDialog(title = p.displayName, label = if (pin) "PIN" else "Password", numeric = pin, onDismiss = { asking = null }) { secret, _ ->
-            runCatching { if (pin) switchTo(p, secret, null) else switchTo(p, null, secret) }.exceptionOrNull()?.let(::switchError)
+        // A PIN: the compact pad, which switches on the fourth digit.
+        if (pin) PinPadDialog(p.displayName, marquee.absolute(p.avatarUrl), onDismiss = { asking = null }) { secret ->
+            runCatching { switchTo(p, secret, null) }.exceptionOrNull()?.let(::pinError)
+        }
+        else SecretDialog(title = p.displayName, label = "Password", numeric = false, onDismiss = { asking = null }) { secret, _ ->
+            runCatching { switchTo(p, null, secret) }.exceptionOrNull()?.let(::switchError)
         }
     }
 }

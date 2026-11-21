@@ -144,6 +144,7 @@ func toAPISummary(s items.Summary) ItemSummary {
 	out.Watchlisted = nz(s.Watchlisted)
 	out.Favorite = nz(s.Favorite)
 	out.Disliked = nz(s.Disliked)
+	out.Liked = nz(s.Liked)
 	if s.ExtraType != "" {
 		out.ExtraType = ptr(ItemSummaryExtraType(s.ExtraType))
 	}
@@ -375,7 +376,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		OriginallyAvailableAt: sum.OriginallyAvailableAt, Available: sum.Available,
 		MatchState: ItemDetailMatchState(sum.MatchState), AddedAt: sum.AddedAt, Images: sum.Images,
 		ViewOffsetMs: sum.ViewOffsetMs, ViewCount: sum.ViewCount, WatchedLeafCount: sum.WatchedLeafCount, LastViewedAt: sum.LastViewedAt,
-		UserRating: sum.UserRating, Watchlisted: sum.Watchlisted, Favorite: sum.Favorite, Disliked: sum.Disliked, ExtraType: (*ItemDetailExtraType)(sum.ExtraType),
+		UserRating: sum.UserRating, Watchlisted: sum.Watchlisted, Favorite: sum.Favorite, Disliked: sum.Disliked, Liked: sum.Liked, ExtraType: (*ItemDetailExtraType)(sum.ExtraType),
 		ReleaseType:    (*ItemDetailReleaseType)(sum.ReleaseType),
 		AudienceRating: nz(float32(d.AudienceRating)), Credits: make([]Credit, len(d.Credits)),
 		Summary: nz(d.Plot), Tagline: nz(d.Tagline), ContentRating: nz(d.ContentRating), Studio: nz(d.Studio),

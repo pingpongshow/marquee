@@ -198,11 +198,12 @@ function ProfilePicker({
         />
         <div className="font-medium">{chosen.displayName}</div>
       </div>
-      {login.isError && <Alert tone="error">{login.error.message}</Alert>}
+      {login.isError && chosen.requires !== "pin" && <Alert tone="error">{login.error.message}</Alert>}
       {chosen.requires === "pin" ? (
         <PinPad
           disabled={login.isPending}
           resetKey={attempt}
+          error={login.isError ? login.error.message : null}
           onComplete={(pin) => login.mutate({ userId: chosen.id, pin })}
         />
       ) : (

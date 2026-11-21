@@ -89,8 +89,12 @@ export function ResetPage({ token }: { token: string }) {
     body = (
       <div className="space-y-4">
         <p className="text-center text-sm text-muted">Enter a new 4-digit PIN for {info.data.displayName}.</p>
-        {reset.isError && <Alert tone="error">{reset.error.message}</Alert>}
-        <PinPad disabled={reset.isPending} resetKey={attempt} onComplete={(pin) => reset.mutate({ pin })} />
+        <PinPad
+          disabled={reset.isPending}
+          resetKey={attempt}
+          error={reset.isError ? reset.error.message : null}
+          onComplete={(pin) => reset.mutate({ pin })}
+        />
       </div>
     );
   else

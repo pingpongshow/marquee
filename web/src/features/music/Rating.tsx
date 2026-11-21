@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { Star, ThumbsDown } from "lucide-react";
+import { Star, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import { useMusicActions } from "../player/MusicPlayer";
@@ -8,14 +8,28 @@ import { useMusicActions } from "../player/MusicPlayer";
 /** A rating from here up (3.5 stars) and a thumbs down take each other back, as on the server. */
 const TOP_RATING = 7;
 
-type Song = { id: number; title: string; disliked?: boolean };
+type Song = { id: number; title: string; disliked?: boolean; liked?: boolean };
+
+/** Everything that may show a thumbs up or down (or what one clears) loads again. */
+function useRefreshThumbs() {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: ["items"] });
+    void qc.invalidateQueries({ queryKey: ["libraries"] });
+    void qc.invalidateQueries({ queryKey: ["playlists"] });
+    void qc.invalidateQueries({ queryKey: ["search"] });
+    // Mixes and samplers are held for a while, and these are generated lists that lose the song.
+    void qc.invalidateQueries({ queryKey: ["music"] });
+  };
+}
 
 /**
- * Gives a song a thumbs down or takes it back (MUSIC-25). Everything that shows the song refreshes
- * once the server has it, the heart and high stars it clears included, and a station moves on.
+ * Gives a song, film or show a thumbs down or takes it back (MUSIC-25, USER-21); an episode's
+ * goes on its show. Everything that shows it refreshes once the server has it, the heart, thumbs
+ * up and high stars it clears included, and a station moves on from a song.
  */
 export function useSetDisliked() {
-  const qc = useQueryClient();
+  const refresh = useRefreshThumbs();
   const music = useMusicActions();
   return useMutation({
     mutationFn: ({ itemId, on }: { itemId: number; on: boolean }) =>
@@ -23,15 +37,110 @@ export function useSetDisliked() {
         ? unwrap(api.PUT("/items/{itemId}/dislike", { params: { path: { itemId } } }))
         : unwrap(api.DELETE("/items/{itemId}/dislike", { params: { path: { itemId } } })),
     onSuccess: (_, { itemId, on }) => {
-      void qc.invalidateQueries({ queryKey: ["items"] });
-      void qc.invalidateQueries({ queryKey: ["libraries"] });
-      void qc.invalidateQueries({ queryKey: ["playlists"] });
-      void qc.invalidateQueries({ queryKey: ["search"] });
-      // Mixes and samplers are held for a while, and these are generated lists that lose the song.
-      void qc.invalidateQueries({ queryKey: ["music"] });
+      refresh();
       if (on) music.thumbsDown(itemId);
     },
   });
+}
+
+/**
+ * Gives a song, film or show a thumbs up or takes it back (USER-21): liked, not a favourite. It
+ * steers suggestions, radios and mixes, and takes back a thumbs down.
+ */
+export function useSetLiked() {
+  const refresh = useRefreshThumbs();
+  return useMutation({
+    mutationFn: ({ itemId, on }: { itemId: number; on: boolean }) =>
+      on
+        ? unwrap(api.PUT("/items/{itemId}/like", { params: { path: { itemId } } }))
+        : unwrap(api.DELETE("/items/{itemId}/like", { params: { path: { itemId } } })),
+    onSuccess: refresh,
+  });
+}
+
+/** The thumbs up, filled when it's given; pressing it again takes it back. */
+export function ThumbsUpButton({
+  title,
+  on,
+  onToggle,
+  size = "md",
+  className,
+}: {
+  title: string;
+  on: boolean;
+  onToggle: () => void;
+  size?: "xs" | "sm" | "md";
+  className?: string;
+}) {
+  const px = size === "xs" ? "size-3.5" : size === "sm" ? "size-4" : "size-5";
+  return (
+    <button
+      type="button"
+      onClick={(e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggle();
+      }}
+      aria-pressed={on}
+      aria-label={on ? `Take back thumbs up: ${title}` : `Thumbs up: ${title}`}
+      title={on ? "Take back thumbs up" : "Thumbs up"}
+      data-testid="thumbs-up"
+      data-liked={on}
+      className={clsx(
+        "shrink-0 rounded-full transition-colors",
+        size === "md" ? "p-1.5 hover:bg-surface-3" : "p-0.5",
+        on ? "text-accent" : "text-muted hover:text-text",
+        className,
+      )}
+    >
+      <ThumbsUp className={clsx(px, on && "fill-current")} aria-hidden />
+    </button>
+  );
+}
+
+/**
+ * A thumbs up and a thumbs down side by side for a song, film or show (USER-21): they take each
+ * other back, show at once and revert if the server refuses. A film's or show's thumbs down stops
+ * it being suggested; it stays in its library.
+ */
+export function Thumbs({
+  itemId,
+  title,
+  liked,
+  disliked,
+  size = "md",
+  className,
+  buttonClassName,
+}: {
+  itemId: number;
+  title: string;
+  liked?: boolean;
+  disliked?: boolean;
+  size?: "xs" | "sm" | "md";
+  className?: string;
+  buttonClassName?: string;
+}) {
+  const setLiked = useSetLiked();
+  const setDisliked = useSetDisliked();
+  const server = `${!!liked}|${!!disliked}`;
+  const [state, setState] = useState({ up: !!liked, down: !!disliked });
+  const [seen, setSeen] = useState(server);
+  if (seen !== server) {
+    setSeen(server);
+    setState({ up: !!liked, down: !!disliked });
+  }
+  const press = (which: "up" | "down") => {
+    const before = state;
+    const on = !state[which];
+    setState(which === "up" ? { up: on, down: on ? false : state.down } : { down: on, up: on ? false : state.up });
+    (which === "up" ? setLiked : setDisliked).mutate({ itemId, on }, { onError: () => setState(before) });
+  };
+  return (
+    <div className={clsx("flex items-center gap-0.5", className)} data-testid="thumbs">
+      <ThumbsUpButton title={title} on={state.up} onToggle={() => press("up")} size={size} className={buttonClassName} />
+      <ThumbsDownButton title={title} on={state.down} onToggle={() => press("down")} size={size} className={buttonClassName} />
+    </div>
+  );
 }
 
 /** A song's thumbs down as it shows: the change shows at once and reverts if the server refuses it. */
@@ -50,6 +159,33 @@ function useThumbsDown(song?: Song) {
     const next = !on;
     setOn(next);
     setDisliked.mutate(
+      { itemId: song.id, on: next },
+      {
+        onError: () => {
+          setOn(!next);
+          onError();
+        },
+      },
+    );
+  };
+  return { on, setOn, toggle };
+}
+
+/** A song's thumbs up as it shows (USER-21), as useThumbsDown. */
+function useThumbsUp(song?: Song) {
+  const setLiked = useSetLiked();
+  const value = !!song?.liked;
+  const [on, setOn] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) {
+    setSeen(value);
+    setOn(value);
+  }
+  const toggle = (onError: () => void) => {
+    if (!song) return;
+    const next = !on;
+    setOn(next);
+    setLiked.mutate(
       { itemId: song.id, on: next },
       {
         onError: () => {
@@ -120,6 +256,7 @@ export function Rating({
   song,
   row,
   thumbClassName,
+  thumbsUp,
 }: {
   /** The library item rated (PUT /items/{itemId}/rating), unless save is given. */
   itemId?: number;
@@ -138,9 +275,12 @@ export function Rating({
   /** In a song row: the thumbs down shows on hover, and in place of the stars once it's given. */
   row?: boolean;
   thumbClassName?: string;
+  /** With song: a thumbs up too, before the thumbs down (Now Playing, USER-21). */
+  thumbsUp?: boolean;
 }) {
   const qc = useQueryClient();
   const thumbs = useThumbsDown(song);
+  const up = useThumbsUp(song);
   const [hover, setHover] = useState<number | null>(null);
   const [local, setLocal] = useState<number | undefined>(value);
   // A new value from the server (a refetch) replaces the local one.
@@ -184,8 +324,18 @@ export function Rating({
   };
   const toggleThumb = () => {
     const before = local;
+    const upBefore = up.on;
     if (!thumbs.on && (local ?? 0) >= TOP_RATING) setLocal(undefined);
-    thumbs.toggle(() => setLocal(before));
+    if (!thumbs.on) up.setOn(false);
+    thumbs.toggle(() => {
+      setLocal(before);
+      up.setOn(upBefore);
+    });
+  };
+  const toggleUp = () => {
+    const downBefore = thumbs.on;
+    if (!up.on) thumbs.setOn(false);
+    up.toggle(() => thumbs.setOn(downBefore));
   };
   const shown = hover ?? local ?? 0;
   const px = size === "xs" ? "size-3" : size === "sm" ? "size-4" : "size-5";
@@ -261,6 +411,7 @@ export function Rating({
   return (
     <div className={clsx("flex shrink-0 items-center gap-0.5", className)}>
       {stars}
+      {thumbsUp && <ThumbsUpButton title={song.title} on={up.on} onToggle={toggleUp} size={size} className={thumbClassName} />}
       <ThumbsDownButton
         title={song.title}
         on={thumbs.on}

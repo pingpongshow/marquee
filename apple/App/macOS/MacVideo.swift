@@ -200,6 +200,8 @@ struct PlayerController: View {
     let playback: VideoPlayback
     var together: WatchTogether?
     let onNext: () -> Void
+    /// The thumbs (USER-21): on the Mac they're overlay buttons, so this goes unused.
+    var thumbs: PlayerThumbs?
     var trailer: TrailerActions?
     var chrome: PlayerChrome?
 

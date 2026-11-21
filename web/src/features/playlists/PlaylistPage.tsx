@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { clsx } from "clsx";
-import { FolderInput, GripVertical, Pencil, Play, Share2, Shuffle, Trash2, X } from "lucide-react";
+import { Combine, FolderInput, GripVertical, ListChecks, Pencil, Play, Share2, Shuffle, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { api, imageUrl, unwrap } from "@/api/client";
 import { playlistItemsQuery, playlistQuery } from "@/api/queries";
@@ -18,6 +18,7 @@ import { newShuffleSeed, seededShuffle } from "./order";
 import { PinToHomeButton } from "../home/EditHome";
 import { RulesEditor, rulesValid } from "./RulesEditor";
 import { MoveToFolderDialog } from "./Folders";
+import { CombinePlaylistsDialog } from "./Combine";
 import { RemoveSharedDialog, ShareDialog, SharedIcon, sharedByText, sharedText } from "./Sharing";
 import type { SmartRules } from "@/api/types";
 import { Sparkles } from "lucide-react";
@@ -41,6 +42,7 @@ export function PlaylistPage() {
   const [sharing, setSharing] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [filing, setFiling] = useState(false);
+  const [combining, setCombining] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
   const [editingRules, setEditingRules] = useState<SmartRules | null>(null);
   const saveRules = useMutation({
@@ -175,6 +177,19 @@ export function PlaylistPage() {
                 <Sparkles className="size-4" /> Edit rules
               </Button>
             )}
+            {!fixedTracks && (
+              <Link
+                to="/playlist/$playlistId/edit"
+                params={{ playlistId: String(id) }}
+                className="inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-medium text-muted hover:bg-surface-2 hover:text-text"
+                data-testid="edit-playlist"
+              >
+                <ListChecks className="size-4" /> Edit tracks
+              </Link>
+            )}
+            <Button variant="ghost" onClick={() => setCombining(true)}>
+              <Combine className="size-4" /> Combine
+            </Button>
             <PinToHomeButton kind="playlist" id={id} />
             {!p.readOnly && (
               <Button variant="ghost" onClick={() => setSharing(true)}>
@@ -296,6 +311,7 @@ export function PlaylistPage() {
         <p className="text-sm text-muted">“{p.title}” will be deleted. The media in it isn’t affected.</p>
       </Dialog>
       {filing && <MoveToFolderDialog playlist={p} onClose={() => setFiling(false)} />}
+      {combining && <CombinePlaylistsDialog initial={[id]} onClose={() => setCombining(false)} />}
       {sharing && <ShareDialog playlist={p} onClose={() => setSharing(false)} />}
       {removing && <RemoveSharedDialog playlist={p} onClose={() => setRemoving(false)} onRemoved={() => navigate({ to: "/playlists" })} />}
     </div>

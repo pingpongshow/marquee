@@ -111,6 +111,11 @@ fun MainScreen() {
     // The tab whose section is showing; reselecting it goes back to its first screen.
     var tab by rememberSaveable { mutableStateOf("home") }
     LaunchedEffect(route) { if (tabs.any { it.route == route }) tab = route }
+    // The music that was playing or paused when the app was last closed comes back, paused where
+    // it stopped (once the person signed in is known).
+    val music = LocalMusic.current
+    val me by marquee.me.collectAsState()
+    LaunchedEffect(me?.id) { if (me != null) music.restoreSavedQueue() }
     fun go(r: String) {
         if (r == tab) { nav.popBackStack(r, inclusive = false); return }
         tab = r
@@ -218,6 +223,7 @@ private fun Routes(nav: NavHostController) {
         // All of an artist's Top Songs (their page's More).
         composable("topsongs/{id}", listOf(navArgument("id") { type = NavType.LongType })) { TopSongsScreen(nav, it.arguments!!.getLong("id")) }
         composable("playlist/{id}", listOf(navArgument("id") { type = NavType.LongType })) { PlaylistScreen(nav, it.arguments!!.getLong("id")) }
+        composable("playlist/{id}/edit", listOf(navArgument("id") { type = NavType.LongType })) { PlaylistEditScreen(nav, it.arguments!!.getLong("id")) }
         composable(
             "player/{id}?start={start}&group={group}&vm={vm}&vs={vs}&ve={ve}",
             listOf(

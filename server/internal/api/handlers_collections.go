@@ -108,17 +108,86 @@ func (h *Handlers) AddDislike(ctx context.Context, req AddDislikeRequestObject) 
 	if !ok {
 		return AddDislike401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	d, err := h.Items.Get(ctx, itemAccess(ctx), req.ItemId, false)
+	target, found, err := h.thumbTarget(ctx, req.ItemId)
 	if err != nil {
+		return nil, internal(ctx, "dislike", err)
+	}
+	if !found {
 		return AddDislike404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
-	if d.Type != "track" {
-		return AddDislike400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "only songs can have a thumbs down"))}, nil
+	if target == 0 {
+		return AddDislike400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "only songs, films and shows can have a thumbs down"))}, nil
 	}
-	if err := h.Items.SetDislikedAt(ctx, sess.User.ID, req.ItemId, true, req.Params.At); err != nil {
+	if err := h.Items.SetDislikedAt(ctx, sess.User.ID, target, true, req.Params.At); err != nil {
 		return nil, internal(ctx, "dislike", err)
 	}
 	return AddDislike204Response{}, nil
+}
+
+// thumbTarget is what a thumbs up or down on an item goes on (USER-21): a song, film or show
+// itself, and an episode's show; 0 for anything else. found is false when the caller can't
+// see the item.
+func (h *Handlers) thumbTarget(ctx context.Context, itemID int64) (target int64, found bool, err error) {
+	d, err := h.Items.Get(ctx, itemAccess(ctx), itemID, false)
+	if errors.Is(err, items.ErrNotFound) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	switch d.Type {
+	case "track", "movie", "show":
+		return itemID, true, nil
+	case "episode":
+		if d.GrandparentID != 0 {
+			return d.GrandparentID, true, nil
+		}
+	}
+	return 0, true, nil
+}
+
+// AddLike gives a song, film or show the caller's thumbs up (USER-21).
+func (h *Handlers) AddLike(ctx context.Context, req AddLikeRequestObject) (AddLikeResponseObject, error) {
+	sess, ok := session(ctx)
+	if !ok {
+		return AddLike401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	target, found, err := h.thumbTarget(ctx, req.ItemId)
+	if err != nil {
+		return nil, internal(ctx, "like", err)
+	}
+	if !found {
+		return AddLike404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	if target == 0 {
+		return AddLike400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "only songs, films and shows can have a thumbs up"))}, nil
+	}
+	if err := h.Items.SetLikedAt(ctx, sess.User.ID, target, true, req.Params.At); err != nil {
+		return nil, internal(ctx, "like", err)
+	}
+	return AddLike204Response{}, nil
+}
+
+// RemoveLike takes back the caller's thumbs up.
+func (h *Handlers) RemoveLike(ctx context.Context, req RemoveLikeRequestObject) (RemoveLikeResponseObject, error) {
+	sess, ok := session(ctx)
+	if !ok {
+		return RemoveLike401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	target, found, err := h.thumbTarget(ctx, req.ItemId)
+	if err != nil {
+		return nil, internal(ctx, "like", err)
+	}
+	if !found {
+		return RemoveLike404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	if target == 0 {
+		target = req.ItemId
+	}
+	if err := h.Items.SetLikedAt(ctx, sess.User.ID, target, false, req.Params.At); err != nil {
+		return nil, internal(ctx, "like", err)
+	}
+	return RemoveLike204Response{}, nil
 }
 
 // RemoveDislike takes back the caller's thumbs down on a song.
@@ -127,10 +196,17 @@ func (h *Handlers) RemoveDislike(ctx context.Context, req RemoveDislikeRequestOb
 	if !ok {
 		return RemoveDislike401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); err != nil {
+	target, found, err := h.thumbTarget(ctx, req.ItemId)
+	if err != nil {
+		return nil, internal(ctx, "dislike", err)
+	}
+	if !found {
 		return RemoveDislike404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
-	if err := h.Items.SetDislikedAt(ctx, sess.User.ID, req.ItemId, false, req.Params.At); err != nil {
+	if target == 0 {
+		target = req.ItemId
+	}
+	if err := h.Items.SetDislikedAt(ctx, sess.User.ID, target, false, req.Params.At); err != nil {
 		return nil, internal(ctx, "dislike", err)
 	}
 	return RemoveDislike204Response{}, nil

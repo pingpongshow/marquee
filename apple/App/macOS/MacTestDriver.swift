@@ -49,9 +49,9 @@ enum MacTestDriver {
                 return "\(p.app.me?.displayName ?? "-") kid=\(p.app.me?.restrictions.isKid ?? false) managed=\(p.app.me?.isManaged ?? false)"
             case "pinsize": // Whether the PIN sheet's content fits the sheet.
                 let profile = Schemas.Profile(id: 1, displayName: "stephen", isManaged: false, requires: .pin)
-                let host = NSHostingView(rootView: PinEntry(profile: profile) { _ in }.macEnvironment().frame(width: 420, height: 640).preferredColorScheme(.dark))
+                let host = NSHostingView(rootView: PinEntry(profile: profile) { _ in nil }.macEnvironment().frame(width: 420, height: 640).preferredColorScheme(.dark))
                 host.frame = NSRect(x: 0, y: 0, width: 420, height: 640)
-                let fit = NSHostingView(rootView: PinEntry(profile: profile) { _ in }.macEnvironment()).fittingSize
+                let fit = NSHostingView(rootView: PinEntry(profile: profile) { _ in nil }.macEnvironment()).fittingSize
                 host.layoutSubtreeIfNeeded()
                 if w.count > 1, let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
                     host.cacheDisplay(in: host.bounds, to: rep)

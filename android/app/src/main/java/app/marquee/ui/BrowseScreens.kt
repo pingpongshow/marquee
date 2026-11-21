@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -540,6 +541,7 @@ fun PlaylistsScreen(nav: NavHostController, folderId: Long? = null) {
     var naming by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    var combining by remember { mutableStateOf(false) }
     // The playlist whose folder menu is open.
     var filing by remember { mutableStateOf<Long?>(null) }
     var opened by rememberLastOpened(page)
@@ -560,6 +562,10 @@ fun PlaylistsScreen(nav: NavHostController, folderId: Long? = null) {
                     OutlinedButton({ naming = true }, Modifier.focusRing()) {
                         Icon(Icons.Filled.CreateNewFolder, null); Text("New folder", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
                     }
+                }
+                // Combine two or more into one (MUSIC-29).
+                if (lists.size >= 2) OutlinedButton({ combining = true }, Modifier.focusRing().testTag("combinePlaylists")) {
+                    Icon(Icons.Filled.CallMerge, null); Text("Combine", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
                 }
             }
         }
@@ -624,6 +630,10 @@ fun PlaylistsScreen(nav: NavHostController, folderId: Long? = null) {
                 )
             }
         }
+    }
+    if (combining) CombinePlaylistsDialog(lists) { made ->
+        combining = false
+        if (made != null) { version++; toast(context, "“${made.title}” now has ${made.itemCount} ${if (made.kind == PlaylistKind.AUDIO) "songs" else "videos"}") }
     }
     if (naming) FolderNameDialog("New folder", "", "Create", { naming = false }) { name ->
         withContext(Dispatchers.IO) { runCatching { marquee.playlists.createPlaylistFolder(app.marquee.api.models.PlaylistFolderUpdate(name)) } }.onSuccess { version++ }
@@ -742,6 +752,10 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
                         OutlinedButton(onClick = { playVideos(videos.shuffled()) }, modifier = Modifier.focusRing()) {
                             Icon(Icons.Filled.Shuffle, null); Text("Shuffle", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
                         }
+                    }
+                    // Edit (MUSIC-29): select, remove, reorder, sort and take out duplicates, saved at once.
+                    if (editable && entries.size > 0) OutlinedButton({ nav.navigate("playlist/$playlistId/edit") }, Modifier.focusRing().testTag("editPlaylist")) {
+                        Icon(Icons.Filled.Edit, null); Text("Edit", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
                     }
                     PinToHomeButton("playlist-$playlistId")
                     playlist?.let { p -> PlaylistFolderButton(p, folderName?.takeIf { p.folderId != null && it.isNotEmpty() }) { version++ } }

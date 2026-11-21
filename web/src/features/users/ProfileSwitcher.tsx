@@ -18,6 +18,8 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
   const me = useQuery(meQuery);
   const [target, setTarget] = useState<Profile | null>(null);
   const [password, setPassword] = useState("");
+  // Bumped on each failed try: clears the PIN pad (failureCount stays 1 after a second miss).
+  const [attempt, setAttempt] = useState(0);
   const sw = useMutation({
     mutationFn: (p: { id: number; pin?: string; password?: string }) =>
       unwrap(
@@ -32,6 +34,7 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
       signIn(res.token);
       onClose();
     },
+    onError: () => setAttempt((n) => n + 1),
   });
 
   // Admins open managed profiles directly.
@@ -53,7 +56,7 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
           : "Switch profile"
       }
     >
-      {sw.isError && (
+      {sw.isError && !(target && needs(target) === "pin") && (
         <div className="mb-4">
           <Alert tone="error">{sw.error.message}</Alert>
         </div>
@@ -94,13 +97,14 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
           </ul>
         )
       ) : needs(target) === "pin" ? (
-        <div className="flex flex-col items-center gap-5">
+        <div className="flex flex-col items-center gap-3">
           <PinPad
             disabled={sw.isPending}
-            resetKey={sw.failureCount}
+            resetKey={attempt}
+            error={sw.isError ? sw.error.message : null}
             onComplete={(pin) => sw.mutate({ id: target.id, pin })}
           />
-          <Button variant="ghost" size="sm" onClick={() => setTarget(null)}>
+          <Button variant="ghost" size="sm" onClick={() => (setTarget(null), sw.reset())}>
             Back
           </Button>
         </div>

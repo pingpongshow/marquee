@@ -166,6 +166,9 @@ func (s *Store) ByIDs(ctx context.Context, acc Access, ids []int64) ([]Summary, 
 func (s *Store) SetRating(ctx context.Context, uid, itemID int64, rating *float64) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO user_item_state(user_id, item_id, rating) VALUES (?, ?, ?)
 		ON CONFLICT(user_id, item_id) DO UPDATE SET rating = excluded.rating, disliked_at = CASE WHEN excluded.rating >= `+topRatingSQL+` THEN NULL ELSE disliked_at END, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`, uid, itemID, rating)
+	if err == nil && rating != nil && *rating >= topRating {
+		err = s.clearNotInterestedFromThumb(ctx, uid, itemID)
+	}
 	return err
 }
 

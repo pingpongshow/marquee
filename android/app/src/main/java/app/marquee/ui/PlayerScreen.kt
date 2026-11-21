@@ -54,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -577,6 +578,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                         Text(d?.let { if (it.type == ItemType.EPISODE) listOfNotNull(it.parentTitle, it.index?.let { i -> "E$i" }, it.title).joinToString(" · ") else it.title } ?: "",
                             color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                    // Thumbs up and down on the film, or an episode's show (USER-21): they steer what's suggested.
+                    if (roll < 0) detail?.let { VideoThumbs(it) }
                     if (local == null && roll < 0) IconButton({ if (group == null) together.start() else groupPanel = true; poke() }, Modifier.focusRing()) {
                         val g = group
                         if (g == null) Icon(Icons.Filled.Groups, "Watch together", tint = Color.White)
@@ -700,6 +703,27 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
 }
 
 /** A library video for the Up Next screen: an episode's show, season and number, or a film's year. */
+/**
+ * The player's thumbs up and down (USER-21), on the film or, for an episode, its show, whose
+ * own state is loaded for them. Nothing for other videos.
+ */
+@Composable
+private fun VideoThumbs(d: ItemDetail) {
+    val marquee = LocalMarquee.current
+    val showId = d.grandparentId?.takeIf { d.type == ItemType.EPISODE }
+    if (d.type != ItemType.MOVIE && showId == null) return
+    var show by remember(showId) { mutableStateOf<ItemDetail?>(null) }
+    LaunchedEffect(showId) {
+        if (showId != null) show = withContext(Dispatchers.IO) { runCatching { marquee.items.getItem(showId) }.getOrNull() }
+    }
+    val id = showId ?: d.id
+    val title = if (showId != null) d.grandparentTitle ?: d.title else d.title
+    val liked = if (showId != null) show?.liked else d.liked
+    val disliked = if (showId != null) show?.disliked else d.disliked
+    LikeButton(id, title, liked, Modifier.testTag("player-like"))
+    VideoDislikeButton(id, title, disliked, Modifier.testTag("player-dislike"))
+}
+
 @Composable
 private fun upNextEntry(d: ItemDetail?): UpNextEntry {
     val marquee = LocalMarquee.current

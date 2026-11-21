@@ -31,6 +31,8 @@ struct MainView: View {
     @State private var selection = "home"
     /// The signed-in profile's picture for the sidebar's profile entry (iPad, Apple TV).
     @State private var profileIcon = ProfileIcon()
+    /// When the app last went to the background (cleared once it's back).
+    @State private var backgroundedAt: Date?
     #if !os(tvOS)
     /// iPhone: the profiles, opened from the avatar on Home.
     @State private var showProfiles = false
@@ -135,6 +137,17 @@ struct MainView: View {
         // A rating request after a movie or episode ended (USER-19).
         .ratingPromptOverlay(active: linkedItem == nil)
         .onChange(of: scenePhase) { old, new in
+            // Away from the app (the TV turned off, another app): when it's back, Home, Continue
+            // Watching and any title page load again, since they may have been watched on another
+            // device meanwhile.
+            if new == .background { backgroundedAt = Date() }
+            if old != new, new == .active, let away = backgroundedAt {
+                backgroundedAt = nil
+                if Date().timeIntervalSince(away) > 10, app.client != nil, !app.isOffline {
+                    WatchStore.shared.serverMayHaveChanged()
+                    HomeChanges.shared.version += 1
+                }
+            }
             // Back in the app: anything that failed at launch (server unreachable) loads now,
             // and Live TV is checked again (a source may have lost its channels, LIVE-1).
             if old != new, new == .active { Task { await loadAll() } }
@@ -187,6 +200,10 @@ struct MainView: View {
             // player is presented from inside its cover.
             .fullScreenCover(item: $video.request) { req in
                 PlayerView(request: req)
+                    // A new player for each video: playing the next episode changes the request
+                    // while the cover is up, and the TV kept the last one's stopped player in it
+                    // (a spinner that never played).
+                    .id(req.id)
                     .environment(video)
             }
             .environment(video)
@@ -194,6 +211,7 @@ struct MainView: View {
         .fullScreenCover(item: Binding(get: { linkedItem == nil ? video.request : nil },
                                        set: { if linkedItem == nil { video.request = $0 } })) { req in
             PlayerView(request: req)
+                .id(req.id) // a new player for each video (see above)
                 .environment(video)
         }
         #if !os(tvOS)

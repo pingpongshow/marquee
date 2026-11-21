@@ -1434,11 +1434,31 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited the song or rated it 3.5 stars or more. */
+        /** Give a song, film or show your thumbs down (MUSIC-25, USER-21). A song: radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. A film or show: it's no longer suggested to you (it's marked Not interested too), though it stays in its library; an episode's goes on its show. It takes back your favourite, your thumbs up and a rating of 3.5 stars or more; giving any of them later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited it or rated it 3.5 stars or more. */
         put: operations["addDislike"];
         post?: never;
-        /** Take back your thumbs down on a song (MUSIC-25). */
+        /** Take back your thumbs down on a song, film or show (MUSIC-25, USER-21); an episode's goes to its show. */
         delete: operations["removeDislike"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Give a song, film or show your thumbs up (USER-21): you liked it, without making it a favourite. Films and shows you liked steer your recommendations, and songs your radios and mixes. It takes back your thumbs down; a thumbs down later takes it back. An episode's goes on its show. */
+        put: operations["addLike"];
+        post?: never;
+        /** Take back your thumbs up (USER-21); an episode's goes to its show. */
+        delete: operations["removeLike"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4182,6 +4202,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/playlists/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Combine playlists (MUSIC-29): yours, ones shared with you and smart ones (as they are now), in the order given, into a new playlist of yours or the end of one you have. They must all be music or all video. */
+        post: operations["mergePlaylists"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/playlists/{playlistId}/items": {
         parameters: {
             query?: never;
@@ -4192,7 +4229,8 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listPlaylistItems"];
-        put?: never;
+        /** Reorder and remove entries in one go (MUSIC-29): the entries listed stay, in that order, and the others you can see are removed. Entries in libraries you can't see stay, after the ones listed. Not for smart playlists. */
+        put: operations["setPlaylistItems"];
         /** Append items. Shows, seasons, artists and albums add their episodes or tracks. */
         post: operations["addPlaylistItems"];
         delete?: never;
@@ -7898,6 +7936,21 @@ export interface components {
             itemIds?: number[];
             rules?: components["schemas"]["SmartRules"];
         };
+        /** @description Which playlists to combine and where (MUSIC-29). Give intoId to add them to the end of one of your playlists, or a title for a new one. */
+        PlaylistMerge: {
+            sourceIds: number[];
+            /**
+             * Format: int64
+             * @description One of your playlists (not a smart one) to add them to the end of. Left out, a new playlist is made.
+             */
+            intoId?: number;
+            /** @description The new playlist's title; the first source's when left out. */
+            title?: string;
+            /** @description Leave out what's already in the playlist or came from an earlier source, so each song or video is in it once. */
+            skipDuplicates?: boolean;
+            /** @description Delete the sources afterwards (yours only: shared ones stay). */
+            deleteSources?: boolean;
+        };
         PlaylistItemPage: {
             items: components["schemas"]["PlaylistEntry"][];
             total: number;
@@ -8244,8 +8297,10 @@ export interface components {
             watchlisted?: boolean;
             /** @description One of the user's favourites (the heart). Absent or false when it isn't. */
             favorite?: boolean;
-            /** @description A song the user gave a thumbs down (MUSIC-25). Absent or false when they didn't. */
+            /** @description A song, film or show the user gave a thumbs down (MUSIC-25, USER-21). Absent or false when they didn't. */
             disliked?: boolean;
+            /** @description A song, film or show the user gave a thumbs up (USER-21). Absent or false when they didn't. */
+            liked?: boolean;
             /**
              * @description Set for extras (LIB-8).
              * @enum {string}
@@ -11660,6 +11715,57 @@ export interface operations {
         };
     };
     removeDislike: {
+        parameters: {
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addLike: {
+        parameters: {
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Added. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeLike: {
         parameters: {
             query?: {
                 /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
@@ -16341,6 +16447,33 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    mergePlaylists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistMerge"];
+            };
+        };
+        responses: {
+            /** @description The playlist they went into. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Playlist"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listPlaylistItems: {
         parameters: {
             query?: {
@@ -16364,6 +16497,37 @@ export interface operations {
                     "application/json": components["schemas"]["PlaylistItemPage"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setPlaylistItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    entryIds: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Playlist"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

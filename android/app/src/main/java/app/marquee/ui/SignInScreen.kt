@@ -93,7 +93,13 @@ fun SignInScreen() {
         TextButton(onClick = { marquee.forgetServer() }, Modifier.focusRing()) { Text("Use a different server", color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 
-    asking?.let { p ->
+    asking?.takeIf { it.requires == Profile.Requires.PIN }?.let { p ->
+        // A PIN: the compact pad, which signs in on the fourth digit.
+        PinPadDialog(p.displayName, marquee.absolute(p.avatarUrl), onDismiss = { asking = null }) { pin ->
+            runCatching { marquee.signInProfile(p.id, pin, null) }.exceptionOrNull()?.let(::pinError)
+        }
+    }
+    asking?.takeIf { it.requires != Profile.Requires.PIN }?.let { p ->
         SecretDialog(
             title = p.displayName,
             label = if (p.requires == Profile.Requires.PIN) "PIN" else "Password",

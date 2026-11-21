@@ -6,6 +6,8 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbDownOffAlt
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.ThumbUpOffAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -80,6 +82,72 @@ fun DislikeButton(id: Long, title: String, server: Boolean?, modifier: Modifier 
             if (on) "Take back the thumbs down on $title" else "Thumbs down on $title",
             Modifier.size(if (small) 18.dp else 24.dp),
             tint = if (on) Gold else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (small) 0.6f else 1f))
+    }
+}
+
+/**
+ * Gives or takes back a thumbs up (USER-21) on a song, film or show: shown at once everywhere (it
+ * takes back a thumbs down), then saved, or queued offline. A refusal undoes it with a toast.
+ */
+fun setThumbUp(marquee: Marquee, context: android.content.Context, id: Long, title: String, on: Boolean) {
+    val undo = marquee.dislikes.thumbsUp(id, on)
+    marquee.scope.launch {
+        if (!marquee.sync.saveShowing(marquee.sync.like(id, on))) {
+            undo()
+            toast(context, if (on) "Couldn't give “$title” a thumbs up" else "Couldn't take back the thumbs up on “$title”")
+        }
+    }
+}
+
+/**
+ * Gives or takes back a thumbs down (USER-21) on a film or show: it's no longer suggested,
+ * though it stays in its library. Songs go through the music player's own, which also moves a
+ * station on past them.
+ */
+fun setVideoThumbDown(marquee: Marquee, context: android.content.Context, id: Long, title: String, on: Boolean) {
+    val undo = marquee.dislikes.thumbsDown(id, on)
+    val heart = marquee.favorites.marks.value[id]
+    if (on) marquee.favorites.mark(id, false)
+    marquee.scope.launch {
+        if (!marquee.sync.saveShowing(marquee.sync.dislike(id, on))) {
+            undo()
+            if (on) { if (heart == null) marquee.favorites.forget(id) else marquee.favorites.mark(id, heart) }
+            toast(context, if (on) "Couldn't give “$title” a thumbs down" else "Couldn't take back the thumbs down on “$title”")
+        } else if (on) marquee.favorites.changed()
+    }
+}
+
+/**
+ * The thumbs up (USER-21): filled when given. It says the person liked it, without making it a
+ * favourite, and steers what's suggested to them. Made offline, it's queued to send later.
+ */
+@Composable
+fun LikeButton(id: Long, title: String, server: Boolean?, modifier: Modifier = Modifier, small: Boolean = false) {
+    val marquee = LocalMarquee.current
+    val context = LocalContext.current
+    val marks by marquee.dislikes.marks.collectAsState()
+    val on = marks.liked(id, server)
+    IconButton({ setThumbUp(marquee, context, id, title, !on) },
+        modifier.focusRing().then(if (small) Modifier.size(36.dp) else Modifier).semantics { stateDescription = if (on) "Thumbs up" else "No thumbs up" }) {
+        Icon(if (on) Icons.Filled.ThumbUp else Icons.Filled.ThumbUpOffAlt,
+            if (on) "Take back the thumbs up on $title" else "Thumbs up on $title",
+            Modifier.size(if (small) 18.dp else 24.dp),
+            tint = if (on) Gold else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (small) 0.6f else 1f))
+    }
+}
+
+/** The thumbs down on a film or show (USER-21), for the video player: filled when given. */
+@Composable
+fun VideoDislikeButton(id: Long, title: String, server: Boolean?, modifier: Modifier = Modifier) {
+    val marquee = LocalMarquee.current
+    val context = LocalContext.current
+    val marks by marquee.dislikes.marks.collectAsState()
+    val on = marks.disliked(id, server)
+    IconButton({ setVideoThumbDown(marquee, context, id, title, !on) },
+        modifier.focusRing().semantics { stateDescription = if (on) "Thumbs down" else "No thumbs down" }) {
+        Icon(if (on) Icons.Filled.ThumbDown else Icons.Filled.ThumbDownOffAlt,
+            if (on) "Take back the thumbs down on $title" else "Thumbs down on $title",
+            tint = if (on) Gold else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

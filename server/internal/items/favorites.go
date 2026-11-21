@@ -28,29 +28,136 @@ func (s *Store) SetFavorite(ctx context.Context, uid, itemID int64, on bool) err
 		_, err := s.db.ExecContext(ctx, `INSERT INTO user_item_state (user_id, item_id, favorite_at)
 			VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			ON CONFLICT(user_id, item_id) DO UPDATE SET favorite_at = COALESCE(favorite_at, excluded.favorite_at), disliked_at = NULL`, uid, itemID)
+		if err == nil {
+			err = s.clearNotInterestedFromThumb(ctx, uid, itemID)
+		}
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE user_item_state SET favorite_at = NULL WHERE user_id = ? AND item_id = ?`, uid, itemID)
 	return err
 }
 
-// ---------- Thumbs down (MUSIC-25) ----------
+// ---------- Thumbs down (MUSIC-25, USER-21) ----------
 //
-// A thumbs down is someone's mark on a song they don't like: radios and generated playlists
-// leave it out for them altogether, though it stays in its album and in playlists they made.
-// It takes back a favourite and a high rating, and giving either takes back the thumbs down.
+// A thumbs down is someone's mark on a song, film or show they don't like. A song: radios and
+// generated playlists leave it out for them altogether, though it stays in its album and in
+// playlists they made. A film or show: it's never suggested to them again (it's marked Not
+// interested too), though it stays in its library. It takes back a favourite, a thumbs up and
+// a high rating, and giving any of those takes back the thumbs down.
 
-// SetDisliked gives a song uid's thumbs down, or takes it back.
+// SetDisliked gives a song, film or show uid's thumbs down, or takes it back.
 func (s *Store) SetDisliked(ctx context.Context, uid, itemID int64, on bool) error {
 	if on {
 		_, err := s.db.ExecContext(ctx, `INSERT INTO user_item_state (user_id, item_id, disliked_at)
 			VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			ON CONFLICT(user_id, item_id) DO UPDATE SET disliked_at = COALESCE(disliked_at, excluded.disliked_at), favorite_at = NULL,
-				rating = CASE WHEN rating >= ? THEN NULL ELSE rating END`, uid, itemID, topRating)
+				liked_at = NULL, rating = CASE WHEN rating >= ? THEN NULL ELSE rating END`, uid, itemID, topRating)
+		if err == nil && s.isVideoTitle(ctx, itemID) {
+			err = s.SetNotInterested(ctx, uid, itemID, true)
+		}
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE user_item_state SET disliked_at = NULL WHERE user_id = ? AND item_id = ?`, uid, itemID)
+	if err == nil && s.isVideoTitle(ctx, itemID) {
+		err = s.SetNotInterested(ctx, uid, itemID, false)
+	}
 	return err
+}
+
+// isVideoTitle reports whether the item is a film or show (what a thumbs down keeps out of
+// suggestions by marking it Not interested).
+func (s *Store) isVideoTitle(ctx context.Context, itemID int64) bool {
+	var typ string
+	s.db.QueryRowContext(ctx, `SELECT type FROM items WHERE id = ?`, itemID).Scan(&typ)
+	return typ == "movie" || typ == "show"
+}
+
+// clearNotInterestedFromThumb takes back the Not interested a thumbs down made, when
+// something that likes the title (a heart, a thumbs up, a high rating) took the thumbs down
+// back. A Not interested made on its own, with no thumbs down, stays.
+func (s *Store) clearNotInterestedFromThumb(ctx context.Context, uid, itemID int64) error {
+	if !s.isVideoTitle(ctx, itemID) || !s.NotInterested(ctx, uid, itemID) {
+		return nil
+	}
+	var disliked bool
+	s.db.QueryRowContext(ctx, `SELECT disliked_at IS NOT NULL FROM user_item_state WHERE user_id = ? AND item_id = ?`, uid, itemID).Scan(&disliked)
+	if disliked {
+		return nil
+	}
+	return s.SetNotInterested(ctx, uid, itemID, false)
+}
+
+// ---------- Thumbs up (USER-21) ----------
+//
+// A thumbs up says someone liked a song, film or show, without making it a favourite: films
+// and shows they liked steer their recommendations, and songs their radios and mixes. It
+// takes back a thumbs down; a thumbs down takes it back.
+
+// SetLiked gives a song, film or show uid's thumbs up, or takes it back.
+func (s *Store) SetLiked(ctx context.Context, uid, itemID int64, on bool) error {
+	if !on {
+		_, err := s.db.ExecContext(ctx, `UPDATE user_item_state SET liked_at = NULL WHERE user_id = ? AND item_id = ?`, uid, itemID)
+		return err
+	}
+	var wasDisliked bool
+	s.db.QueryRowContext(ctx, `SELECT disliked_at IS NOT NULL FROM user_item_state WHERE user_id = ? AND item_id = ?`, uid, itemID).Scan(&wasDisliked)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO user_item_state (user_id, item_id, liked_at)
+		VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+		ON CONFLICT(user_id, item_id) DO UPDATE SET liked_at = COALESCE(liked_at, excluded.liked_at), disliked_at = NULL`, uid, itemID)
+	if err == nil && wasDisliked {
+		err = s.clearNotInterestedFromThumb(ctx, uid, itemID)
+	}
+	return err
+}
+
+// SetLikedAt is SetLiked for a change made at a given time (nil = now), which may be one made
+// offline and sent later (USER-18): it's ignored if a newer thumbs up or down was made since.
+func (s *Store) SetLikedAt(ctx context.Context, uid, itemID int64, on bool, at *time.Time) error {
+	fresh, err := s.Fresh(ctx, uid, itemID, "like", at)
+	if err != nil || !fresh {
+		return err
+	}
+	if on {
+		// A thumbs down made after this one stands.
+		if at != nil {
+			var newer bool
+			if err := s.db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM change_clock WHERE user_id = ? AND item_id = ? AND field = 'dislike' AND at > ?)`,
+				uid, itemID, at.UTC().Format(clockLayout)).Scan(&newer); err != nil {
+				return err
+			}
+			if newer {
+				return nil
+			}
+		}
+		if _, err := s.Fresh(ctx, uid, itemID, "dislike", at); err != nil {
+			return err
+		}
+	}
+	return s.SetLiked(ctx, uid, itemID, on)
+}
+
+// likedVideos is uid's thumbed-up movies and shows (most recent first), with the shows of
+// their thumbed-up episodes.
+func (s *Store) likedVideos(ctx context.Context, uid int64, limit int) ([]int64, error) {
+	var out []int64
+	if uid == 0 {
+		return out, nil
+	}
+	err := eachRow(ctx, s.db, `SELECT id FROM (
+			SELECT i.id AS id, x.liked_at AS at FROM user_item_state x JOIN items i ON i.id = x.item_id AND i.type IN ('movie', 'show')
+				WHERE x.user_id = ?1 AND x.liked_at IS NOT NULL AND i.extra_type IS NULL
+			UNION ALL
+			SELECT e.grandparent_id, x.liked_at FROM user_item_state x JOIN items e ON e.id = x.item_id AND e.type = 'episode'
+				WHERE x.user_id = ?1 AND x.liked_at IS NOT NULL AND e.grandparent_id IS NOT NULL)
+		GROUP BY id ORDER BY MAX(at) DESC LIMIT ?2`, []any{uid, limit}, func(r *sql.Rows) error {
+		var id int64
+		if err := r.Scan(&id); err != nil {
+			return err
+		}
+		out = append(out, id)
+		return nil
+	})
+	return out, err
 }
 
 // SetDislikedAt is SetDisliked for a change made at a given time (nil = now), which may be one

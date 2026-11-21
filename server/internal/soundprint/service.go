@@ -380,7 +380,7 @@ func (s *Service) Avoid(ctx context.Context, userID int64) map[int64]float64 {
 // then tracks played more than once or rated 4+ stars, most recent first (at most 2,000).
 func (s *Service) Liked(ctx context.Context, userID int64) []*Track {
 	rows, err := s.DB.QueryContext(ctx, `SELECT item_id FROM user_item_state
-		WHERE user_id = ? AND (favorite_at IS NOT NULL OR play_count > 1 OR rating >= 8 OR (play_count > 0 AND last_viewed_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-90 days')))
+		WHERE user_id = ? AND (favorite_at IS NOT NULL OR liked_at IS NOT NULL OR play_count > 1 OR rating >= 8 OR (play_count > 0 AND last_viewed_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-90 days')))
 		ORDER BY favorite_at IS NULL, favorite_at DESC, last_viewed_at DESC LIMIT 2000`, userID)
 	if err != nil {
 		return nil
@@ -879,7 +879,7 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 
 	// Rediscover: favourites (the heart, 4+ stars, or played 3+ times) not played for six months.
 	var old []*Track
-	rows, err = s.DB.QueryContext(ctx, `SELECT item_id FROM user_item_state WHERE user_id = ? AND (favorite_at IS NOT NULL OR rating >= 8 OR play_count >= 3)
+	rows, err = s.DB.QueryContext(ctx, `SELECT item_id FROM user_item_state WHERE user_id = ? AND (favorite_at IS NOT NULL OR liked_at IS NOT NULL OR rating >= 8 OR play_count >= 3)
 		AND (last_viewed_at IS NULL OR last_viewed_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days'))`, userID)
 	if err == nil {
 		for rows.Next() {

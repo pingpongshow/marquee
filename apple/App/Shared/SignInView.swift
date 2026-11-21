@@ -99,40 +99,67 @@ struct SignInView: View {
     private let avatarSize: CGFloat = 76
     #endif
 
-    private func pinSignIn(_ p: Schemas.Profile, pin: String?) async {
+    /// Signs in as the profile. A refused PIN's reason is returned for the PIN pad to show
+    /// (the page's own banner is behind its sheet); anything else shows on the page.
+    @discardableResult
+    private func pinSignIn(_ p: Schemas.Profile, pin: String?) async -> String? {
         busy = true
         defer { busy = false }
         do {
             try await app.pinSignIn(userID: p.id, pin: pin)
             chosen = nil
+            return nil
         } catch {
+            if pin != nil { return error.localizedDescription }
             self.error = error.localizedDescription
+            return nil
         }
     }
 }
 
 
+/// A profile's PIN: its picture and name in a row above a compact keypad, in a sheet only as
+/// tall as it needs. A refused PIN shows why on the pad and it's ready for the next try.
 struct PinEntry: View {
     @Environment(\.dismiss) private var dismiss
     let profile: Schemas.Profile
-    let submit: (String) async -> Void
+    /// Sends the PIN; returns why it was refused, or nil.
+    let submit: (String) async -> String?
     @State private var busy = false
+    @State private var error: String?
+    @State private var failures = 0
+
     var body: some View {
-        VStack(spacing: 24) {
-            AvatarView(name: profile.displayName, url: profile.avatarUrl, size: 80)
-            Text("Enter \(profile.displayName)'s PIN").font(.title3.bold())
-            PinPad(disabled: busy) { pin in
+        VStack(spacing: isTV ? 30 : 18) {
+            HStack(spacing: 12) {
+                AvatarView(name: profile.displayName, url: profile.avatarUrl, size: isTV ? 72 : 40)
+                Text(profile.displayName).font(isTV ? .title2.bold() : .headline).lineLimit(1)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Enter \(profile.displayName)'s PIN")
+            PinPad(disabled: busy, error: error, failures: failures) { pin in
                 busy = true
-                Task { await submit(pin); busy = false }
+                error = nil
+                Task {
+                    let refused = await submit(pin)
+                    busy = false
+                    if let refused {
+                        error = refused
+                        failures += 1
+                    }
+                }
             }
             #if os(macOS)
-            // A Mac's sheet has no swipe to close it.
+            // A Mac's sheet has no swipe to close it (the TV's Back closes it).
             Button("Cancel", role: .cancel) { dismiss() }
                 .keyboardShortcut(.cancelAction)
             #endif
         }
-        .padding(32)
-        .presentationDetents([.medium, .large])
+        .padding(isTV ? 50 : 24)
+        #if os(iOS)
+        .presentationDetents([.height(440)])
+        .presentationDragIndicator(.visible)
+        #endif
     }
 }
 

@@ -33,7 +33,9 @@ import type {
 } from "@/api/types";
 import { Spinner } from "@/components/ui";
 import { languageName, versionLabel } from "../browse/format";
+import { isFullscreen, onFullscreenChange, toggleFullscreen } from "@/lib/fullscreen";
 import { ignoreShortcut } from "@/lib/keys";
+import { Thumbs } from "../music/Rating";
 import { cueCss, placeCues, resolveSubtitleStyle } from "@/lib/subtitleStyle";
 import { deviceProfile, prefersNativeHLS } from "./deviceProfile";
 import { SubtitleSearchDialog } from "./SubtitleSearch";
@@ -624,10 +626,8 @@ export function VideoPlayer({
     if (el)
       el.currentTime = Math.max(0, Math.min(el.currentTime + d, duration - 1));
   };
-  const goFullscreen = () => {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else document.getElementById("player-root")?.requestFullscreen();
-  };
+  // The player full screen; on iPhone, where only a video can be, the system's player.
+  const goFullscreen = () => toggleFullscreen(document.getElementById("player-root"), videoRef.current);
   const playNext = useCallback(() => {
     if (!next) return;
     leavingForNext.current = true;
@@ -668,7 +668,7 @@ export function VideoPlayer({
           el.muted = !el.muted;
           break;
         case "Escape":
-          if (!document.fullscreenElement)
+          if (!isFullscreen(videoRef.current))
             navigate({
               to: "/item/$itemId",
               params: { itemId: String(preroll?.movieId ?? itemId) },
@@ -677,11 +677,10 @@ export function VideoPlayer({
       poke();
     };
     window.addEventListener("keydown", onKey);
-    const onFs = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onFs);
+    const offFs = onFullscreenChange(videoRef.current, () => setFullscreen(isFullscreen(videoRef.current)));
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.removeEventListener("fullscreenchange", onFs);
+      offFs();
     };
   });
 
@@ -1042,6 +1041,7 @@ export function VideoPlayer({
               )}
             </button>
             )}
+            {d && !preroll && <VideoThumbs item={d} />}
             <button
               onClick={() => setMenu(menu === "info" ? null : "info")}
               className="rounded-full p-2 hover:bg-white/10"
@@ -1531,3 +1531,25 @@ function PreviewThumb({
 }
 
 export type { ItemDetail };
+
+/**
+ * Thumbs up and down for the film, or an episode's show (USER-21): what's liked steers
+ * suggestions, and what's given a thumbs down isn't suggested again (it stays in its library).
+ */
+function VideoThumbs({ item }: { item: { id: number; type: string; title: string; grandparentId?: number; grandparentTitle?: string; liked?: boolean; disliked?: boolean } }) {
+  const show = item.type === "episode" && item.grandparentId ? item.grandparentId : null;
+  const showItem = useQuery({ ...itemQuery(show ?? 0), enabled: show !== null });
+  if (item.type !== "movie" && !show) return null;
+  const target = show ? showItem.data : item;
+  if (!target) return null;
+  return (
+    <Thumbs
+      key={target.id}
+      itemId={target.id}
+      title={show ? (item.grandparentTitle ?? target.title) : item.title}
+      liked={target.liked}
+      disliked={target.disliked}
+      buttonClassName="hover:bg-white/10"
+    />
+  );
+}

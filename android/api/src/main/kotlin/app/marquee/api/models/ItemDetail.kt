@@ -76,7 +76,8 @@ import kotlinx.serialization.Contextual
  * @param userRating The user's rating, 0–10 (10 = loved).
  * @param watchlisted On the user's watchlist (USER-8).
  * @param favorite One of the user's favourites (the heart). Absent or false when it isn't.
- * @param disliked A song the user gave a thumbs down (MUSIC-25). Absent or false when they didn't.
+ * @param disliked A song, film or show the user gave a thumbs down (MUSIC-25, USER-21). Absent or false when they didn't.
+ * @param liked A song, film or show the user gave a thumbs up (USER-21). Absent or false when they didn't.
  * @param extraType Set for extras (LIB-8).
  * @param releaseType Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
  * @param audioFormat 
@@ -214,9 +215,13 @@ data class ItemDetail (
     @SerialName(value = "favorite")
     val favorite: kotlin.Boolean? = null,
 
-    /* A song the user gave a thumbs down (MUSIC-25). Absent or false when they didn't. */
+    /* A song, film or show the user gave a thumbs down (MUSIC-25, USER-21). Absent or false when they didn't. */
     @SerialName(value = "disliked")
     val disliked: kotlin.Boolean? = null,
+
+    /* A song, film or show the user gave a thumbs up (USER-21). Absent or false when they didn't. */
+    @SerialName(value = "liked")
+    val liked: kotlin.Boolean? = null,
 
     /* Set for extras (LIB-8). */
     @SerialName(value = "extraType")

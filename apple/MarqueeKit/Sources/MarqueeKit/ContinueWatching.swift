@@ -93,7 +93,7 @@ public extension ContinueEntry {
     }
 
     /// The show an episode belongs to (library or on demand), as "lib:<id>" / "vod:<id>".
-    private var showKey: String? {
+    var showKey: String? {
         if let item, item._type == .episode, let show = item.grandparentId { return "lib:\(show)" }
         if let e = vodEpisode { return "vod:\(e.seriesId)" }
         return nil
@@ -106,4 +106,25 @@ public extension ContinueEntry {
         guard let show = showKey else { return false }
         return other.showKey == show
     }
+}
+
+public extension Array where Element == ContinueEntry {
+    /// Ids for the row's tiles that stay the same when a show moves on to its next episode
+    /// (the show's, when it's in the row once). On the TV the tile that had the focus then
+    /// stays where it is and plays the new episode: one swapped for another under the focus
+    /// looked focused but did nothing until the focus moved off it and back.
+    func stableIDs() -> [ContinueRowEntry] {
+        var shows: [String: Int] = [:]
+        for e in self { if let s = e.showKey { shows[s, default: 0] += 1 } }
+        return map { e in
+            if let s = e.showKey, shows[s] == 1 { return ContinueRowEntry(id: "show:" + s, entry: e) }
+            return ContinueRowEntry(id: e.key, entry: e)
+        }
+    }
+}
+
+/// A Continue Watching entry with its tile's id (see `stableIDs`).
+public struct ContinueRowEntry: Identifiable {
+    public let id: String
+    public let entry: ContinueEntry
 }

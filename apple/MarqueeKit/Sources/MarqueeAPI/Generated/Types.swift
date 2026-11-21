@@ -549,16 +549,26 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /items/{itemId}/watchlist`.
     /// - Remark: Generated from `#/paths//items/{itemId}/watchlist/delete(removeFromWatchlist)`.
     func removeFromWatchlist(_ input: Operations.RemoveFromWatchlist.Input) async throws -> Operations.RemoveFromWatchlist.Output
-    /// Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited the song or rated it 3.5 stars or more.
+    /// Give a song, film or show your thumbs down (MUSIC-25, USER-21). A song: radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. A film or show: it's no longer suggested to you (it's marked Not interested too), though it stays in its library; an episode's goes on its show. It takes back your favourite, your thumbs up and a rating of 3.5 stars or more; giving any of them later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited it or rated it 3.5 stars or more.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/dislike`.
     /// - Remark: Generated from `#/paths//items/{itemId}/dislike/put(addDislike)`.
     func addDislike(_ input: Operations.AddDislike.Input) async throws -> Operations.AddDislike.Output
-    /// Take back your thumbs down on a song (MUSIC-25).
+    /// Take back your thumbs down on a song, film or show (MUSIC-25, USER-21); an episode's goes to its show.
     ///
     /// - Remark: HTTP `DELETE /items/{itemId}/dislike`.
     /// - Remark: Generated from `#/paths//items/{itemId}/dislike/delete(removeDislike)`.
     func removeDislike(_ input: Operations.RemoveDislike.Input) async throws -> Operations.RemoveDislike.Output
+    /// Give a song, film or show your thumbs up (USER-21): you liked it, without making it a favourite. Films and shows you liked steer your recommendations, and songs your radios and mixes. It takes back your thumbs down; a thumbs down later takes it back. An episode's goes on its show.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/like`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/like/put(addLike)`.
+    func addLike(_ input: Operations.AddLike.Input) async throws -> Operations.AddLike.Output
+    /// Take back your thumbs up (USER-21); an episode's goes to its show.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/like`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/like/delete(removeLike)`.
+    func removeLike(_ input: Operations.RemoveLike.Input) async throws -> Operations.RemoveLike.Output
     /// Make a movie, show, episode, song, album or artist one of your favourites (the heart). Favourites are yours alone (a managed profile has its own); recommendations, Muse, radios and mixes weight them above star ratings.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/favorite`.
@@ -1429,6 +1439,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /me/playlist-shares/{playlistId}`.
     /// - Remark: Generated from `#/paths//me/playlist-shares/{playlistId}/delete(removePlaylistShare)`.
     func removePlaylistShare(_ input: Operations.RemovePlaylistShare.Input) async throws -> Operations.RemovePlaylistShare.Output
+    /// Combine playlists (MUSIC-29): yours, ones shared with you and smart ones (as they are now), in the order given, into a new playlist of yours or the end of one you have. They must all be music or all video.
+    ///
+    /// - Remark: HTTP `POST /playlists/merge`.
+    /// - Remark: Generated from `#/paths//playlists/merge/post(mergePlaylists)`.
+    func mergePlaylists(_ input: Operations.MergePlaylists.Input) async throws -> Operations.MergePlaylists.Output
     /// - Remark: HTTP `GET /playlists/{playlistId}/items`.
     /// - Remark: Generated from `#/paths//playlists/{playlistId}/items/get(listPlaylistItems)`.
     func listPlaylistItems(_ input: Operations.ListPlaylistItems.Input) async throws -> Operations.ListPlaylistItems.Output
@@ -1437,6 +1452,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /playlists/{playlistId}/items`.
     /// - Remark: Generated from `#/paths//playlists/{playlistId}/items/post(addPlaylistItems)`.
     func addPlaylistItems(_ input: Operations.AddPlaylistItems.Input) async throws -> Operations.AddPlaylistItems.Output
+    /// Reorder and remove entries in one go (MUSIC-29): the entries listed stay, in that order, and the others you can see are removed. Entries in libraries you can't see stay, after the ones listed. Not for smart playlists.
+    ///
+    /// - Remark: HTTP `PUT /playlists/{playlistId}/items`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/items/put(setPlaylistItems)`.
+    func setPlaylistItems(_ input: Operations.SetPlaylistItems.Input) async throws -> Operations.SetPlaylistItems.Output
     /// Move an entry to just after another one (or to the top when afterEntryId is absent).
     ///
     /// - Remark: HTTP `PATCH /playlists/{playlistId}/items/{entryId}`.
@@ -2936,7 +2956,7 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Give a song your thumbs down (MUSIC-25). Radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. It takes back your favourite and a rating of 3.5 stars or more; giving either later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited the song or rated it 3.5 stars or more.
+    /// Give a song, film or show your thumbs down (MUSIC-25, USER-21). A song: radios and generated playlists leave it out for you from then on, though it stays in its album and in playlists you made. A film or show: it's no longer suggested to you (it's marked Not interested too), though it stays in its library; an episode's goes on its show. It takes back your favourite, your thumbs up and a rating of 3.5 stars or more; giving any of them later takes back the thumbs down. One made offline and sent later is ignored if you've since favourited it or rated it 3.5 stars or more.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/dislike`.
     /// - Remark: Generated from `#/paths//items/{itemId}/dislike/put(addDislike)`.
@@ -2951,7 +2971,7 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Take back your thumbs down on a song (MUSIC-25).
+    /// Take back your thumbs down on a song, film or show (MUSIC-25, USER-21); an episode's goes to its show.
     ///
     /// - Remark: HTTP `DELETE /items/{itemId}/dislike`.
     /// - Remark: Generated from `#/paths//items/{itemId}/dislike/delete(removeDislike)`.
@@ -2961,6 +2981,36 @@ extension APIProtocol {
         headers: Operations.RemoveDislike.Input.Headers = .init()
     ) async throws -> Operations.RemoveDislike.Output {
         try await removeDislike(Operations.RemoveDislike.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Give a song, film or show your thumbs up (USER-21): you liked it, without making it a favourite. Films and shows you liked steer your recommendations, and songs your radios and mixes. It takes back your thumbs down; a thumbs down later takes it back. An episode's goes on its show.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/like`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/like/put(addLike)`.
+    public func addLike(
+        path: Operations.AddLike.Input.Path,
+        query: Operations.AddLike.Input.Query = .init(),
+        headers: Operations.AddLike.Input.Headers = .init()
+    ) async throws -> Operations.AddLike.Output {
+        try await addLike(Operations.AddLike.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Take back your thumbs up (USER-21); an episode's goes to its show.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/like`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/like/delete(removeLike)`.
+    public func removeLike(
+        path: Operations.RemoveLike.Input.Path,
+        query: Operations.RemoveLike.Input.Query = .init(),
+        headers: Operations.RemoveLike.Input.Headers = .init()
+    ) async throws -> Operations.RemoveLike.Output {
+        try await removeLike(Operations.RemoveLike.Input(
             path: path,
             query: query,
             headers: headers
@@ -5098,6 +5148,19 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Combine playlists (MUSIC-29): yours, ones shared with you and smart ones (as they are now), in the order given, into a new playlist of yours or the end of one you have. They must all be music or all video.
+    ///
+    /// - Remark: HTTP `POST /playlists/merge`.
+    /// - Remark: Generated from `#/paths//playlists/merge/post(mergePlaylists)`.
+    public func mergePlaylists(
+        headers: Operations.MergePlaylists.Input.Headers = .init(),
+        body: Operations.MergePlaylists.Input.Body
+    ) async throws -> Operations.MergePlaylists.Output {
+        try await mergePlaylists(Operations.MergePlaylists.Input(
+            headers: headers,
+            body: body
+        ))
+    }
     /// - Remark: HTTP `GET /playlists/{playlistId}/items`.
     /// - Remark: Generated from `#/paths//playlists/{playlistId}/items/get(listPlaylistItems)`.
     public func listPlaylistItems(
@@ -5121,6 +5184,21 @@ extension APIProtocol {
         body: Operations.AddPlaylistItems.Input.Body
     ) async throws -> Operations.AddPlaylistItems.Output {
         try await addPlaylistItems(Operations.AddPlaylistItems.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Reorder and remove entries in one go (MUSIC-29): the entries listed stay, in that order, and the others you can see are removed. Entries in libraries you can't see stay, after the ones listed. Not for smart playlists.
+    ///
+    /// - Remark: HTTP `PUT /playlists/{playlistId}/items`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/items/put(setPlaylistItems)`.
+    public func setPlaylistItems(
+        path: Operations.SetPlaylistItems.Input.Path,
+        headers: Operations.SetPlaylistItems.Input.Headers = .init(),
+        body: Operations.SetPlaylistItems.Input.Body
+    ) async throws -> Operations.SetPlaylistItems.Output {
+        try await setPlaylistItems(Operations.SetPlaylistItems.Input(
             path: path,
             headers: headers,
             body: body

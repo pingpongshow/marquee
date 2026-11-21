@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { clsx } from "clsx";
-import { ChevronRight, Folder, FolderInput, FolderPlus, ListMusic, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Combine, Folder, FolderInput, FolderPlus, ListMusic, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import { playlistFoldersQuery, playlistsQuery } from "@/api/queries";
@@ -12,6 +12,7 @@ import { PlaylistMosaic } from "./PlaylistMosaic";
 import { defaultRules, RulesEditor, rulesValid } from "./RulesEditor";
 import { PlaylistInvites, SharedIcon, sharedByText } from "./Sharing";
 import { DeleteFolderDialog, FolderNameDialog, MoveToFolderDialog } from "./Folders";
+import { CombinePlaylistsDialog } from "./Combine";
 import type { SmartRules } from "@/api/types";
 
 function NewPlaylistDialog({ folderId, onClose }: { folderId?: number; onClose: () => void }) {
@@ -128,6 +129,7 @@ export function PlaylistsPage() {
   const [naming, setNaming] = useState<"new" | "rename" | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [moving, setMoving] = useState<Playlist | null>(null);
+  const [combining, setCombining] = useState(false);
   const lists = useQuery(playlistsQuery(tab === "all" ? undefined : tab));
   const folders = useQuery(playlistFoldersQuery());
   const openFolder = (id?: number) => navigate({ to: "/playlists", search: id ? { folder: id } : {} });
@@ -175,6 +177,9 @@ export function PlaylistsPage() {
               <FolderPlus className="size-4" /> New folder
             </Button>
           )}
+          <Button size="sm" variant="ghost" onClick={() => setCombining(true)} disabled={(lists.data?.length ?? 0) < 2} data-testid="combine-playlists">
+            <Combine className="size-4" /> Combine playlists
+          </Button>
           <Button size="sm" variant="primary" onClick={() => setCreating(true)}>
             <Plus className="size-4" /> New playlist
           </Button>
@@ -208,6 +213,7 @@ export function PlaylistsPage() {
       {naming && <FolderNameDialog folder={naming === "rename" ? folder : undefined} onClose={() => setNaming(null)} />}
       {deleting && folder && <DeleteFolderDialog folder={folder} onClose={() => setDeleting(false)} onDeleted={() => openFolder()} />}
       {moving && <MoveToFolderDialog playlist={moving} onClose={() => setMoving(null)} />}
+      {combining && <CombinePlaylistsDialog onClose={() => setCombining(false)} />}
     </div>
   );
 }

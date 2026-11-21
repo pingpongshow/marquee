@@ -6,6 +6,7 @@ import { api, onTimeLimit, unwrap } from "@/api/client";
 import { toast } from "@/components/Toast";
 import { Button } from "@/components/ui";
 import { formatMinutes } from "@/features/users/timeLimits";
+import { exitFullscreen } from "@/lib/fullscreen";
 
 /** The signed-in person's time limit today (kids' profiles). */
 export const timeLimitQuery = queryOptions({
@@ -33,7 +34,7 @@ export function showTimeUp(reason: string) {
   if (Date.now() - closedAt < 10_000) return;
   shown = reason || "Time's up for today";
   document.querySelectorAll("video").forEach((v) => v.pause());
-  if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+  exitFullscreen(document.querySelector("video"));
   emit();
 }
 

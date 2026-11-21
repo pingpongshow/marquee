@@ -89,6 +89,25 @@ struct PendingQueueTests {
         #expect(waiting(9) == nil)
     }
 
+    @Test func aThumbsUpAndDownTakeEachOtherBack() {
+        var q = PendingQueue()
+        func up() -> Bool? { q.like(item: 7, server: "a", user: 1) }
+        func down() -> Bool? { q.dislike(item: 7, server: "a", user: 1) }
+        #expect(up() == nil)
+        q.add(tagged(.like(7, true), at: 1))
+        #expect(up() == true)
+        #expect(down() == false)
+        q.add(tagged(.dislike(7, true), at: 2))
+        #expect(up() == false)
+        #expect(down() == true)
+        q.add(tagged(.like(7, true), at: 3))
+        #expect(up() == true)
+        #expect(down() == false)
+        // Taking back a thumbs down leaves the thumbs up alone.
+        q.add(tagged(.dislike(7, false), at: 4))
+        #expect(up() == true)
+    }
+
     @Test func sendsInTheOrderChangesWereMade() {
         var q = PendingQueue()
         q.add(tagged(.watched(1, true), at: 1))

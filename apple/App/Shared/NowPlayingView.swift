@@ -498,12 +498,12 @@ struct NowPlayingView: View {
             // Stars and the menus on one row when they fit, otherwise on two.
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 18) {
-                    HStack(spacing: 10) { favorite(t); dislike(t); RatingStars(itemID: t.id, rating: t.userRating).id(t.id) }
+                    HStack(spacing: 10) { favorite(t); like(t); dislike(t); RatingStars(itemID: t.id, rating: t.userRating).id(t.id) }
                     Spacer(minLength: 8)
                     actionMenus(t)
                 }
                 VStack(spacing: 12) {
-                    HStack(spacing: 10) { favorite(t); dislike(t); RatingStars(itemID: t.id, rating: t.userRating).id(t.id) }
+                    HStack(spacing: 10) { favorite(t); like(t); dislike(t); RatingStars(itemID: t.id, rating: t.userRating).id(t.id) }
                     actionMenus(t)
                 }
             }
@@ -513,6 +513,7 @@ struct NowPlayingView: View {
             #else
             HStack(spacing: 24) {
                 favorite(t)
+                like(t)
                 dislike(t)
                 addToPlaylist(t)
                 Button { panel = panel == .lyrics ? .queue : .lyrics } label: {
@@ -541,6 +542,16 @@ struct NowPlayingView: View {
         RowFavorite(item: t, size: 30, identifier: "np.favorite")
         #else
         RowFavorite(item: t, size: 22, identifier: "np.favorite")
+        #endif
+    }
+
+    /// The playing song's thumbs up (USER-21): liked, which steers radios and mixes, without
+    /// making it a favourite. Identified by the song so a press lands on it.
+    private func like(_ t: Item) -> some View {
+        #if os(tvOS)
+        RowLike(item: t, size: 30, identifier: "np.like").id(t.id)
+        #else
+        RowLike(item: t, size: 22, identifier: "np.like").id(t.id)
         #endif
     }
 

@@ -518,7 +518,7 @@ func (s *Service) museFilters(ctx context.Context, userID int64, q MusicQuery) M
 		for _, t := range s.Liked(ctx, userID) {
 			f.Liked[t.ItemID] = true
 		}
-		f.Old = ids(`SELECT item_id FROM user_item_state WHERE user_id = ? AND (favorite_at IS NOT NULL OR rating >= 8 OR play_count >= 3)
+		f.Old = ids(`SELECT item_id FROM user_item_state WHERE user_id = ? AND (favorite_at IS NOT NULL OR liked_at IS NOT NULL OR rating >= 8 OR play_count >= 3)
 			AND (last_viewed_at IS NULL OR last_viewed_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days'))`, userID)
 	}
 	if q.LikeFavourites {

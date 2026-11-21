@@ -28,6 +28,7 @@ import { MusicProvider } from "@/features/player/MusicPlayer";
 import { PlayerPage } from "@/features/player/PlayerPage";
 import { InTownPage } from "@/features/music/InTown";
 import { TopSongsPage } from "@/features/music/TopSongs";
+import { PlaylistEditorPage } from "@/features/playlists/PlaylistEditor";
 import { PlaylistPage } from "@/features/playlists/PlaylistPage";
 import { PlaylistsPage } from "@/features/playlists/PlaylistsPage";
 import { MoodStylePage } from "@/features/music/MoodStylePage";
@@ -245,6 +246,12 @@ const playlistRoute = createRoute({
   path: "/playlist/$playlistId",
   component: PlaylistPage,
 });
+// The full playlist editor (MUSIC-29).
+const playlistEditRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/playlist/$playlistId/edit",
+  component: PlaylistEditorPage,
+});
 export type LiveTab = "guide" | "now" | "recordings";
 const liveTvRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -408,6 +415,7 @@ const routeTree = rootRoute.addChildren([
   recapRoute,
   playlistsRoute,
   playlistRoute,
+  playlistEditRoute,
   personRoute,
   linkRoute,
   joinRoute,

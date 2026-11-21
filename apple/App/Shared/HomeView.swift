@@ -24,6 +24,9 @@ struct HomeView: View {
     #endif
     /// Counts loads, so an older one finishing late doesn't put back rows a newer one changed.
     @State private var loads = 0
+    /// When the rows last came from the server: Home open a while loads them again, so what
+    /// was watched on another device shows (Continue Watching, progress, watched marks).
+    @State private var loadedAt = Date.distantPast
 
     var body: some View {
         ScrollView {
@@ -80,7 +83,8 @@ struct HomeView: View {
                         // the TV it stands in for the See all tile, which goes to the same page).
                         let more = (hub.total ?? 0) > entries.count
                         ShelfRow(title: hub.title, seeAll: isTV && more ? nil : seeAll(hub), seeAllSize: seeAllSize(hub)) {
-                            ForEach(entries, id: \.key) { e in
+                            ForEach(entries.stableIDs(), id: \.id) { row in
+                                let e = row.entry
                                 ContinueEntryTile(entry: e, onRemove: { removeFromContinue(e) }, playVod: playVod)
                             }
                             if more, let total = hub.total { ContinueViewMoreTile(total: total) }
@@ -160,6 +164,7 @@ struct HomeView: View {
                     let me = app.me?.id
                     let fresh = ((try? await app.watchGroups()) ?? []).filter { !$0.members.contains { $0.userId == me } }
                     if fresh != groups { groups = fresh }
+                    if loaded, Date().timeIntervalSince(loadedAt) > 120 { await load() }
                 }
                 try? await Task.sleep(for: .seconds(15))
             }
@@ -296,7 +301,10 @@ struct HomeView: View {
                     && !($0.mixedEntries?.isEmpty == true && $0.items.isEmpty)
             }
             guard load == loads else { return }
-            hubs = fresh
+            // Set only when they changed: setting them redraws every row (and on the TV would
+            // move the focus on a refresh nobody asked for).
+            if fresh != hubs { hubs = fresh }
+            loadedAt = Date()
             error = nil
             #if os(tvOS)
             if let lists = try? await app.playlists(kind: .video) { videoPlaylists = lists }

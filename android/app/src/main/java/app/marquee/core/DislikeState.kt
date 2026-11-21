@@ -4,10 +4,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The thumbs down on songs (MUSIC-25) as this device last set it, and what it does to ratings,
- * shown at once in every view before the server's lists catch up. A thumbs down clears a rating
- * of 3.5 stars or more; a rating of 3.5 or more (or a favourite) clears the thumbs down. The heart
- * follows through [FavoriteState].
+ * The thumbs down on songs (MUSIC-25), and the thumbs up and down on songs, films and shows
+ * (USER-21), as this device last set them, and what they do to ratings, shown at once in every
+ * view before the server's lists catch up. A thumbs down clears a rating of 3.5 stars or more and
+ * a thumbs up; a rating of 3.5 or more (or a favourite, or a thumbs up) clears the thumbs down.
+ * The heart follows through [FavoriteState].
  */
 class DislikeState {
     /** This device's changes, over what a list or page last had from the server. */
@@ -16,8 +17,11 @@ class DislikeState {
         val ratings: Map<Long, Double?> = emptyMap(),
         /** Thumbs downs given here: any rating of 3.5 or more that a list still has is gone. */
         val highCleared: Set<Long> = emptySet(),
+        /** Thumbs ups given or taken back here (USER-21). */
+        val likes: Map<Long, Boolean> = emptyMap(),
     ) {
         fun disliked(id: Long, server: Boolean?): Boolean = dislikes[id] ?: (server == true)
+        fun liked(id: Long, server: Boolean?): Boolean = likes[id] ?: (server == true)
 
         /** The rating to show for [id], where a list or page has [shown]. */
         fun rating(id: Long, shown: Double?): Double? {
@@ -25,7 +29,10 @@ class DislikeState {
             return if (id in highCleared) r?.takeIf { it < TOP_RATING } else r
         }
 
-        fun thumbsDown(id: Long, on: Boolean) = copy(dislikes = dislikes + (id to on), highCleared = if (on) highCleared + id else highCleared)
+        fun thumbsDown(id: Long, on: Boolean) = copy(dislikes = dislikes + (id to on), highCleared = if (on) highCleared + id else highCleared,
+            likes = if (on) likes + (id to false) else likes)
+
+        fun thumbsUp(id: Long, on: Boolean) = copy(likes = likes + (id to on), dislikes = if (on) dislikes + (id to false) else dislikes)
 
         fun rated(id: Long, rating: Double?) = copy(
             dislikes = if (rating != null && rating >= TOP_RATING) dislikes + (id to false) else dislikes,
@@ -40,6 +47,7 @@ class DislikeState {
             if (id in from.dislikes) dislikes + (id to from.dislikes.getValue(id)) else dislikes - id,
             if (id in from.ratings) ratings + (id to from.ratings[id]) else ratings - id,
             if (id in from.highCleared) highCleared + id else highCleared - id,
+            if (id in from.likes) likes + (id to from.likes.getValue(id)) else likes - id,
         )
     }
 
@@ -49,6 +57,7 @@ class DislikeState {
     // Each returns what undoes it, for a change the server refuses.
 
     fun thumbsDown(id: Long, on: Boolean): () -> Unit = change(id) { it.thumbsDown(id, on) }
+    fun thumbsUp(id: Long, on: Boolean): () -> Unit = change(id) { it.thumbsUp(id, on) }
     fun rated(id: Long, rating: Double?): () -> Unit = change(id) { it.rated(id, rating) }
     fun favourited(id: Long): () -> Unit = change(id) { it.favourited(id) }
 
@@ -56,8 +65,10 @@ class DislikeState {
     @Synchronized fun showWaiting(waiting: List<PendingChange>) {
         val marks = _marks.value
         val add = waitingDislikes(waiting).filterKeys { it !in marks.dislikes }
-        if (add.isEmpty()) return
-        _marks.value = add.entries.fold(marks) { m, (id, on) -> m.thumbsDown(id, on) }
+        val likes = waitingLikes(waiting).filterKeys { it !in marks.likes && it !in add }
+        if (add.isEmpty() && likes.isEmpty()) return
+        val withLikes = likes.entries.fold(marks) { m, (id, on) -> m.thumbsUp(id, on) }
+        _marks.value = add.entries.fold(withLikes) { m, (id, on) -> m.thumbsDown(id, on) }
     }
 
     /** Another profile's marks mean nothing to the next one. */
@@ -81,8 +92,19 @@ class DislikeState {
             val out = HashMap<Long, Boolean>()
             for (c in changes.sortedBy { it.seq }) when {
                 c.kind == PendingChange.Kind.Dislike -> out[c.item] = c.on
+                c.kind == PendingChange.Kind.Like && c.on && c.item in out -> out[c.item] = false
                 c.kind == PendingChange.Kind.Favorite && c.on && c.item in out -> out[c.item] = false
                 c.kind == PendingChange.Kind.Rating && (c.rating ?: 0.0) >= TOP_RATING && c.item in out -> out[c.item] = false
+            }
+            return out
+        }
+
+        /** What waiting changes leave of each thumbs up (USER-21): a later thumbs down takes it back. */
+        fun waitingLikes(changes: List<PendingChange>): Map<Long, Boolean> {
+            val out = HashMap<Long, Boolean>()
+            for (c in changes.sortedBy { it.seq }) when {
+                c.kind == PendingChange.Kind.Like -> out[c.item] = c.on
+                c.kind == PendingChange.Kind.Dislike && c.on && c.item in out -> out[c.item] = false
             }
             return out
         }

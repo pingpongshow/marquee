@@ -21,6 +21,7 @@ import {
   SkipForward,
   Star,
   ThumbsDown,
+  ThumbsUp,
   Volume2,
   X,
 } from "lucide-react";
@@ -301,7 +302,7 @@ export function MiniPlayer() {
 function useFreshTrack(item: ItemSummary): ItemSummary {
   const fresh = useQuery(itemQuery(item.id)).data;
   // They're left out when unset, so a cleared rating, heart or thumbs down mustn't fall back to the snapshot.
-  return fresh ? { ...item, favorite: fresh.favorite, userRating: fresh.userRating, disliked: fresh.disliked } : item;
+  return fresh ? { ...item, favorite: fresh.favorite, userRating: fresh.userRating, disliked: fresh.disliked, liked: fresh.liked } : item;
 }
 
 /** The queue row of the playing track, whose heart can be changed from the bar or Now Playing. */
@@ -345,7 +346,7 @@ const BarTrackActions = memo(function BarTrackActions({ item }: { item: ItemSumm
   const t = useFreshTrack(item);
   // The track the dialog opened for, even if the music moves on while it's open.
   const [adding, setAdding] = useState<ItemSummary | null>(null);
-  const rating = <Rating key={t.id} itemId={t.id} value={t.userRating} label={ratingText} testId="bar-rating" song={t} />;
+  const rating = <Rating key={t.id} itemId={t.id} value={t.userRating} label={ratingText} testId="bar-rating" song={t} thumbsUp />;
   return (
     <>
       <div className="hidden items-center lg:flex" data-testid="bar-actions">
@@ -354,10 +355,12 @@ const BarTrackActions = memo(function BarTrackActions({ item }: { item: ItemSumm
         </button>
         <FavoriteButton key={t.id} item={t} />
         <BarPopover
-          label={t.disliked ? "You gave this a thumbs down" : t.userRating ? `Your rating: ${t.userRating / 2} stars` : "Rate this track"}
+          label={t.disliked ? "You gave this a thumbs down" : t.liked ? "You gave this a thumbs up" : t.userRating ? `Your rating: ${t.userRating / 2} stars` : "Rate this track"}
           trigger={
             t.disliked ? (
               <ThumbsDown className="size-5 fill-accent text-accent" aria-hidden />
+            ) : t.liked && !t.userRating ? (
+              <ThumbsUp className="size-5 fill-accent text-accent" aria-hidden />
             ) : (
               <>
                 <Star className={clsx("size-5", t.userRating && "fill-accent text-accent")} aria-hidden />
@@ -697,6 +700,7 @@ export function NowPlaying() {
             <div className="flex items-center gap-1">
               <NowPlayingRating key={t.id} item={t} />
               <NowPlayingFavorite key={`fav-${t.id}`} item={t} />
+              <NowPlayingAdd item={t} />
             </div>
             <Volume className="flex" />
             <CrossfadeSelect />
@@ -718,7 +722,27 @@ export function NowPlaying() {
 /** The playing track's stars and thumbs down, from the track's current state. */
 function NowPlayingRating({ item }: { item: ItemSummary }) {
   const t = useFreshTrack(item);
-  return <Rating itemId={t.id} value={t.userRating} song={t.type === "track" ? t : undefined} thumbClassName="hover:bg-white/10" />;
+  return <Rating itemId={t.id} value={t.userRating} song={t.type === "track" ? t : undefined} thumbsUp thumbClassName="hover:bg-white/10" />;
+}
+
+/** Adds the playing track to a playlist, or a new one (USER-21). */
+function NowPlayingAdd({ item }: { item: ItemSummary }) {
+  // The track the dialog opened for, even if the music moves on while it's open.
+  const [adding, setAdding] = useState<ItemSummary | null>(null);
+  return (
+    <>
+      <button
+        onClick={() => setAdding(item)}
+        className="rounded-full p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
+        aria-label={`Add ${item.title} to a playlist`}
+        title="Add to playlist"
+        data-testid="now-playing-add"
+      >
+        <Plus className="size-5" aria-hidden />
+      </button>
+      {adding && <AddToPlaylistDialog item={adding} onClose={() => setAdding(null)} />}
+    </>
+  );
 }
 
 /** The playing track's heart, from the track's current state. */

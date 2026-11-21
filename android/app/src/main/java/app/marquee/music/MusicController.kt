@@ -92,6 +92,9 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private val _disliked = MutableStateFlow<Boolean?>(null)
     /** Whether the current track has a thumbs down on the server (the views show this device's changes over it). */
     val disliked: StateFlow<Boolean?> = _disliked
+    private val _liked = MutableStateFlow<Boolean?>(null)
+    /** Whether the current track has a thumbs up on the server (USER-21; the views show this device's changes over it). */
+    val liked: StateFlow<Boolean?> = _liked
     private val _sleep = MutableStateFlow<Sleep?>(null)
     val sleep: StateFlow<Sleep?> = _sleep
     private val _dj = MutableStateFlow(DJ.saved(prefs.getString("dj", null)))
@@ -129,6 +132,11 @@ class MusicController(private val context: Context, private val marquee: Marquee
     /** A top-up that failed with nothing left to play tries again by itself. */
     private var topUpRetry: Job? = null
     private var topUpWaitMs = TOP_UP_RETRY_MS
+    /** Each queued track's summary, to save the queue with (see [SavedQueue]). */
+    private val summaries = HashMap<Long, ItemSummary>()
+    private val savedFile = java.io.File(context.filesDir, "music-queue.json")
+    private var saveJob: Job? = null
+    private var lastPositionSave = 0L
 
     init {
         // After changes made offline were sent: show the server's rating for the current track.
@@ -173,6 +181,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
                 if (casting) _position.value = marquee.cast.position.value
                 else controller?.let { _position.value = it.currentPosition to it.duration.coerceAtLeast(0) }
                 heard(_position.value.first, _position.value.second)
+                if (!casting && System.currentTimeMillis() - lastPositionSave > 10_000) controller?.let { saveQueue(it) }
                 (_sleep.value as? Sleep.At)?.let {
                     if (System.currentTimeMillis() >= it.epochMs) {
                         if (casting) marquee.cast.pause() else controller?.pause()
@@ -196,6 +205,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
         val cur = p.currentMediaItem?.let(::meta)
         val prevIndex = _index.value
         _now.value = cur
+        // Paused (or stopped by the system): where it is goes on the device at once.
+        if (!casting && _playing.value && !p.isPlaying) saveQueue(p, now = true)
         if (!casting) {
             _playing.value = p.isPlaying
             _position.value = p.currentPosition to p.duration.coerceAtLeast(0)
@@ -204,6 +215,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
         _index.value = p.currentMediaItemIndex
         // The queue list is only rebuilt when the queue itself changed.
         if (queueChanged) _queue.value = (0 until p.mediaItemCount).map { meta(p.getMediaItemAt(it)) }
+        if (queueChanged || p.currentMediaItem?.mediaId != lastEntry) saveQueue(p)
         _shuffle.value = p.shuffleModeEnabled
         _repeat.value = p.repeatMode
         if (p.currentMediaItem?.mediaId != lastEntry) {
@@ -272,6 +284,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
             _rating.value = null
             _favorite.value = n?.favorite
             _disliked.value = n?.disliked
+            _liked.value = null
         }
         ratingJob?.cancel()
         // A rating made offline and not yet sent wins over the server's older one (USER-18).
@@ -285,12 +298,14 @@ class MusicController(private val context: Context, private val marquee: Marquee
                 item.getOrNull()?.let {
                     _favorite.value = it.favorite == true
                     _disliked.value = it.disliked == true
+                    _liked.value = it.liked == true
                 }
             }
         }
     }
 
     private fun mediaItem(t: ItemSummary, dj: String? = null, context: String? = null, radio: Boolean = false): MediaItem {
+        summaries[t.id] = t
         val item = trackItem(marquee, t, dj, context, radio)
         if (item.mediaMetadata.artworkUri != null) return item
         // Offline: the artwork saved with its download.
@@ -607,7 +622,17 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private fun with(block: (MediaController) -> Unit) { scope.launch { block(connect()) } }
     /** An explicit pause (not a toggle). */
     fun pause() = with { if (casting) marquee.cast.pause() else it.pause() }
-    fun toggle() = with { if (casting) marquee.cast.toggle() else if (it.isPlaying) it.pause() else it.play() }
+    fun toggle() = with {
+        when {
+            casting -> marquee.cast.toggle()
+            it.isPlaying -> it.pause()
+            else -> {
+                // A queue put back from the device isn't loaded until it's played.
+                if (it.playbackState == Player.STATE_IDLE && it.mediaItemCount > 0) it.prepare()
+                it.play()
+            }
+        }
+    }
     fun next() = with { if (casting) castNext() else it.seekToNextMediaItem() }
     fun previous() = with {
         when {
@@ -702,6 +727,50 @@ class MusicController(private val context: Context, private val marquee: Marquee
         _sleep.value = null
         it.stop()
         it.clearMediaItems()
+    }
+
+    // Carrying on after the app closes: the queue is saved on the device as it changes, when it
+    // pauses and every few seconds while it plays; opened again with nothing playing, it comes
+    // back paused where it stopped.
+
+    /** Saves the queue (after a moment, so changes together save once; [now] at once). */
+    private fun saveQueue(p: Player, now: Boolean = false) {
+        val owner = SavedQueue.owner(marquee.server?.id, marquee.userId) ?: return
+        if (p.mediaItemCount == 0) return
+        lastPositionSave = System.currentTimeMillis()
+        val entries = (0 until p.mediaItemCount).map { meta(p.getMediaItemAt(it)) }
+        val q = SavedQueue(owner, entries.mapNotNull { summaries[it.id] }.distinctBy { it.id },
+            entries.map { SavedQueue.Entry(it.id, it.dj, it.context, it.radio) }, p.currentMediaItemIndex, p.currentPosition.coerceAtLeast(0),
+            _source.value, radio, stationContext, generated, p.shuffleModeEnabled, p.repeatMode)
+        saveJob?.cancel()
+        saveJob = scope.launch(Dispatchers.IO) {
+            if (!now) delay(1000)
+            SavedQueue.write(savedFile, q)
+        }
+    }
+
+    /**
+     * Puts back the music that was playing or paused when the app was last closed, paused where it
+     * stopped (it loads when it's played). Nothing happens when something's already queued, or the
+     * saved music is someone else's.
+     */
+    fun restoreSavedQueue() {
+        val owner = SavedQueue.owner(marquee.server?.id, marquee.userId) ?: return
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) { SavedQueue.read(savedFile) }?.takeIf { it.owner == owner } ?: return@launch
+            val (entries, at) = saved.playable() ?: return@launch
+            val c = connect()
+            if (c.mediaItemCount > 0 || casting || SavedQueue.owner(marquee.server?.id, marquee.userId) != owner) return@launch
+            val byId = saved.tracks.associateBy { it.id }
+            val ids = QueueIds.assign(entries.map { it.id }, emptyList())
+            val items = entries.mapIndexed { i, e -> mediaItem(byId.getValue(e.id), e.dj, e.context, e.radio).buildUpon().setMediaId(ids[i]).build() }
+            _source.value = saved.source
+            newQueue(saved.radio, saved.context, saved.generated)
+            val pos = if (at == saved.index) saved.positionMs else 0L
+            c.setMediaItems(items, at, pos)
+            c.shuffleModeEnabled = saved.shuffle
+            c.repeatMode = saved.repeat
+        }
     }
 
     private companion object {

@@ -9,7 +9,7 @@ import OpenAPIRuntime
 /// person it belongs to, and the time it was made, which the server uses to ignore it when a
 /// newer change of the same kind was made elsewhere.
 public struct PendingChange: Codable, Equatable, Sendable {
-    public enum Kind: String, Codable, Sendable { case rating, watched, watchlist, favorite, dislike, comment, progress }
+    public enum Kind: String, Codable, Sendable { case rating, watched, watchlist, favorite, dislike, like, comment, progress }
 
     public var kind: Kind
     public var itemID: Int64
@@ -21,7 +21,7 @@ public struct PendingChange: Codable, Equatable, Sendable {
     /// rating: 0–10, nil clears.
     public var rating: Double?
     /// watched: true = watched; watchlist: true = on the list; favorite: true = a favourite;
-    /// dislike: true = a thumbs down.
+    /// dislike: true = a thumbs down; like: true = a thumbs up (USER-21).
     public var on: Bool?
     /// comment: the text ("" removes it), or nil with `reviewUser` to delete that person's review.
     public var comment: String?
@@ -51,6 +51,7 @@ public struct PendingChange: Codable, Equatable, Sendable {
     public static func watchlist(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .watchlist, itemID: item, on: on) }
     public static func favorite(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .favorite, itemID: item, on: on) }
     public static func dislike(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .dislike, itemID: item, on: on) }
+    public static func like(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .like, itemID: item, on: on) }
     public static func comment(_ item: Int64, _ text: String) -> PendingChange { .init(kind: .comment, itemID: item, comment: text) }
     public static func deleteReview(_ item: Int64, user: Int64) -> PendingChange { .init(kind: .comment, itemID: item, reviewUser: user) }
     public static func progress(_ item: Int64, positionMs: Int64, watched: Bool) -> PendingChange {
@@ -114,7 +115,17 @@ public struct PendingQueue: Codable, Equatable, Sendable {
         let thumbs = newest(.dislike).map { (at: $0.at, on: $0.on == true) }
         let heart = newest(.favorite).flatMap { $0.on == true ? (at: $0.at, on: false) : nil }
         let rating = newest(.rating).flatMap { ($0.rating ?? 0) >= 7 ? (at: $0.at, on: false) : nil }
-        return [thumbs, heart, rating].compactMap { $0 }.max { $0.at < $1.at }?.on
+        let up = newest(.like).flatMap { $0.on == true ? (at: $0.at, on: false) : nil }
+        return [thumbs, heart, rating, up].compactMap { $0 }.max { $0.at < $1.at }?.on
+    }
+
+    /// Whether what's waiting leaves an item with a thumbs up (USER-21): the latest of a thumbs
+    /// up and a thumbs down (each takes back the other); nil when neither waits.
+    public func like(item: Int64, server: String, user: Int64) -> Bool? {
+        func newest(_ kind: PendingChange.Kind) -> PendingChange? { latest(kind, item: item, server: server, user: user) }
+        let up = newest(.like).map { (at: $0.at, on: $0.on == true) }
+        let down = newest(.dislike).flatMap { $0.on == true ? (at: $0.at, on: false) : nil }
+        return [up, down].compactMap { $0 }.max { $0.at < $1.at }?.on
     }
 
     /// Removes a change once the server took it or rejected it for good; keeps it otherwise.
@@ -264,6 +275,11 @@ public final class OfflineSync {
     public func pendingDislike(_ item: Int64) -> Bool? {
         guard let s = scope else { return nil }
         return queue.dislike(item: item, server: s.server, user: s.user)
+    }
+
+    public func pendingLike(_ item: Int64) -> Bool? {
+        guard let s = scope else { return nil }
+        return queue.like(item: item, server: s.server, user: s.user)
     }
 
     /// A waiting comment of your own ("" = removed).
@@ -457,6 +473,22 @@ public final class OfflineSync {
                 }
             }
             switch try await client.removeDislike(path: .init(itemId: c.itemID), query: .init(at: c.at)) {
+            case .noContent: return (204, nil)
+            case .unauthorized: return (401, nil)
+            case .notFound: return (404, nil)
+            case let .undocumented(code, _): return (code, nil)
+            }
+        case .like:
+            if c.on == true {
+                switch try await client.addLike(path: .init(itemId: c.itemID), query: .init(at: c.at)) {
+                case .noContent: return (204, nil)
+                case let .badRequest(r): return (400, try? r.body.json.message)
+                case .unauthorized: return (401, nil)
+                case .notFound: return (404, nil)
+                case let .undocumented(code, _): return (code, nil)
+                }
+            }
+            switch try await client.removeLike(path: .init(itemId: c.itemID), query: .init(at: c.at)) {
             case .noContent: return (204, nil)
             case .unauthorized: return (401, nil)
             case .notFound: return (404, nil)

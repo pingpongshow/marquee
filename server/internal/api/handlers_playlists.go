@@ -323,3 +323,53 @@ func (h *Handlers) RemovePlaylistShare(ctx context.Context, req RemovePlaylistSh
 	}
 	return RemovePlaylistShare204Response{}, nil
 }
+
+// SetPlaylistItems reorders and removes a playlist's entries in one go (MUSIC-29).
+func (h *Handlers) SetPlaylistItems(ctx context.Context, req SetPlaylistItemsRequestObject) (SetPlaylistItemsResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return SetPlaylistItems401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	err := h.Items.SetPlaylistOrder(ctx, access(ctx), req.PlaylistId, req.Body.EntryIds)
+	switch {
+	case errors.Is(err, items.ErrNotFound):
+		return SetPlaylistItems404JSONResponse{NotFoundJSONResponse(errPlaylistNotFound)}, nil
+	case errors.Is(err, items.ErrSmartPlaylist):
+		return SetPlaylistItems400JSONResponse{BadRequestJSONResponse(apiErr("smart_playlist", err.Error()))}, nil
+	case err != nil:
+		return nil, internal(ctx, "setPlaylistItems", err)
+	}
+	p, err := h.Items.Playlist(ctx, s.User.ID, req.PlaylistId)
+	if err != nil {
+		return nil, internal(ctx, "setPlaylistItems", err)
+	}
+	return SetPlaylistItems200JSONResponse(toAPIPlaylist(p)), nil
+}
+
+// MergePlaylists combines playlists into a new one or the end of an existing one (MUSIC-29).
+func (h *Handlers) MergePlaylists(ctx context.Context, req MergePlaylistsRequestObject) (MergePlaylistsResponseObject, error) {
+	if _, ok := session(ctx); !ok {
+		return MergePlaylists401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	b := req.Body
+	if len(b.SourceIds) == 0 {
+		return MergePlaylists400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "choose the playlists to combine"))}, nil
+	}
+	var opt items.MergeOptions
+	set(&opt.IntoID, b.IntoId)
+	set(&opt.Title, b.Title)
+	set(&opt.SkipDuplicates, b.SkipDuplicates)
+	set(&opt.DeleteSources, b.DeleteSources)
+	p, err := h.Items.MergePlaylists(ctx, access(ctx), b.SourceIds, opt)
+	switch {
+	case errors.Is(err, items.ErrNotFound):
+		return MergePlaylists404JSONResponse{NotFoundJSONResponse(errPlaylistNotFound)}, nil
+	case errors.Is(err, items.ErrPlaylistMix):
+		return MergePlaylists400JSONResponse{BadRequestJSONResponse(apiErr("wrong_kind", err.Error()))}, nil
+	case errors.Is(err, items.ErrSmartPlaylist):
+		return MergePlaylists400JSONResponse{BadRequestJSONResponse(apiErr("smart_playlist", "a smart playlist fills itself from its rules: combine into a new playlist or one of your own"))}, nil
+	case err != nil:
+		return nil, internal(ctx, "mergePlaylists", err)
+	}
+	return MergePlaylists200JSONResponse(toAPIPlaylist(p)), nil
+}
