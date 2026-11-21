@@ -50,6 +50,11 @@ type Restrictions struct {
 	// Friend: joined through an invite (USER-13). Signs in with a password, isn't on the
 	// profile picker, and can't switch to household profiles.
 	Friend bool `json:"friend,omitempty"`
+	// OpenSignIn: an admin chose that this profile signs in from the profile picker without a
+	// PIN or password (USER-22), at home only: away from home it asks as before. Its password
+	// and PIN, if it has them, still work, and the username and password form still needs the
+	// password. Not for friends, who aren't on the picker.
+	OpenSignIn bool `json:"openSignIn,omitempty"`
 	// Time limits (kids' profiles; never for admins): minutes of video a day (nil or 0 =
 	// none), at weekends instead (nil = the same, 0 = none), and viewing hours ("HH:MM",
 	// both empty = any time; the window may cross midnight). See package timelimit.

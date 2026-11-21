@@ -371,7 +371,7 @@ func (h *Handlers) ListSignInProfiles(ctx context.Context, _ ListSignInProfilesR
 	}
 	for _, u := range list {
 		if !u.Restrictions.Friend { // friends sign in with their password (USER-13)
-			out = append(out, toAPIProfile(u))
+			out = append(out, toAPIProfile(ctx, u))
 		}
 	}
 	return out, nil
@@ -388,7 +388,14 @@ func (h *Handlers) PinLogin(ctx context.Context, req PinLoginRequestObject) (Pin
 	pin := ""
 	set(&pin, b.Pin)
 	ip := requestInfo(ctx).ClientIP
-	u, err := h.Auth.PINSignIn(ctx, ip, b.UserId, pin)
+	var u auth.User
+	var err error
+	if target, gerr := h.Auth.GetUser(ctx, b.UserId); gerr == nil && openSignIn(ctx, target) {
+		// An admin chose that this profile needs no PIN or password at home (USER-22).
+		u = target
+	} else {
+		u, err = h.Auth.PINSignIn(ctx, ip, b.UserId, pin)
+	}
 	var rl *auth.RateLimitedError
 	switch {
 	case errors.As(err, &rl):

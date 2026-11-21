@@ -34,7 +34,7 @@ import kotlinx.serialization.Contextual
  * @param id 
  * @param displayName 
  * @param isManaged 
- * @param requires What switching to this profile asks for.
+ * @param requires What switching to this profile asks for: none for a profile without a PIN or password, or one an admin chose to open without them (restrictions.openSignIn) when the request is from the home network.
  * @param avatarUrl Profile picture URL; absent when the user has none.
  */
 @Serializable
@@ -50,7 +50,7 @@ data class Profile (
     @SerialName(value = "isManaged")
     val isManaged: kotlin.Boolean,
 
-    /* What switching to this profile asks for. */
+    /* What switching to this profile asks for: none for a profile without a PIN or password, or one an admin chose to open without them (restrictions.openSignIn) when the request is from the home network. */
     @SerialName(value = "requires")
     val requires: Profile.Requires,
 
@@ -61,7 +61,7 @@ data class Profile (
 ) {
 
     /**
-     * What switching to this profile asks for.
+     * What switching to this profile asks for: none for a profile without a PIN or password, or one an admin chose to open without them (restrictions.openSignIn) when the request is from the home network.
      *
      * Values: NONE,PIN,PASSWORD
      */

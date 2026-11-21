@@ -80,7 +80,7 @@ func toAPIRestrictions(r auth.Restrictions) UserRestrictions {
 		CanRequest: ptr(r.CanRequest), CanRecord: ptr(r.DVRRecordAllowed()), SeerrUserId: r.SeerrUserID,
 		AutoApproveRequests: ptr(r.AutoApproveRequests), CanDownloadVod: ptr(r.VODDownloads),
 		CanRecordDVR: ptr(r.DVRRecordAllowed()), CanViewDVR: ptr(r.DVRViewAllowed()), DvrQuotaGb: r.DVRQuotaGB,
-		LiveTv: ptr(r.LiveTVAllowed()), Friend: ptr(r.Friend), IsKid: ptr(r.IsKid),
+		LiveTv: ptr(r.LiveTVAllowed()), Friend: ptr(r.Friend), IsKid: ptr(r.IsKid), OpenSignIn: ptr(r.OpenSignIn),
 		DailyLimitMinutes: r.DailyLimitMinutes, WeekendLimitMinutes: r.WeekendLimitMinutes,
 		AllowedFrom: nz(r.AllowedFrom), AllowedUntil: nz(r.AllowedUntil)}
 	if r.MaxContentRating != nil {
@@ -137,6 +137,7 @@ func fromAPIRestrictions(r *UserRestrictions) (auth.Restrictions, error) {
 	out.SeerrUserID = r.SeerrUserId
 	set(&out.Friend, r.Friend)
 	set(&out.IsKid, r.IsKid)
+	set(&out.OpenSignIn, r.OpenSignIn)
 	if err := timeLimitsFromAPI(r, &out); err != nil {
 		return out, err
 	}
@@ -438,15 +439,18 @@ func (h *Handlers) UpdateUser(ctx context.Context, req UpdateUserRequestObject) 
 		if err != nil {
 			return bad(err.Error())
 		}
-		// A friend stays a friend, and a kid a kid, unless the editor says otherwise (older apps
-		// don't send them).
-		if b.Restrictions.Friend == nil || b.Restrictions.IsKid == nil {
+		// A friend stays a friend, a kid a kid, and a profile that signs in without a code
+		// stays one, unless the editor says otherwise (older apps don't send them).
+		if b.Restrictions.Friend == nil || b.Restrictions.IsKid == nil || b.Restrictions.OpenSignIn == nil {
 			if cur, err := h.Auth.GetUser(ctx, req.UserId); err == nil {
 				if b.Restrictions.Friend == nil {
 					r.Friend = cur.Restrictions.Friend
 				}
 				if b.Restrictions.IsKid == nil {
 					r.IsKid = cur.Restrictions.IsKid
+				}
+				if b.Restrictions.OpenSignIn == nil {
+					r.OpenSignIn = cur.Restrictions.OpenSignIn
 				}
 			}
 		}
@@ -528,7 +532,7 @@ func (h *Handlers) ListProfiles(ctx context.Context, _ ListProfilesRequestObject
 	out := ListProfiles200JSONResponse{}
 	for _, u := range list {
 		if u.ID == me.User.ID || (!me.User.Restrictions.Friend && !u.Restrictions.Friend) {
-			out = append(out, toAPIProfile(u))
+			out = append(out, toAPIProfile(ctx, u))
 		}
 	}
 	return out, nil
@@ -559,8 +563,9 @@ func (h *Handlers) SwitchProfile(ctx context.Context, req SwitchProfileRequestOb
 	if pinBlockedBy2FA(ctx, target) {
 		return SwitchProfile401JSONResponse{UnauthorizedJSONResponse(apiErr("password_required", errPinNeeds2FA))}, nil
 	}
-	// Admins can switch into managed profiles without the PIN.
-	if !(s.User.IsAdmin && target.IsManaged) {
+	// Admins can switch into managed profiles without the PIN, and anyone into a profile an
+	// admin chose to open without one at home (USER-22).
+	if !(s.User.IsAdmin && target.IsManaged) && !openSignIn(ctx, target) {
 		err = h.Auth.VerifySwitch(ctx, ip, target, pin, pw)
 		var rl *auth.RateLimitedError
 		switch {

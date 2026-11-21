@@ -48,6 +48,7 @@ import { describeTimeLimits } from "./timeLimits";
 function describe(r: UserRestrictions, libraryNames: Map<number, string>) {
   const parts: string[] = [];
   if (r.isKid) parts.push("Kid");
+  if (r.openSignIn) parts.push("No PIN at home");
   if (r.libraryIds)
     parts.push(
       r.libraryIds.length
@@ -278,6 +279,38 @@ function DvrQuotaField({
           </div>
         )}
       </Field>
+  );
+}
+
+/**
+ * Signing in from the profile picker without a PIN or password (USER-22): an admin's choice for
+ * any profile, their own included. Only at home: away from home the profile asks for its PIN or
+ * password as before, and the username and password form still needs the password.
+ */
+function OpenSignInToggle({
+  value,
+  onChange,
+  admin,
+}: {
+  value: UserRestrictions;
+  onChange: (r: UserRestrictions) => void;
+  admin: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <Toggle
+        label="Sign in without a PIN or password"
+        help="At home, choosing this profile on “Who's watching?” or Switch profile opens it straight away. Away from home it still asks for its PIN or password."
+        checked={!!value.openSignIn}
+        onChange={(v) => onChange({ ...value, openSignIn: v })}
+      />
+      {value.openSignIn && admin && (
+        <Alert tone="info">
+          Anyone on your home network can open this administrator profile, and change settings and
+          users, without a PIN or password.
+        </Alert>
+      )}
+    </div>
   );
 }
 
@@ -721,6 +754,13 @@ function EditUserDialog({
             )}
           </Field>
         </div>
+        {!restrictions.friend && (
+          <OpenSignInToggle
+            value={restrictions}
+            onChange={setRestrictions}
+            admin={isAdmin}
+          />
+        )}
         {live.hasTwoFactor && !isSelf && <TwoFactorOff user={live} />}
         {!user.isManaged && (
           <Toggle

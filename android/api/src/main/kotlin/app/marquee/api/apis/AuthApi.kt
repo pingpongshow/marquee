@@ -877,7 +877,7 @@ open class AuthApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
 
     /**
      * POST /auth/pin
-     * Sign in by choosing a profile and entering its 4-digit PIN (managed profiles without a PIN need none).
+     * Sign in by choosing a profile and entering its 4-digit PIN (managed profiles without a PIN need none, nor, at home, a profile an admin chose to open without one: restrictions.openSignIn).
      * 
      * @param pinLoginRequest 
      * @return AuthResult
@@ -909,7 +909,7 @@ open class AuthApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
 
     /**
      * POST /auth/pin
-     * Sign in by choosing a profile and entering its 4-digit PIN (managed profiles without a PIN need none).
+     * Sign in by choosing a profile and entering its 4-digit PIN (managed profiles without a PIN need none, nor, at home, a profile an admin chose to open without one: restrictions.openSignIn).
      * 
      * @param pinLoginRequest 
      * @return ApiResponse<AuthResult?>

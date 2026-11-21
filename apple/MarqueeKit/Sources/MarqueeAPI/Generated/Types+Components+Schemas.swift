@@ -530,6 +530,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/friend`.
             public var friend: Swift.Bool?
+            /// Signs in from the profile picker without a PIN or password, chosen by an admin for any profile, their own included (USER-22). Only at home: away from home the profile asks for its PIN or password as before, and the username and password form always needs the password. Not for friends. Default false, and left as it is when an update doesn't send it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/openSignIn`.
+            public var openSignIn: Swift.Bool?
             /// Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins.
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/dailyLimitMinutes`.
@@ -565,6 +569,7 @@ extension Components {
             ///   - liveTvGroups: Deprecated and ignored: channel groups no longer limit anyone (everyone who may watch Live TV sees every group). The server ignores it when written and never returns it.
             ///   - seerrUserId: The Seerr user requests are made as. Null = Seerr's API key owner.
             ///   - friend: Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker.
+            ///   - openSignIn: Signs in from the profile picker without a PIN or password, chosen by an admin for any profile, their own included (USER-22). Only at home: away from home the profile asks for its PIN or password as before, and the username and password form always needs the password. Not for friends. Default false, and left as it is when an update doesn't send it.
             ///   - dailyLimitMinutes: Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins.
             ///   - weekendLimitMinutes: Time limit on Saturdays and Sundays instead of dailyLimitMinutes. Null = the same as dailyLimitMinutes; 0 = no limit at weekends.
             ///   - allowedFrom: Viewing hours: video may only play from this time (HH:MM, server time) until allowedUntil; a window may cross midnight. Both null = any time.
@@ -586,6 +591,7 @@ extension Components {
                 liveTvGroups: [Swift.String]? = nil,
                 seerrUserId: Swift.Int64? = nil,
                 friend: Swift.Bool? = nil,
+                openSignIn: Swift.Bool? = nil,
                 dailyLimitMinutes: Swift.Int? = nil,
                 weekendLimitMinutes: Swift.Int? = nil,
                 allowedFrom: Swift.String? = nil,
@@ -607,6 +613,7 @@ extension Components {
                 self.liveTvGroups = liveTvGroups
                 self.seerrUserId = seerrUserId
                 self.friend = friend
+                self.openSignIn = openSignIn
                 self.dailyLimitMinutes = dailyLimitMinutes
                 self.weekendLimitMinutes = weekendLimitMinutes
                 self.allowedFrom = allowedFrom
@@ -629,6 +636,7 @@ extension Components {
                 case liveTvGroups
                 case seerrUserId
                 case friend
+                case openSignIn
                 case dailyLimitMinutes
                 case weekendLimitMinutes
                 case allowedFrom
@@ -890,7 +898,7 @@ extension Components {
             public var displayName: Swift.String
             /// - Remark: Generated from `#/components/schemas/Profile/isManaged`.
             public var isManaged: Swift.Bool
-            /// What switching to this profile asks for.
+            /// What switching to this profile asks for: none for a profile without a PIN or password, or one an admin chose to open without them (restrictions.openSignIn) when the request is from the home network.
             ///
             /// - Remark: Generated from `#/components/schemas/Profile/requires`.
             @frozen public enum RequiresPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -898,7 +906,7 @@ extension Components {
                 case pin = "pin"
                 case password = "password"
             }
-            /// What switching to this profile asks for.
+            /// What switching to this profile asks for: none for a profile without a PIN or password, or one an admin chose to open without them (restrictions.openSignIn) when the request is from the home network.
             ///
             /// - Remark: Generated from `#/components/schemas/Profile/requires`.
             public var requires: Components.Schemas.Profile.RequiresPayload
@@ -912,7 +920,7 @@ extension Components {
             ///   - id:
             ///   - displayName:
             ///   - isManaged:
-            ///   - requires: What switching to this profile asks for.
+            ///   - requires: What switching to this profile asks for: none for a profile without a PIN or password, or one an admin chose to open without them (restrictions.openSignIn) when the request is from the home network.
             ///   - avatarUrl: Profile picture URL; absent when the user has none.
             public init(
                 id: Swift.Int64,
@@ -9782,25 +9790,41 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PlaybackProgress/error`.
             public var error: Swift.String?
+            /// The audio track the player is playing, when the person picked it in the player itself without starting a new session (PLAY-8): remembered for the show or movie, so the next episode plays with the same one. Absent = unchanged.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackProgress/audioStreamId`.
+            public var audioStreamId: Swift.Int64?
+            /// The subtitle track the player is showing, -1 for none, when the person picked it in the player itself (an HLS subtitle rendition or a sidecar track) (PLAY-8): remembered for the show or movie. Absent = unchanged.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackProgress/subtitleStreamId`.
+            public var subtitleStreamId: Swift.Int64?
             /// Creates a new `PlaybackProgress`.
             ///
             /// - Parameters:
             ///   - positionMs:
             ///   - state:
             ///   - error: With state error: what the player reported (logged on the server for diagnosis).
+            ///   - audioStreamId: The audio track the player is playing, when the person picked it in the player itself without starting a new session (PLAY-8): remembered for the show or movie, so the next episode plays with the same one. Absent = unchanged.
+            ///   - subtitleStreamId: The subtitle track the player is showing, -1 for none, when the person picked it in the player itself (an HLS subtitle rendition or a sidecar track) (PLAY-8): remembered for the show or movie. Absent = unchanged.
             public init(
                 positionMs: Swift.Int64,
                 state: Components.Schemas.PlaybackProgress.StatePayload,
-                error: Swift.String? = nil
+                error: Swift.String? = nil,
+                audioStreamId: Swift.Int64? = nil,
+                subtitleStreamId: Swift.Int64? = nil
             ) {
                 self.positionMs = positionMs
                 self.state = state
                 self.error = error
+                self.audioStreamId = audioStreamId
+                self.subtitleStreamId = subtitleStreamId
             }
             public enum CodingKeys: String, CodingKey {
                 case positionMs
                 case state
                 case error
+                case audioStreamId
+                case subtitleStreamId
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaybackSessionInfo`.

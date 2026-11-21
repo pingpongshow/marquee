@@ -34,6 +34,8 @@ import kotlinx.serialization.Contextual
  * @param positionMs 
  * @param state 
  * @param error With state error: what the player reported (logged on the server for diagnosis).
+ * @param audioStreamId The audio track the player is playing, when the person picked it in the player itself without starting a new session (PLAY-8): remembered for the show or movie, so the next episode plays with the same one. Absent = unchanged.
+ * @param subtitleStreamId The subtitle track the player is showing, -1 for none, when the person picked it in the player itself (an HLS subtitle rendition or a sidecar track) (PLAY-8): remembered for the show or movie. Absent = unchanged.
  */
 @Serializable
 
@@ -47,7 +49,15 @@ data class PlaybackProgress (
 
     /* With state error: what the player reported (logged on the server for diagnosis). */
     @SerialName(value = "error")
-    val error: kotlin.String? = null
+    val error: kotlin.String? = null,
+
+    /* The audio track the player is playing, when the person picked it in the player itself without starting a new session (PLAY-8): remembered for the show or movie, so the next episode plays with the same one. Absent = unchanged. */
+    @SerialName(value = "audioStreamId")
+    val audioStreamId: kotlin.Long? = null,
+
+    /* The subtitle track the player is showing, -1 for none, when the person picked it in the player itself (an HLS subtitle rendition or a sidecar track) (PLAY-8): remembered for the show or movie. Absent = unchanged. */
+    @SerialName(value = "subtitleStreamId")
+    val subtitleStreamId: kotlin.Long? = null
 
 ) {
 

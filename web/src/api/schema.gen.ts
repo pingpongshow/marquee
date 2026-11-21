@@ -114,7 +114,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sign in by choosing a profile and entering its 4-digit PIN (managed profiles without a PIN need none). */
+        /** Sign in by choosing a profile and entering its 4-digit PIN (managed profiles without a PIN need none, nor, at home, a profile an admin chose to open without one: restrictions.openSignIn). */
         post: operations["pinLogin"];
         delete?: never;
         options?: never;
@@ -4968,6 +4968,8 @@ export interface components {
             seerrUserId?: number | null;
             /** @description Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker. */
             friend?: boolean;
+            /** @description Signs in from the profile picker without a PIN or password, chosen by an admin for any profile, their own included (USER-22). Only at home: away from home the profile asks for its PIN or password as before, and the username and password form always needs the password. Not for friends. Default false, and left as it is when an update doesn't send it. */
+            openSignIn?: boolean;
             /** @description Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins. */
             dailyLimitMinutes?: number | null;
             /** @description Time limit on Saturdays and Sundays instead of dailyLimitMinutes. Null = the same as dailyLimitMinutes; 0 = no limit at weekends. */
@@ -5032,7 +5034,7 @@ export interface components {
             displayName: string;
             isManaged: boolean;
             /**
-             * @description What switching to this profile asks for.
+             * @description What switching to this profile asks for: none for a profile without a PIN or password, or one an admin chose to open without them (restrictions.openSignIn) when the request is from the home network.
              * @enum {string}
              */
             requires: "none" | "pin" | "password";
@@ -7124,6 +7126,16 @@ export interface components {
             state: "playing" | "paused" | "buffering" | "error";
             /** @description With state error: what the player reported (logged on the server for diagnosis). */
             error?: string;
+            /**
+             * Format: int64
+             * @description The audio track the player is playing, when the person picked it in the player itself without starting a new session (PLAY-8): remembered for the show or movie, so the next episode plays with the same one. Absent = unchanged.
+             */
+            audioStreamId?: number;
+            /**
+             * Format: int64
+             * @description The subtitle track the player is showing, -1 for none, when the person picked it in the player itself (an HLS subtitle rendition or a sidecar track) (PLAY-8): remembered for the show or movie. Absent = unchanged.
+             */
+            subtitleStreamId?: number;
         };
         PlaybackSessionInfo: {
             id: string;

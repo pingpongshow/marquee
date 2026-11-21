@@ -384,6 +384,75 @@ func TestPinSignIn(t *testing.T) {
 	}
 }
 
+// An admin can choose that a profile, their own included, signs in from the picker without a
+// PIN or password at home (USER-22); an update that doesn't mention it leaves it as it is.
+func TestOpenSignIn(t *testing.T) {
+	h := newHarness(t)
+	var res api.AuthResult
+	h.do("POST", "/setup", map[string]any{"serverName": "T", "username": "admin", "password": "correct horse", "device": device}, &res)
+	h.token = res.Token
+	var me, kid api.User
+	h.do("GET", "/me", nil, &me)
+	h.do("POST", "/users", map[string]any{"username": "kid", "isManaged": true, "pin": "4321"}, &kid)
+	requires := func(id int64) api.ProfileRequires {
+		t.Helper()
+		var profiles []api.Profile
+		token := h.token
+		h.token = ""
+		h.do("GET", "/auth/profiles", nil, &profiles)
+		h.token = token
+		for _, p := range profiles {
+			if p.Id == id {
+				return p.Requires
+			}
+		}
+		t.Fatalf("profile %d not listed in %+v", id, profiles)
+		return ""
+	}
+	if r := requires(me.Id); r != api.ProfileRequiresPassword {
+		t.Fatalf("admin before: %s", r)
+	}
+	if code := h.do("PATCH", fmt.Sprintf("/users/%d", me.Id), map[string]any{"restrictions": map[string]any{"openSignIn": true}}, nil); code != 200 {
+		t.Fatalf("turn on: %d", code)
+	}
+	if r := requires(me.Id); r != api.ProfileRequiresNone {
+		t.Fatalf("admin after: %s", r)
+	}
+	// Signing in, and switching to it from another profile, need nothing.
+	h.token = ""
+	if code := h.do("POST", "/auth/pin", map[string]any{"userId": me.Id, "device": device}, &res); code != 200 || res.User.Id != me.Id {
+		t.Fatalf("sign in without a code: %d", code)
+	}
+	if !*res.User.Restrictions.OpenSignIn {
+		t.Fatal("openSignIn not reported")
+	}
+	h.do("POST", "/auth/pin", map[string]any{"userId": kid.Id, "pin": "4321", "device": device}, &res)
+	h.token = res.Token
+	if code := h.do("POST", fmt.Sprintf("/profiles/%d/switch", me.Id), map[string]any{"device": device}, &res); code != 200 || res.User.Id != me.Id {
+		t.Fatalf("switch without a code: %d", code)
+	}
+	h.token = res.Token
+	// Its password still signs in with the form.
+	if code := h.do("POST", "/auth/login", map[string]any{"username": "admin", "password": "correct horse", "device": device}, &res); code != 200 {
+		t.Fatalf("password: %d", code)
+	}
+	h.token = res.Token // signing in again on this device replaced its session
+	// Other changes leave it on; turning it off asks for the password again.
+	if code := h.do("PATCH", fmt.Sprintf("/users/%d", me.Id), map[string]any{"restrictions": map[string]any{"canRequest": true}}, nil); code != 200 {
+		t.Fatalf("other change: %d", code)
+	}
+	if r := requires(me.Id); r != api.ProfileRequiresNone {
+		t.Fatalf("kept: %s", r)
+	}
+	if code := h.do("PATCH", fmt.Sprintf("/users/%d", me.Id), map[string]any{"restrictions": map[string]any{"openSignIn": false}}, nil); code != 200 {
+		t.Fatalf("turn off: %d", code)
+	}
+	h.token = ""
+	if code := h.do("POST", "/auth/pin", map[string]any{"userId": me.Id, "device": device}, &res); code != 401 {
+		t.Fatalf("turned off: %d", code)
+	}
+}
+
 func (h *harness) raw(method, path string, body []byte) (*http.Response, []byte) {
 	h.t.Helper()
 	req, _ := http.NewRequest(method, h.srv.URL+path, bytes.NewReader(body))

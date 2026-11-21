@@ -8,6 +8,7 @@ import (
 
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
+	"marquee/internal/netclass"
 )
 
 func avatarURL(u auth.User) *string {
@@ -17,9 +18,20 @@ func avatarURL(u auth.User) *string {
 	return ptr(fmt.Sprintf("/api/v1/users/%d/avatar?v=%d", u.ID, u.Avatar))
 }
 
-func toAPIProfile(u auth.User) Profile {
+func toAPIProfile(ctx context.Context, u auth.User) Profile {
+	requires := ProfileRequires(auth.SwitchCredentials(u))
+	if openSignIn(ctx, u) {
+		requires = ProfileRequiresNone
+	}
 	return Profile{Id: u.ID, DisplayName: u.DisplayName, IsManaged: u.IsManaged,
-		Requires: ProfileRequires(auth.SwitchCredentials(u)), AvatarUrl: avatarURL(u)}
+		Requires: requires, AvatarUrl: avatarURL(u)}
+}
+
+// openSignIn reports whether u signs in from the profile picker without a PIN or password
+// here (USER-22): an admin chose it for the profile, and the request is from the home network.
+// Away from home the profile asks for its PIN or password as before.
+func openSignIn(ctx context.Context, u auth.User) bool {
+	return u.Restrictions.OpenSignIn && !u.Restrictions.Friend && requestInfo(ctx).Class == netclass.Local
 }
 
 // avatarTarget checks that the caller may change userID's picture: themselves, or anyone as an admin.

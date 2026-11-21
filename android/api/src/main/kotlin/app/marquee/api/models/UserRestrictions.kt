@@ -47,6 +47,7 @@ import kotlinx.serialization.Contextual
  * @param liveTvGroups Deprecated and ignored: channel groups no longer limit anyone (everyone who may watch Live TV sees every group). The server ignores it when written and never returns it.
  * @param seerrUserId The Seerr user requests are made as. Null = Seerr's API key owner.
  * @param friend Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker.
+ * @param openSignIn Signs in from the profile picker without a PIN or password, chosen by an admin for any profile, their own included (USER-22). Only at home: away from home the profile asks for its PIN or password as before, and the username and password form always needs the password. Not for friends. Default false, and left as it is when an update doesn't send it.
  * @param dailyLimitMinutes Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins.
  * @param weekendLimitMinutes Time limit on Saturdays and Sundays instead of dailyLimitMinutes. Null = the same as dailyLimitMinutes; 0 = no limit at weekends.
  * @param allowedFrom Viewing hours: video may only play from this time (HH:MM, server time) until allowedUntil; a window may cross midnight. Both null = any time.
@@ -120,6 +121,10 @@ data class UserRestrictions (
     /* Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker. */
     @SerialName(value = "friend")
     val friend: kotlin.Boolean? = null,
+
+    /* Signs in from the profile picker without a PIN or password, chosen by an admin for any profile, their own included (USER-22). Only at home: away from home the profile asks for its PIN or password as before, and the username and password form always needs the password. Not for friends. Default false, and left as it is when an update doesn't send it. */
+    @SerialName(value = "openSignIn")
+    val openSignIn: kotlin.Boolean? = null,
 
     /* Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins. */
     @SerialName(value = "dailyLimitMinutes")

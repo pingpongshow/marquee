@@ -863,7 +863,7 @@ public enum Operations {
             }
         }
     }
-    /// Sign in by choosing a profile and entering its 4-digit PIN (managed profiles without a PIN need none).
+    /// Sign in by choosing a profile and entering its 4-digit PIN (managed profiles without a PIN need none, nor, at home, a profile an admin chose to open without one: restrictions.openSignIn).
     ///
     /// - Remark: HTTP `POST /auth/pin`.
     /// - Remark: Generated from `#/paths//auth/pin/post(pinLogin)`.
