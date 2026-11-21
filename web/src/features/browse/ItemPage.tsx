@@ -23,7 +23,7 @@ import { PlayButtons } from "./PlayButtons";
 import { AlsoOnVod } from "../livetv/VodSuggestions";
 import { isWatched } from "./watched";
 import { Poster } from "./Poster";
-import { audioTrackLabel, formatBytes, formatDuration, formatTrackTime, languageName, spokenLanguage, subtitleFor, subtitleLanguages } from "./format";
+import { audioTrackLabel, formatBytes, formatDuration, formatTrackTime, trackLanguage, subtitleFor, subtitleLanguages } from "./format";
 import { audioQualityLabel, audioQualityShort, useShowAudioQuality } from "../player/audioQuality";
 
 function Breadcrumbs({ item }: { item: ItemDetail }) {
@@ -48,8 +48,8 @@ function Breadcrumbs({ item }: { item: ItemDetail }) {
 function streamLabel(s: MediaStream) {
   if (s.kind === "video") return [s.height ? `${s.height}p` : "", s.codec.toUpperCase(), s.bitDepth === 10 ? "10-bit" : "", s.frameRate ? `${s.frameRate} fps` : ""].filter(Boolean).join(" · ");
   if (s.kind === "audio")
-    return [spokenLanguage(s), s.codec.toUpperCase(), s.channelLayout ?? (s.channels ? `${s.channels} ch` : ""), s.title ?? ""].filter(Boolean).join(" · ");
-  return [languageName(s.language), s.codec.toUpperCase(), s.forced ? "Forced" : "", s.hearingImpaired ? "SDH" : "", s.external ? "External" : "", s.title ?? ""].filter(Boolean).join(" · ");
+    return [trackLanguage(s), s.codec.toUpperCase(), s.channelLayout ?? (s.channels ? `${s.channels} ch` : ""), s.title ?? ""].filter(Boolean).join(" · ");
+  return [trackLanguage(s), s.codec.toUpperCase(), s.forced ? "Forced" : "", s.hearingImpaired ? "SDH" : "", s.external ? "External" : "", s.title ?? ""].filter(Boolean).join(" · ");
 }
 
 const problemText: Record<FileProblem["check"], string> = {

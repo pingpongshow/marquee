@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"marquee/internal/db"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -225,6 +226,7 @@ func (w *writer) writeStreams(ctx context.Context, fileID int64, c candidate, re
 	}
 	dirFiles := w.dirs[filepath.Dir(c.Path)]
 	if w.lib.Type != library.Music {
+		sidecars := map[string][2]int64{}
 		for _, sf := range findSubtitles(c.Path, dirFiles) {
 			if _, err := w.tx.ExecContext(ctx, `INSERT INTO streams
 				(file_id, kind, codec, language, title, is_default, is_forced, is_hearing_impaired, external_path)
@@ -232,6 +234,15 @@ func (w *writer) writeStreams(ctx context.Context, fileID int64, c candidate, re
 				fileID, sf.Codec, nullStr(sf.Language), nullStr(sf.Title), sf.Default, sf.Forced, sf.HearingImpaired, sf.Path); err != nil {
 				return err
 			}
+			if sf.Language == "" {
+				if fi, err := os.Stat(sf.Path); err == nil {
+					sidecars[sf.Path] = [2]int64{fi.Size(), fi.ModTime().Unix()}
+				}
+			}
+		}
+		// Subtitle languages read from their text before (PLAY-20), while the files are the same.
+		if err := db.ReapplySubtitleLanguages(ctx, w.tx, fileID, sidecars); err != nil {
+			return err
 		}
 		// Subtitles downloaded from OpenSubtitles live outside the (read-only) media folder.
 		if _, err := w.tx.ExecContext(ctx, `INSERT INTO streams (file_id, kind, codec, language, title, is_hearing_impaired, external_path)

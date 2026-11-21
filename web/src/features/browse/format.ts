@@ -100,10 +100,10 @@ export function audioCodecName(codec: string, profile?: string) {
 const usefulTrackTitle = /commentary|descripti|narrat|isolated|score|brazil|latin|castil|european|canad|quebec|mandarin|cantonese/i;
 
 /**
- * An audio track's language, "English (detected)" when Soundprint heard it because the file
- * doesn't say (PLAY-19).
+ * A track's language, "English (detected)" when the file doesn't say and Marquee found it:
+ * heard by Soundprint for audio (PLAY-19), read from the text for subtitles (PLAY-20).
  */
-export function spokenLanguage(s: { language?: string; languageDetected?: boolean }) {
+export function trackLanguage(s: { language?: string; languageDetected?: boolean }) {
   const name = languageName(s.language);
   return name && s.languageDetected ? `${name} (detected)` : name;
 }
@@ -112,16 +112,16 @@ export function spokenLanguage(s: { language?: string; languageDetected?: boolea
 export function audioTrackLabel(s: { language?: string; languageDetected?: boolean; codec: string; profile?: string; channels?: number; title?: string }) {
   const codec = [audioCodecName(s.codec, s.profile), s.channels === 2 ? "Stereo" : channelsLabel(s.channels)].filter(Boolean).join(" ");
   const title = s.title?.trim();
-  return [spokenLanguage(s), codec, title && usefulTrackTitle.test(title) ? title : ""].filter(Boolean).join(" · ");
+  return [trackLanguage(s), codec, title && usefulTrackTitle.test(title) ? title : ""].filter(Boolean).join(" · ");
 }
 
 /** A title's subtitles by language, each once: "English", "English (SDH)", "French (Forced)". */
-export function subtitleLanguages(streams: { kind: string; language?: string; forced: boolean; hearingImpaired: boolean }[]) {
+export function subtitleLanguages(streams: { kind: string; language?: string; languageDetected?: boolean; forced: boolean; hearingImpaired: boolean }[]) {
   const out: string[] = [];
   for (const s of streams) {
     if (s.kind !== "subtitle") continue;
     const flags = [s.forced ? "Forced" : "", s.hearingImpaired ? "SDH" : ""].filter(Boolean).join(", ");
-    const label = languageName(s.language) + (flags ? ` (${flags})` : "");
+    const label = trackLanguage(s) + (flags ? ` (${flags})` : "");
     if (!out.includes(label)) out.push(label);
   }
   return out;

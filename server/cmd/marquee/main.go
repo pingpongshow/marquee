@@ -62,6 +62,7 @@ import (
 	"marquee/internal/soundprint"
 	"marquee/internal/speakers"
 	"marquee/internal/storage"
+	"marquee/internal/sublang"
 	"marquee/internal/subtitles"
 	"marquee/internal/syncplay"
 	"marquee/internal/sysstats"
@@ -453,6 +454,11 @@ func run() error {
 		return subtitles.Config{APIKey: m.OpenSubtitlesAPIKey, Username: m.OpenSubtitlesUser, Password: m.OpenSubtitlesPass,
 			UserAgent: "Marquee v" + config.Version, Base: os.Getenv("MARQUEE_OPENSUBTITLES_URL")}
 	}}
+	// The language of subtitle tracks whose files don't say, from their text (PLAY-20).
+	subLang := &sublang.Service{DB: database, FFmpeg: cfg.FFmpegPath}
+	scheduler.Register(tasks.Task{ID: "subtitle-languages", Name: "Find subtitle languages", Every: time.Hour,
+		Description: "Reads subtitle tracks whose files don't say their language (three short stretches of each) and, when they clearly agree, shows it, marked as detected. Picture subtitles (Blu-ray and DVD) have no text and stay unknown.",
+		Run:         subLang.Run, Progress: subLang.Progress})
 	// Offline downloads (M7): conversions for phones and tablets.
 	dl := &downloads.Service{DB: database, Playback: player, Dir: filepath.Join(cfg.TranscodeDir, "downloads"),
 		Request: func(ctx context.Context, userID, itemID, fileID int64) (playback.Request, error) {

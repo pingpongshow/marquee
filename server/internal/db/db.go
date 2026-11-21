@@ -117,6 +117,32 @@ func ApplyPendingRestore(dbPath, configDir, backupDir string) error {
 	return nil
 }
 
+// ReapplySubtitleLanguages gives a file's subtitle tracks without a language the languages read
+// from their text before (PLAY-20), after a rescan wrote them again: embedded tracks while the
+// video file is the same, subtitle files (path → size and time) while they are.
+func ReapplySubtitleLanguages(ctx context.Context, q interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}, fileID int64, sidecars map[string][2]int64) error {
+	if _, err := q.ExecContext(ctx, `UPDATE streams SET language = (SELECT d.language FROM subtitle_languages d JOIN media_files f ON f.id = d.file_id
+			WHERE d.file_id = streams.file_id AND d.stream_key = 's:' || streams.stream_index AND d.size = f.size AND d.mtime = f.mtime),
+		language_detected = 1
+		WHERE file_id = ? AND kind = 'subtitle' AND external_path IS NULL AND COALESCE(language, '') IN ('', 'und') AND EXISTS (
+			SELECT 1 FROM subtitle_languages d JOIN media_files f ON f.id = d.file_id WHERE d.file_id = streams.file_id
+			AND d.stream_key = 's:' || streams.stream_index AND d.size = f.size AND d.mtime = f.mtime AND d.language IS NOT NULL)`, fileID); err != nil {
+		return err
+	}
+	for path, st := range sidecars {
+		if _, err := q.ExecContext(ctx, `UPDATE streams SET language = (SELECT language FROM subtitle_languages
+				WHERE file_id = ?1 AND stream_key = 'x:' || ?2 AND size = ?3 AND mtime = ?4), language_detected = 1
+			WHERE file_id = ?1 AND kind = 'subtitle' AND external_path = ?2 AND COALESCE(language, '') IN ('', 'und') AND EXISTS (
+				SELECT 1 FROM subtitle_languages WHERE file_id = ?1 AND stream_key = 'x:' || ?2 AND size = ?3 AND mtime = ?4 AND language IS NOT NULL)`,
+			fileID, path, st[0], st[1]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ReapplySpokenLanguages gives a file's audio streams without a language the languages
 // Soundprint heard on them before (PLAY-19), after a rescan wrote the streams again, while the
 // file is the same (its size and time).

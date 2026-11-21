@@ -7,6 +7,7 @@ toolchain go1.26.8
 tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 
 require (
+	github.com/abadojack/whatlanggo v1.0.1
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/getkin/kin-openapi v0.144.0
 	github.com/grandcat/zeroconf v1.0.0
