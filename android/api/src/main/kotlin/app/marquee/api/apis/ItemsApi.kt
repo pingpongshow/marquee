@@ -28,6 +28,9 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 
 import app.marquee.api.models.AddToCollectionRequest
+import app.marquee.api.models.ArtworkChoice
+import app.marquee.api.models.ArtworkKind
+import app.marquee.api.models.ArtworkOption
 import app.marquee.api.models.BazarrCandidate
 import app.marquee.api.models.BazarrDownloadRequest
 import app.marquee.api.models.BazarrPick
@@ -919,6 +922,86 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}/subtitles/bazarr".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /items/{itemId}/artwork/{kind}
+     * Use one of the item&#39;s artwork (artworkId), or an image from the web (url: a TMDB alternative, or any https image link) (META-13, admin only). Kept through metadata refreshes until set back to automatic.
+     * 
+     * @param itemId 
+     * @param kind 
+     * @param artworkChoice 
+     * @return ItemDetail
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun chooseItemArtwork(itemId: kotlin.Long, kind: ArtworkKind, artworkChoice: ArtworkChoice) : ItemDetail {
+        val localVarResponse = chooseItemArtworkWithHttpInfo(itemId = itemId, kind = kind, artworkChoice = artworkChoice)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemDetail
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /items/{itemId}/artwork/{kind}
+     * Use one of the item&#39;s artwork (artworkId), or an image from the web (url: a TMDB alternative, or any https image link) (META-13, admin only). Kept through metadata refreshes until set back to automatic.
+     * 
+     * @param itemId 
+     * @param kind 
+     * @param artworkChoice 
+     * @return ApiResponse<ItemDetail?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun chooseItemArtworkWithHttpInfo(itemId: kotlin.Long, kind: ArtworkKind, artworkChoice: ArtworkChoice) : ApiResponse<ItemDetail?> {
+        val localVariableConfig = chooseItemArtworkRequestConfig(itemId = itemId, kind = kind, artworkChoice = artworkChoice)
+
+        return request<ArtworkChoice, ItemDetail>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation chooseItemArtwork
+     *
+     * @param itemId 
+     * @param kind 
+     * @param artworkChoice 
+     * @return RequestConfig
+     */
+    fun chooseItemArtworkRequestConfig(itemId: kotlin.Long, kind: ArtworkKind, artworkChoice: ArtworkChoice) : RequestConfig<ArtworkChoice> {
+        val localVariableBody = artworkChoice
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/items/{itemId}/artwork/{kind}".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())).replace("{"+"kind"+"}", encodeURIComponent(kind.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -2139,6 +2222,85 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/libraries/{libraryId}/filters".replace("{"+"libraryId"+"}", encodeURIComponent(libraryId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /items/{itemId}/artwork
+     * An item&#39;s artwork of one kind to choose from (META-13, admin only): what it has (its own, from files, uploaded, chosen) and, for matched films, shows, seasons and episodes, TMDB&#39;s alternatives.
+     * 
+     * @param itemId 
+     * @param kind 
+     * @return kotlin.collections.List<ArtworkOption>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listItemArtwork(itemId: kotlin.Long, kind: ArtworkKind) : kotlin.collections.List<ArtworkOption> {
+        val localVarResponse = listItemArtworkWithHttpInfo(itemId = itemId, kind = kind)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<ArtworkOption>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/artwork
+     * An item&#39;s artwork of one kind to choose from (META-13, admin only): what it has (its own, from files, uploaded, chosen) and, for matched films, shows, seasons and episodes, TMDB&#39;s alternatives.
+     * 
+     * @param itemId 
+     * @param kind 
+     * @return ApiResponse<kotlin.collections.List<ArtworkOption>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listItemArtworkWithHttpInfo(itemId: kotlin.Long, kind: ArtworkKind) : ApiResponse<kotlin.collections.List<ArtworkOption>?> {
+        val localVariableConfig = listItemArtworkRequestConfig(itemId = itemId, kind = kind)
+
+        return request<Unit, kotlin.collections.List<ArtworkOption>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listItemArtwork
+     *
+     * @param itemId 
+     * @param kind 
+     * @return RequestConfig
+     */
+    fun listItemArtworkRequestConfig(itemId: kotlin.Long, kind: ArtworkKind) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                put("kind", listOf(kind.toString()))
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/artwork".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -3763,6 +3925,82 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * DELETE /items/{itemId}/artwork/{kind}
+     * Back to automatic (META-13, admin only): chosen and uploaded images of this kind go, and the item&#39;s own or the metadata agents&#39; is used.
+     * 
+     * @param itemId 
+     * @param kind 
+     * @return ItemDetail
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun resetItemArtwork(itemId: kotlin.Long, kind: ArtworkKind) : ItemDetail {
+        val localVarResponse = resetItemArtworkWithHttpInfo(itemId = itemId, kind = kind)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemDetail
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /items/{itemId}/artwork/{kind}
+     * Back to automatic (META-13, admin only): chosen and uploaded images of this kind go, and the item&#39;s own or the metadata agents&#39; is used.
+     * 
+     * @param itemId 
+     * @param kind 
+     * @return ApiResponse<ItemDetail?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun resetItemArtworkWithHttpInfo(itemId: kotlin.Long, kind: ArtworkKind) : ApiResponse<ItemDetail?> {
+        val localVariableConfig = resetItemArtworkRequestConfig(itemId = itemId, kind = kind)
+
+        return request<Unit, ItemDetail>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation resetItemArtwork
+     *
+     * @param itemId 
+     * @param kind 
+     * @return RequestConfig
+     */
+    fun resetItemArtworkRequestConfig(itemId: kotlin.Long, kind: ArtworkKind) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/items/{itemId}/artwork/{kind}".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())).replace("{"+"kind"+"}", encodeURIComponent(kind.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /items/{itemId}/commercials/restore
      * Put back the original of a recording whose commercials were cut, while it&#39;s still in the media trash (admin only). The cut file goes to the trash instead.
      * 
@@ -4302,6 +4540,85 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/collections/{collectionId}/rules".replace("{"+"collectionId"+"}", encodeURIComponent(collectionId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /items/{itemId}/artwork/{kind}
+     * Upload an image (JPEG, PNG or WebP, up to 20 MB) and use it (META-13, admin only). Kept through metadata refreshes until set back to automatic.
+     * 
+     * @param itemId 
+     * @param kind 
+     * @param body 
+     * @return ItemDetail
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun uploadItemArtwork(itemId: kotlin.Long, kind: ArtworkKind, body: java.io.File) : ItemDetail {
+        val localVarResponse = uploadItemArtworkWithHttpInfo(itemId = itemId, kind = kind, body = body)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemDetail
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /items/{itemId}/artwork/{kind}
+     * Upload an image (JPEG, PNG or WebP, up to 20 MB) and use it (META-13, admin only). Kept through metadata refreshes until set back to automatic.
+     * 
+     * @param itemId 
+     * @param kind 
+     * @param body 
+     * @return ApiResponse<ItemDetail?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun uploadItemArtworkWithHttpInfo(itemId: kotlin.Long, kind: ArtworkKind, body: java.io.File) : ApiResponse<ItemDetail?> {
+        val localVariableConfig = uploadItemArtworkRequestConfig(itemId = itemId, kind = kind, body = body)
+
+        return request<java.io.File, ItemDetail>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation uploadItemArtwork
+     *
+     * @param itemId 
+     * @param kind 
+     * @param body 
+     * @return RequestConfig
+     */
+    fun uploadItemArtworkRequestConfig(itemId: kotlin.Long, kind: ArtworkKind, body: java.io.File) : RequestConfig<java.io.File> {
+        val localVariableBody = body
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/items/{itemId}/artwork/{kind}".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())).replace("{"+"kind"+"}", encodeURIComponent(kind.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

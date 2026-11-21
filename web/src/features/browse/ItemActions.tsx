@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, Disc3, History, Lock, Pencil, RefreshCw, Scissors, Search, Trash2, Unlock } from "lucide-react";
+import { Check, Disc3, History, Pencil, RefreshCw, Scissors, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import { settingsQuery } from "@/api/queries";
-import type { components } from "@/api/schema.gen";
 import type { ItemDetail } from "@/api/types";
 import { toast } from "@/components/Toast";
-import { Alert, Button, Dialog, Field, Input, Spinner } from "@/components/ui";
+import { Alert, Button, Dialog, Input, Spinner } from "@/components/ui";
+import { EditMetadataDialog } from "./EditMetadata";
 import { ItemFiles } from "./FileNames";
 import { MoveTrackDialog, MusicMatchDialog } from "./MusicFixes";
 import {
@@ -20,8 +20,6 @@ import {
   useRestoreCommercials,
 } from "../livetv/commercials";
 
-type Edit = components["schemas"]["ItemEdit"];
-type LockField = NonNullable<Edit["unlock"]>[number];
 
 function useItemUpdated() {
   const qc = useQueryClient();
@@ -92,114 +90,6 @@ export function FixMatchDialog({ item, onClose }: { item: ItemDetail; onClose: (
         ))}
       </ul>
       {apply.isPending && <Spinner label="Downloading metadata" />}
-    </Dialog>
-  );
-}
-
-const fields: { key: LockField; label: string; multiline?: boolean; type?: string }[] = [
-  { key: "title", label: "Title" },
-  { key: "sortTitle", label: "Sort title" },
-  { key: "originalTitle", label: "Original title" },
-  { key: "originallyAvailableAt", label: "Release date", type: "date" },
-  { key: "contentRating", label: "Content rating" },
-  { key: "studio", label: "Studio / network" },
-  { key: "tagline", label: "Tagline" },
-  { key: "summary", label: "Summary", multiline: true },
-];
-
-function currentValue(item: ItemDetail, key: LockField): string {
-  switch (key) {
-    case "sortTitle":
-      return "";
-    case "year":
-      return item.year ? String(item.year) : "";
-    case "originallyAvailableAt":
-      return item.originallyAvailableAt ?? "";
-    default:
-      return ((item as Record<string, unknown>)[key] as string | undefined) ?? "";
-  }
-}
-
-function EditDialog({ item, onClose }: { item: ItemDetail; onClose: () => void }) {
-  const updated = useItemUpdated();
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [unlock, setUnlock] = useState<LockField[]>([]);
-  const locked = new Set(item.lockedFields);
-  const save = useMutation({
-    mutationFn: (body: Edit) => unwrap(api.PATCH("/items/{itemId}/metadata", { params: { path: { itemId: item.id } }, body })),
-    onSuccess: (it) => {
-      updated(it);
-      onClose();
-    },
-  });
-  const submit = () => {
-    const body: Edit = { unlock: unlock.length ? unlock : undefined };
-    for (const [k, v] of Object.entries(values)) (body as Record<string, unknown>)[k] = v;
-    save.mutate(body);
-  };
-  const dirty = Object.keys(values).length > 0 || unlock.length > 0;
-  return (
-    <Dialog
-      open
-      wide
-      onClose={onClose}
-      title={`Edit ${item.title}`}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" disabled={!dirty} loading={save.isPending} onClick={submit}>
-            Save
-          </Button>
-        </>
-      }
-    >
-      {save.isError && (
-        <div className="mb-4">
-          <Alert tone="error">{save.error.message}</Alert>
-        </div>
-      )}
-      <p className="mb-4 text-sm text-muted">Edited fields are locked <Lock className="inline size-3.5" /> so metadata refreshes won't change them. Click a lock to hand a field back.</p>
-      <div className="space-y-4">
-        {fields.map((f) => {
-          const isLocked = (locked.has(f.key) || f.key in values) && !unlock.includes(f.key);
-          return (
-            <Field key={f.key} label={f.label}>
-              {(id) => (
-                <div className="flex gap-2">
-                  {f.multiline ? (
-                    <textarea
-                      id={id}
-                      rows={5}
-                      className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm focus:border-accent focus:outline-none"
-                      value={values[f.key] ?? currentValue(item, f.key)}
-                      onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
-                    />
-                  ) : (
-                    <Input id={id} type={f.type} value={values[f.key] ?? currentValue(item, f.key)} placeholder={f.key === "sortTitle" ? "Automatic" : undefined} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} />
-                  )}
-                  <button
-                    type="button"
-                    disabled={!isLocked}
-                    onClick={() => {
-                      const { [f.key]: _drop, ...rest } = values;
-                      void _drop;
-                      setValues(rest);
-                      setUnlock([...unlock, f.key]);
-                    }}
-                    title={isLocked ? "Locked. Click to unlock." : "Not locked"}
-                    aria-label={isLocked ? `Unlock ${f.label}` : `${f.label} not locked`}
-                    className={isLocked ? "shrink-0 self-start rounded p-2 text-accent hover:bg-surface-2" : "shrink-0 self-start p-2 text-faint"}
-                  >
-                    {isLocked ? <Lock className="size-4" /> : <Unlock className="size-4" />}
-                  </button>
-                </div>
-              )}
-            </Field>
-          );
-        })}
-      </div>
     </Dialog>
   );
 }
@@ -360,7 +250,7 @@ export function ItemActions({ item }: { item: ItemDetail }) {
       {dialog === "match" && <FixMatchDialog item={item} onClose={() => setDialog(null)} />}
       {dialog === "musicMatch" && <MusicMatchDialog item={item} onClose={() => setDialog(null)} />}
       {dialog === "move" && <MoveTrackDialog track={item} onClose={() => setDialog(null)} />}
-      {dialog === "edit" && <EditDialog item={item} onClose={() => setDialog(null)} />}
+      {dialog === "edit" && <EditMetadataDialog item={item} onClose={() => setDialog(null)} />}
       {dialog === "delete" && <DeleteItemDialog item={item} onClose={() => setDialog(null)} />}
     </>
   );

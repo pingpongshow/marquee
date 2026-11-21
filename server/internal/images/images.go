@@ -200,8 +200,9 @@ func (s *Service) original(ctx context.Context, a artwork, key string) ([]byte, 
 		return s.extractEmbedded(ctx, a.localPath)
 	case "frame":
 		return s.extractFrame(ctx, a.localPath)
-	case "generated":
-		// Made by the thumbnail task; the path is inside the image cache.
+	case "generated", "upload":
+		// Made by the thumbnail task, or uploaded by an administrator (META-13); the path is
+		// inside the image cache.
 		p := filepath.Clean(a.localPath)
 		if filepath.IsAbs(p) || strings.HasPrefix(p, "..") {
 			return nil, ErrNotFound

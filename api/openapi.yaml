@@ -1116,6 +1116,89 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /items/{itemId}/artwork:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: listItemArtwork
+      summary: "An item's artwork of one kind to choose from (META-13, admin only): what it has (its own, from files, uploaded, chosen) and, for matched films, shows, seasons and episodes, TMDB's alternatives."
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema: { $ref: "#/components/schemas/ArtworkKind" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ArtworkOption" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/artwork/{kind}:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+      - name: kind
+        in: path
+        required: true
+        schema: { $ref: "#/components/schemas/ArtworkKind" }
+    put:
+      tags: [items]
+      operationId: chooseItemArtwork
+      summary: "Use one of the item's artwork (artworkId), or an image from the web (url: a TMDB alternative, or any https image link) (META-13, admin only). Kept through metadata refreshes until set back to automatic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArtworkChoice" }
+      responses:
+        "200":
+          description: The item as it is now.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [items]
+      operationId: uploadItemArtwork
+      summary: "Upload an image (JPEG, PNG or WebP, up to 20 MB) and use it (META-13, admin only). Kept through metadata refreshes until set back to automatic."
+      requestBody:
+        required: true
+        content:
+          image/*:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: The item as it is now.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [items]
+      operationId: resetItemArtwork
+      summary: "Back to automatic (META-13, admin only): chosen and uploaded images of this kind go, and the item's own or the metadata agents' is used."
+      responses:
+        "200":
+          description: The item as it is now.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /items/{itemId}/match:
     parameters:
       - $ref: "#/components/parameters/ItemId"
@@ -9356,10 +9439,41 @@ components:
         summary: { type: string, maxLength: 10000 }
         tagline: { type: string, maxLength: 500 }
         contentRating: { type: string, maxLength: 20 }
-        studio: { type: string, maxLength: 200 }
+        studio: { type: string, maxLength: 200, description: "The studio or network; a record label for an album." }
+        index: { type: integer, minimum: 0, maximum: 100000, description: "A season's, episode's or track's number (META-13)." }
+        artistCredit: { type: string, maxLength: 300, description: "An album's or track's artist as shown (META-13)." }
+        genres: { type: array, maxItems: 50, items: { type: string, maxLength: 100 }, description: "Replaces the genres (META-13)." }
+        styles: { type: array, maxItems: 50, items: { type: string, maxLength: 100 }, description: "Replaces a music item's styles (META-13)." }
+        moods: { type: array, maxItems: 50, items: { type: string, maxLength: 100 }, description: "Replaces a music item's moods (META-13)." }
+        countries: { type: array, maxItems: 50, items: { type: string, maxLength: 100 }, description: "Replaces the countries (META-13)." }
         unlock:
           type: array
-          items: { type: string, enum: [title, sortTitle, originalTitle, year, originallyAvailableAt, summary, tagline, contentRating, studio] }
+          items: { type: string, enum: [title, sortTitle, originalTitle, year, originallyAvailableAt, summary, tagline, contentRating, studio, index, artistCredit, genres, styles, moods, countries] }
+
+    ArtworkKind:
+      type: string
+      enum: [poster, backdrop, logo, thumb]
+      description: "poster (an album's cover too), backdrop (background), logo (clear logo), thumb (an episode's still)."
+
+    ArtworkOption:
+      type: object
+      required: [source, previewUrl, selected]
+      properties:
+        id: { type: integer, format: int64, description: "The item's own artwork (choose it by id); absent for a TMDB alternative (choose it by url)." }
+        source: { type: string, description: "local (a file beside the media), embedded, tmdb, deezer, fanart, plex, upload, chosen, generated…" }
+        previewUrl: { type: string, description: "A small image to show: /api/v1/images/{id} for the item's own, a TMDB thumbnail for an alternative." }
+        url: { type: string, description: "A TMDB alternative's full image, to choose it." }
+        width: { type: integer }
+        height: { type: integer }
+        language: { type: string }
+        selected: { type: boolean }
+        votes: { type: number, description: "TMDB's rating of an alternative (0–10)." }
+
+    ArtworkChoice:
+      type: object
+      properties:
+        artworkId: { type: integer, format: int64 }
+        url: { type: string, maxLength: 2000, description: "An https image link." }
 
     MatchCandidate:
       type: object
@@ -9479,6 +9593,9 @@ components:
             genres:
               type: array
               items: { type: string }
+            styles: { type: array, items: { type: string }, description: "Music styles (albums and artists)." }
+            moods: { type: array, items: { type: string }, description: "Music moods." }
+            countries: { type: array, items: { type: string }, description: "Countries of production (films and shows)." }
             externalIds:
               type: object
               additionalProperties: { type: string }

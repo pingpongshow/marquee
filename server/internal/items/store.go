@@ -75,6 +75,7 @@ type Detail struct {
 	IMDbVotes, RTCritic, Metacritic      int
 	AniListScore                         int
 	Genres                               []string
+	Styles, Moods, Countries             []string // music styles and moods; countries of production
 	Credits                              []Credit
 	LockedFields                         []string
 	ExternalIDs                          map[string]string
@@ -490,6 +491,25 @@ func (s *Store) Get(ctx context.Context, acc Access, id int64, withPaths bool) (
 		return d, err
 	}
 
+	d.Styles, d.Moods, d.Countries = []string{}, []string{}, []string{}
+	if err := eachRow(ctx, s.db, `SELECT t.kind, t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id
+		WHERE it.item_id = ? AND t.kind IN ('style', 'mood', 'country') ORDER BY t.name`, []any{id}, func(r *sql.Rows) error {
+		var kind, name string
+		if err := r.Scan(&kind, &name); err != nil {
+			return err
+		}
+		switch kind {
+		case "style":
+			d.Styles = append(d.Styles, name)
+		case "mood":
+			d.Moods = append(d.Moods, name)
+		case "country":
+			d.Countries = append(d.Countries, name)
+		}
+		return nil
+	}); err != nil {
+		return d, err
+	}
 	d.Genres = []string{}
 	if err := eachRow(ctx, s.db, `SELECT t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = ? AND t.kind = 'genre' ORDER BY t.name`,
 		[]any{id}, func(r *sql.Rows) error {

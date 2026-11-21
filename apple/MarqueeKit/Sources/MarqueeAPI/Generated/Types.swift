@@ -309,6 +309,26 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PATCH /items/{itemId}/metadata`.
     /// - Remark: Generated from `#/paths//items/{itemId}/metadata/patch(editItem)`.
     func editItem(_ input: Operations.EditItem.Input) async throws -> Operations.EditItem.Output
+    /// An item's artwork of one kind to choose from (META-13, admin only): what it has (its own, from files, uploaded, chosen) and, for matched films, shows, seasons and episodes, TMDB's alternatives.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/artwork`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/artwork/get(listItemArtwork)`.
+    func listItemArtwork(_ input: Operations.ListItemArtwork.Input) async throws -> Operations.ListItemArtwork.Output
+    /// Upload an image (JPEG, PNG or WebP, up to 20 MB) and use it (META-13, admin only). Kept through metadata refreshes until set back to automatic.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/artwork/{kind}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/artwork/{kind}/post(uploadItemArtwork)`.
+    func uploadItemArtwork(_ input: Operations.UploadItemArtwork.Input) async throws -> Operations.UploadItemArtwork.Output
+    /// Use one of the item's artwork (artworkId), or an image from the web (url: a TMDB alternative, or any https image link) (META-13, admin only). Kept through metadata refreshes until set back to automatic.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/artwork/{kind}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/artwork/{kind}/put(chooseItemArtwork)`.
+    func chooseItemArtwork(_ input: Operations.ChooseItemArtwork.Input) async throws -> Operations.ChooseItemArtwork.Output
+    /// Back to automatic (META-13, admin only): chosen and uploaded images of this kind go, and the item's own or the metadata agents' is used.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/artwork/{kind}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/artwork/{kind}/delete(resetItemArtwork)`.
+    func resetItemArtwork(_ input: Operations.ResetItemArtwork.Input) async throws -> Operations.ResetItemArtwork.Output
     /// Candidate matches for Fix Match (admin only, movies and shows).
     ///
     /// - Remark: HTTP `GET /items/{itemId}/match`.
@@ -2346,6 +2366,64 @@ extension APIProtocol {
             path: path,
             headers: headers,
             body: body
+        ))
+    }
+    /// An item's artwork of one kind to choose from (META-13, admin only): what it has (its own, from files, uploaded, chosen) and, for matched films, shows, seasons and episodes, TMDB's alternatives.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/artwork`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/artwork/get(listItemArtwork)`.
+    public func listItemArtwork(
+        path: Operations.ListItemArtwork.Input.Path,
+        query: Operations.ListItemArtwork.Input.Query,
+        headers: Operations.ListItemArtwork.Input.Headers = .init()
+    ) async throws -> Operations.ListItemArtwork.Output {
+        try await listItemArtwork(Operations.ListItemArtwork.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Upload an image (JPEG, PNG or WebP, up to 20 MB) and use it (META-13, admin only). Kept through metadata refreshes until set back to automatic.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/artwork/{kind}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/artwork/{kind}/post(uploadItemArtwork)`.
+    public func uploadItemArtwork(
+        path: Operations.UploadItemArtwork.Input.Path,
+        headers: Operations.UploadItemArtwork.Input.Headers = .init(),
+        body: Operations.UploadItemArtwork.Input.Body
+    ) async throws -> Operations.UploadItemArtwork.Output {
+        try await uploadItemArtwork(Operations.UploadItemArtwork.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Use one of the item's artwork (artworkId), or an image from the web (url: a TMDB alternative, or any https image link) (META-13, admin only). Kept through metadata refreshes until set back to automatic.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/artwork/{kind}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/artwork/{kind}/put(chooseItemArtwork)`.
+    public func chooseItemArtwork(
+        path: Operations.ChooseItemArtwork.Input.Path,
+        headers: Operations.ChooseItemArtwork.Input.Headers = .init(),
+        body: Operations.ChooseItemArtwork.Input.Body
+    ) async throws -> Operations.ChooseItemArtwork.Output {
+        try await chooseItemArtwork(Operations.ChooseItemArtwork.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Back to automatic (META-13, admin only): chosen and uploaded images of this kind go, and the item's own or the metadata agents' is used.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/artwork/{kind}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/artwork/{kind}/delete(resetItemArtwork)`.
+    public func resetItemArtwork(
+        path: Operations.ResetItemArtwork.Input.Path,
+        headers: Operations.ResetItemArtwork.Input.Headers = .init()
+    ) async throws -> Operations.ResetItemArtwork.Output {
+        try await resetItemArtwork(Operations.ResetItemArtwork.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// Candidate matches for Fix Match (admin only, movies and shows).

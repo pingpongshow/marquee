@@ -24,6 +24,7 @@ import (
 	"marquee/internal/avatars"
 	"marquee/internal/bazarr"
 	"marquee/internal/db"
+	"marquee/internal/images"
 	"marquee/internal/items"
 	"marquee/internal/library"
 	"marquee/internal/netclass"
@@ -450,6 +451,74 @@ func TestOpenSignIn(t *testing.T) {
 	h.token = ""
 	if code := h.do("POST", "/auth/pin", map[string]any{"userId": me.Id, "device": device}, &res); code != 401 {
 		t.Fatalf("turned off: %d", code)
+	}
+}
+
+// An administrator uploads a poster, lists the posters to choose from, and sets it back to
+// automatic; others can't (META-13).
+func TestArtworkUploadAndReset(t *testing.T) {
+	h := newHarness(t)
+	var res api.AuthResult
+	h.do("POST", "/setup", map[string]any{"serverName": "T", "username": "admin", "password": "correct horse", "device": device}, &res)
+	h.token = res.Token
+	cache := t.TempDir()
+	h.handlers.Images = images.New(h.db, cache, "ffmpeg")
+	lib, _ := h.db.Exec(`INSERT INTO libraries (name, type) VALUES ('Movies', 'movies')`)
+	libID, _ := lib.LastInsertId()
+	it, _ := h.db.Exec(`INSERT INTO items (library_id, type, title, sort_title) VALUES (?, 'movie', 'Film', 'Film')`, libID)
+	film, _ := it.LastInsertId()
+	h.db.Exec(`INSERT INTO artwork (item_id, kind, source, remote_url, selected) VALUES (?, 'poster', 'tmdb', 'https://image.tmdb.org/t/p/original/a.jpg', 1)`, film)
+
+	var pic bytes.Buffer
+	png.Encode(&pic, image.NewRGBA(image.Rect(0, 0, 20, 30)))
+	upload := func(token string, body []byte) (int, api.ItemDetail) {
+		req, _ := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/items/%d/artwork/poster", h.srv.URL, film), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "image/png")
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var d api.ItemDetail
+		json.NewDecoder(resp.Body).Decode(&d)
+		return resp.StatusCode, d
+	}
+	if code, _ := upload(res.Token, []byte("not an image")); code != 400 {
+		t.Fatalf("not an image: %d", code)
+	}
+	code, d := upload(res.Token, pic.Bytes())
+	if code != 200 || d.Images == nil || d.Images.Poster == nil {
+		t.Fatalf("upload: %d %+v", code, d.Images)
+	}
+	// The uploaded poster is what the item shows, and it's served.
+	resp, _ := h.raw("GET", fmt.Sprintf("/api/v1/images/%d?w=120", *d.Images.Poster), nil)
+	if resp.StatusCode != 200 {
+		t.Fatalf("serving the upload: %d", resp.StatusCode)
+	}
+	var opts []api.ArtworkOption
+	if code := h.do("GET", fmt.Sprintf("/items/%d/artwork?kind=poster", film), nil, &opts); code != 200 || len(opts) != 2 || opts[0].Source != "upload" || !opts[0].Selected {
+		t.Fatalf("options: %d %+v", code, opts)
+	}
+	if code := h.do("PUT", fmt.Sprintf("/items/%d/artwork/poster", film), map[string]any{"url": "file:///etc/passwd"}, nil); code != 400 {
+		t.Fatalf("a file link: %d", code)
+	}
+	if code := h.do("DELETE", fmt.Sprintf("/items/%d/artwork/poster", film), nil, &d); code != 200 {
+		t.Fatalf("reset: %d", code)
+	}
+	h.do("GET", fmt.Sprintf("/items/%d/artwork?kind=poster", film), nil, &opts)
+	if len(opts) != 1 || opts[0].Source != "tmdb" || !opts[0].Selected {
+		t.Fatalf("after reset: %+v", opts)
+	}
+	if entries, _ := os.ReadDir(filepath.Join(cache, "uploads")); len(entries) != 0 {
+		t.Fatalf("the uploaded file stayed: %d", len(entries))
+	}
+	// Only administrators.
+	h.do("POST", "/users", map[string]any{"username": "bob", "password": "bob-password"}, nil)
+	var bob api.AuthResult
+	h.do("POST", "/auth/login", map[string]any{"username": "bob", "password": "bob-password", "device": map[string]any{"clientId": "b", "name": "B"}}, &bob)
+	if code, _ := upload(bob.Token, pic.Bytes()); code != 403 {
+		t.Fatalf("a non-admin uploaded: %d", code)
 	}
 }
 

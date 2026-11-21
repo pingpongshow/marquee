@@ -435,6 +435,28 @@ func (c *Client) imageLangs() string {
 	return lang + ",en,null"
 }
 
+// ImagesOf fetches all of a film's, show's, season's or episode's images in the library's
+// language, English and none (META-13): typ is movie, tv, season or episode; season and episode
+// numbers are used for those.
+func (c *Client) ImagesOf(ctx context.Context, typ string, id, season, episode int) (*Images, error) {
+	var path string
+	switch typ {
+	case "movie":
+		path = "/movie/" + strconv.Itoa(id) + "/images"
+	case "tv":
+		path = "/tv/" + strconv.Itoa(id) + "/images"
+	case "season":
+		path = "/tv/" + strconv.Itoa(id) + "/season/" + strconv.Itoa(season) + "/images"
+	case "episode":
+		path = "/tv/" + strconv.Itoa(id) + "/season/" + strconv.Itoa(season) + "/episode/" + strconv.Itoa(episode) + "/images"
+	default:
+		return nil, fmt.Errorf("no TMDB images for %s", typ)
+	}
+	var imgs Images
+	err := c.get(ctx, path, url.Values{"include_image_language": {c.imageLangs()}}, &imgs)
+	return &imgs, err
+}
+
 // CollectionRef is the TMDB collection (film series) a movie belongs to.
 type CollectionRef struct {
 	ID           int    `json:"id"`

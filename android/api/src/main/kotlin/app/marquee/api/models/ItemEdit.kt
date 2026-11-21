@@ -39,7 +39,13 @@ import kotlinx.serialization.Contextual
  * @param summary 
  * @param tagline 
  * @param contentRating 
- * @param studio 
+ * @param studio The studio or network; a record label for an album.
+ * @param index A season's, episode's or track's number (META-13).
+ * @param artistCredit An album's or track's artist as shown (META-13).
+ * @param genres Replaces the genres (META-13).
+ * @param styles Replaces a music item's styles (META-13).
+ * @param moods Replaces a music item's moods (META-13).
+ * @param countries Replaces the countries (META-13).
  * @param unlock 
  */
 @Serializable
@@ -70,8 +76,33 @@ data class ItemEdit (
     @SerialName(value = "contentRating")
     val contentRating: kotlin.String? = null,
 
+    /* The studio or network; a record label for an album. */
     @SerialName(value = "studio")
     val studio: kotlin.String? = null,
+
+    /* A season's, episode's or track's number (META-13). */
+    @SerialName(value = "index")
+    val index: kotlin.Int? = null,
+
+    /* An album's or track's artist as shown (META-13). */
+    @SerialName(value = "artistCredit")
+    val artistCredit: kotlin.String? = null,
+
+    /* Replaces the genres (META-13). */
+    @SerialName(value = "genres")
+    val genres: kotlin.collections.List<kotlin.String>? = null,
+
+    /* Replaces a music item's styles (META-13). */
+    @SerialName(value = "styles")
+    val styles: kotlin.collections.List<kotlin.String>? = null,
+
+    /* Replaces a music item's moods (META-13). */
+    @SerialName(value = "moods")
+    val moods: kotlin.collections.List<kotlin.String>? = null,
+
+    /* Replaces the countries (META-13). */
+    @SerialName(value = "countries")
+    val countries: kotlin.collections.List<kotlin.String>? = null,
 
     @SerialName(value = "unlock")
     val unlock: kotlin.collections.List<ItemEdit.Unlock>? = null
@@ -81,7 +112,7 @@ data class ItemEdit (
     /**
      * 
      *
-     * Values: TITLE,SORT_TITLE,ORIGINAL_TITLE,YEAR,ORIGINALLY_AVAILABLE_AT,SUMMARY,TAGLINE,CONTENT_RATING,STUDIO
+     * Values: TITLE,SORT_TITLE,ORIGINAL_TITLE,YEAR,ORIGINALLY_AVAILABLE_AT,SUMMARY,TAGLINE,CONTENT_RATING,STUDIO,INDEX,ARTIST_CREDIT,GENRES,STYLES,MOODS,COUNTRIES
      */
     @Serializable
     enum class Unlock(val value: kotlin.String) {
@@ -93,7 +124,13 @@ data class ItemEdit (
         @SerialName(value = "summary") SUMMARY("summary"),
         @SerialName(value = "tagline") TAGLINE("tagline"),
         @SerialName(value = "contentRating") CONTENT_RATING("contentRating"),
-        @SerialName(value = "studio") STUDIO("studio");
+        @SerialName(value = "studio") STUDIO("studio"),
+        @SerialName(value = "index") INDEX("index"),
+        @SerialName(value = "artistCredit") ARTIST_CREDIT("artistCredit"),
+        @SerialName(value = "genres") GENRES("genres"),
+        @SerialName(value = "styles") STYLES("styles"),
+        @SerialName(value = "moods") MOODS("moods"),
+        @SerialName(value = "countries") COUNTRIES("countries");
     }
 
 }

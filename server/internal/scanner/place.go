@@ -443,8 +443,11 @@ func (w *writer) tag(ctx context.Context, itemID int64, kind, name string) {
 	if name == "" {
 		return
 	}
+	// A list an administrator edited (META-13) isn't added to from the files.
+	lock := map[string]string{"genre": "genres", "style": "styles", "mood": "moods", "country": "countries"}[kind]
 	w.tx.ExecContext(ctx, `INSERT OR IGNORE INTO tags(kind, name) VALUES (?, ?)`, kind, name)
-	w.tx.ExecContext(ctx, `INSERT OR IGNORE INTO item_tags(item_id, tag_id) SELECT ?, id FROM tags WHERE kind = ? AND name = ?`, itemID, kind, name)
+	w.tx.ExecContext(ctx, `INSERT OR IGNORE INTO item_tags(item_id, tag_id) SELECT ?, id FROM tags WHERE kind = ? AND name = ?
+		AND NOT EXISTS (SELECT 1 FROM items i, json_each(i.locked_fields) j WHERE i.id = ? AND j.value = ?)`, itemID, kind, name, itemID, lock)
 }
 
 func idKey(ids naming.IDs, fallback string) string {

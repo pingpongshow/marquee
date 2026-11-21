@@ -380,7 +380,8 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		ReleaseType:    (*ItemDetailReleaseType)(sum.ReleaseType),
 		AudienceRating: nz(float32(d.AudienceRating)), Credits: make([]Credit, len(d.Credits)),
 		Summary: nz(d.Plot), Tagline: nz(d.Tagline), ContentRating: nz(d.ContentRating), Studio: nz(d.Studio),
-		Genres: d.Genres, ExternalIds: d.ExternalIDs, LockedFields: d.LockedFields,
+		Genres: d.Genres, Styles: nzSlice(d.Styles), Moods: nzSlice(d.Moods), Countries: nzSlice(d.Countries),
+		ExternalIds: d.ExternalIDs, LockedFields: d.LockedFields,
 		Versions: make([]MediaVersion, len(d.Versions)), Chapters: make([]Chapter, len(d.Chapters)),
 		CommunityRating: sum.CommunityRating, AudioFormat: sum.AudioFormat,
 	}

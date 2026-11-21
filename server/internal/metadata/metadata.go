@@ -845,7 +845,7 @@ func finishMatch(ctx context.Context, tx *sql.Tx, itemID int64, ids map[string]s
 }
 
 func setGenres(ctx context.Context, tx *sql.Tx, itemID int64, genres []tmdb.Genre) error {
-	if len(genres) == 0 {
+	if len(genres) == 0 || tagsLocked(ctx, tx, itemID, "genres") {
 		return nil
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM item_tags WHERE item_id = ? AND tag_id IN (SELECT id FROM tags WHERE kind = 'genre')`, itemID); err != nil {

@@ -69,7 +69,7 @@ func setVideoExtras(ctx context.Context, tx *sql.Tx, itemID int64, x videoExtras
 // replaceTags sets an item's tags of one kind to names (an empty list leaves them alone:
 // TMDB sometimes answers without them).
 func replaceTags(ctx context.Context, tx *sql.Tx, itemID int64, kind string, names []string) error {
-	if len(names) == 0 {
+	if len(names) == 0 || (kind == "country" && tagsLocked(ctx, tx, itemID, "countries")) {
 		return nil
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM item_tags WHERE item_id = ? AND tag_id IN (SELECT id FROM tags WHERE kind = ?)`, itemID, kind); err != nil {
@@ -209,4 +209,14 @@ func (s *Service) saveExtras(ctx context.Context, itemID int64, x videoExtras, f
 		return err
 	}
 	return tx.Commit()
+}
+
+// tagsLocked reports whether an administrator edited one of the item's tag lists (META-13):
+// genres, styles, moods or countries, which agents then leave alone.
+func tagsLocked(ctx context.Context, q interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, itemID int64, lock string) bool {
+	var locked bool
+	q.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM items i, json_each(i.locked_fields) j WHERE i.id = ? AND j.value = ?)`, itemID, lock).Scan(&locked)
+	return locked
 }

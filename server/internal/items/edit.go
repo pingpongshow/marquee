@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strings"
 
 	"marquee/internal/scanner/naming"
 )
@@ -14,14 +15,31 @@ import (
 var editable = map[string]string{
 	"title": "title", "sortTitle": "sort_title", "originalTitle": "original_title", "year": "year",
 	"originallyAvailableAt": "originally_available_at", "summary": "summary", "tagline": "tagline",
-	"contentRating": "content_rating", "studio": "studio",
+	"contentRating": "content_rating", "studio": "studio", "index": "idx", "artistCredit": "artist_credit",
 }
 
-// LockedAPIFields maps stored (column) locks back to API names.
+// TagLocks are the tag lists an administrator can edit (META-13): API name → tag kind. Each is
+// locked by its API name, so metadata agents leave an edited list alone.
+var TagLocks = map[string]string{"genres": "genre", "styles": "style", "moods": "mood", "countries": "country"}
+
+// TagLock is the lock name of a tag kind ("" for kinds that can't be edited).
+func TagLock(kind string) string {
+	for lock, k := range TagLocks {
+		if k == kind {
+			return lock
+		}
+	}
+	return ""
+}
+
+// LockedAPIFields maps stored (column and tag-list) locks back to API names.
 func LockedAPIFields(columns []string) []string {
 	rev := map[string]string{}
 	for api, col := range editable {
 		rev[col] = api
+	}
+	for lock := range TagLocks {
+		rev[lock] = lock
 	}
 	out := []string{}
 	for _, c := range columns {
@@ -33,9 +51,9 @@ func LockedAPIFields(columns []string) []string {
 	return out
 }
 
-// Edit sets fields (API names) and locks them, then unlocks the listed fields.
-// Changing the title also updates and locks the sort title unless one is given.
-func (s *Store) Edit(ctx context.Context, id int64, set map[string]any, unlock []string) error {
+// Edit sets fields (API names) and tag lists (TagLocks names) and locks them, then unlocks the
+// listed fields. Changing the title also updates and locks the sort title unless one is given.
+func (s *Store) Edit(ctx context.Context, id int64, set map[string]any, tags map[string][]string, unlock []string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -73,7 +91,35 @@ func (s *Store) Edit(ctx context.Context, id int64, set map[string]any, unlock [
 		}
 		lockSet[col] = true
 	}
+	for lock, names := range tags {
+		kind, ok := TagLocks[lock]
+		if !ok {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM item_tags WHERE item_id = ? AND tag_id IN (SELECT id FROM tags WHERE kind = ?)`, id, kind); err != nil {
+			return err
+		}
+		seen := map[string]bool{}
+		for _, n := range names {
+			n = strings.TrimSpace(n)
+			if n == "" || seen[strings.ToLower(n)] {
+				continue
+			}
+			seen[strings.ToLower(n)] = true
+			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO tags(kind, name) VALUES (?, ?)`, kind, n); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO item_tags(item_id, tag_id) SELECT ?, id FROM tags WHERE kind = ? AND name = ?`, id, kind, n); err != nil {
+				return err
+			}
+		}
+		lockSet[lock] = true
+	}
 	for _, field := range unlock {
+		if _, isTag := TagLocks[field]; isTag {
+			delete(lockSet, field)
+			continue
+		}
 		delete(lockSet, editable[field])
 	}
 	locked = locked[:0]

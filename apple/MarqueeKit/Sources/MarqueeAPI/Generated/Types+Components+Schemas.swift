@@ -15281,8 +15281,34 @@ extension Components {
             public var tagline: Swift.String?
             /// - Remark: Generated from `#/components/schemas/ItemEdit/contentRating`.
             public var contentRating: Swift.String?
+            /// The studio or network; a record label for an album.
+            ///
             /// - Remark: Generated from `#/components/schemas/ItemEdit/studio`.
             public var studio: Swift.String?
+            /// A season's, episode's or track's number (META-13).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemEdit/index`.
+            public var index: Swift.Int?
+            /// An album's or track's artist as shown (META-13).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemEdit/artistCredit`.
+            public var artistCredit: Swift.String?
+            /// Replaces the genres (META-13).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemEdit/genres`.
+            public var genres: [Swift.String]?
+            /// Replaces a music item's styles (META-13).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemEdit/styles`.
+            public var styles: [Swift.String]?
+            /// Replaces a music item's moods (META-13).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemEdit/moods`.
+            public var moods: [Swift.String]?
+            /// Replaces the countries (META-13).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemEdit/countries`.
+            public var countries: [Swift.String]?
             /// - Remark: Generated from `#/components/schemas/ItemEdit/UnlockPayload`.
             @frozen public enum UnlockPayloadPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case title = "title"
@@ -15294,6 +15320,12 @@ extension Components {
                 case tagline = "tagline"
                 case contentRating = "contentRating"
                 case studio = "studio"
+                case index = "index"
+                case artistCredit = "artistCredit"
+                case genres = "genres"
+                case styles = "styles"
+                case moods = "moods"
+                case countries = "countries"
             }
             /// - Remark: Generated from `#/components/schemas/ItemEdit/unlock`.
             public typealias UnlockPayload = [Components.Schemas.ItemEdit.UnlockPayloadPayload]
@@ -15310,7 +15342,13 @@ extension Components {
             ///   - summary:
             ///   - tagline:
             ///   - contentRating:
-            ///   - studio:
+            ///   - studio: The studio or network; a record label for an album.
+            ///   - index: A season's, episode's or track's number (META-13).
+            ///   - artistCredit: An album's or track's artist as shown (META-13).
+            ///   - genres: Replaces the genres (META-13).
+            ///   - styles: Replaces a music item's styles (META-13).
+            ///   - moods: Replaces a music item's moods (META-13).
+            ///   - countries: Replaces the countries (META-13).
             ///   - unlock:
             public init(
                 title: Swift.String? = nil,
@@ -15322,6 +15360,12 @@ extension Components {
                 tagline: Swift.String? = nil,
                 contentRating: Swift.String? = nil,
                 studio: Swift.String? = nil,
+                index: Swift.Int? = nil,
+                artistCredit: Swift.String? = nil,
+                genres: [Swift.String]? = nil,
+                styles: [Swift.String]? = nil,
+                moods: [Swift.String]? = nil,
+                countries: [Swift.String]? = nil,
                 unlock: Components.Schemas.ItemEdit.UnlockPayload? = nil
             ) {
                 self.title = title
@@ -15333,6 +15377,12 @@ extension Components {
                 self.tagline = tagline
                 self.contentRating = contentRating
                 self.studio = studio
+                self.index = index
+                self.artistCredit = artistCredit
+                self.genres = genres
+                self.styles = styles
+                self.moods = moods
+                self.countries = countries
                 self.unlock = unlock
             }
             public enum CodingKeys: String, CodingKey {
@@ -15345,7 +15395,122 @@ extension Components {
                 case tagline
                 case contentRating
                 case studio
+                case index
+                case artistCredit
+                case genres
+                case styles
+                case moods
+                case countries
                 case unlock
+            }
+        }
+        /// poster (an album's cover too), backdrop (background), logo (clear logo), thumb (an episode's still).
+        ///
+        /// - Remark: Generated from `#/components/schemas/ArtworkKind`.
+        @frozen public enum ArtworkKind: String, Codable, Hashable, Sendable, CaseIterable {
+            case poster = "poster"
+            case backdrop = "backdrop"
+            case logo = "logo"
+            case thumb = "thumb"
+        }
+        /// - Remark: Generated from `#/components/schemas/ArtworkOption`.
+        public struct ArtworkOption: Codable, Hashable, Sendable {
+            /// The item's own artwork (choose it by id); absent for a TMDB alternative (choose it by url).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ArtworkOption/id`.
+            public var id: Swift.Int64?
+            /// local (a file beside the media), embedded, tmdb, deezer, fanart, plex, upload, chosen, generated…
+            ///
+            /// - Remark: Generated from `#/components/schemas/ArtworkOption/source`.
+            public var source: Swift.String
+            /// A small image to show: /api/v1/images/{id} for the item's own, a TMDB thumbnail for an alternative.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ArtworkOption/previewUrl`.
+            public var previewUrl: Swift.String
+            /// A TMDB alternative's full image, to choose it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ArtworkOption/url`.
+            public var url: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ArtworkOption/width`.
+            public var width: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/ArtworkOption/height`.
+            public var height: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/ArtworkOption/language`.
+            public var language: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/ArtworkOption/selected`.
+            public var selected: Swift.Bool
+            /// TMDB's rating of an alternative (0–10).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ArtworkOption/votes`.
+            public var votes: Swift.Double?
+            /// Creates a new `ArtworkOption`.
+            ///
+            /// - Parameters:
+            ///   - id: The item's own artwork (choose it by id); absent for a TMDB alternative (choose it by url).
+            ///   - source: local (a file beside the media), embedded, tmdb, deezer, fanart, plex, upload, chosen, generated…
+            ///   - previewUrl: A small image to show: /api/v1/images/{id} for the item's own, a TMDB thumbnail for an alternative.
+            ///   - url: A TMDB alternative's full image, to choose it.
+            ///   - width:
+            ///   - height:
+            ///   - language:
+            ///   - selected:
+            ///   - votes: TMDB's rating of an alternative (0–10).
+            public init(
+                id: Swift.Int64? = nil,
+                source: Swift.String,
+                previewUrl: Swift.String,
+                url: Swift.String? = nil,
+                width: Swift.Int? = nil,
+                height: Swift.Int? = nil,
+                language: Swift.String? = nil,
+                selected: Swift.Bool,
+                votes: Swift.Double? = nil
+            ) {
+                self.id = id
+                self.source = source
+                self.previewUrl = previewUrl
+                self.url = url
+                self.width = width
+                self.height = height
+                self.language = language
+                self.selected = selected
+                self.votes = votes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case source
+                case previewUrl
+                case url
+                case width
+                case height
+                case language
+                case selected
+                case votes
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ArtworkChoice`.
+        public struct ArtworkChoice: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ArtworkChoice/artworkId`.
+            public var artworkId: Swift.Int64?
+            /// An https image link.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ArtworkChoice/url`.
+            public var url: Swift.String?
+            /// Creates a new `ArtworkChoice`.
+            ///
+            /// - Parameters:
+            ///   - artworkId:
+            ///   - url: An https image link.
+            public init(
+                artworkId: Swift.Int64? = nil,
+                url: Swift.String? = nil
+            ) {
+                self.artworkId = artworkId
+                self.url = url
+            }
+            public enum CodingKeys: String, CodingKey {
+                case artworkId
+                case url
             }
         }
         /// - Remark: Generated from `#/components/schemas/MatchCandidate`.
@@ -15781,6 +15946,18 @@ extension Components {
                 public var studio: Swift.String?
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/genres`.
                 public var genres: [Swift.String]
+                /// Music styles (albums and artists).
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/styles`.
+                public var styles: [Swift.String]?
+                /// Music moods.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/moods`.
+                public var moods: [Swift.String]?
+                /// Countries of production (films and shows).
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/countries`.
+                public var countries: [Swift.String]?
                 /// Provider → ID, e.g. tmdb: 603, imdb: tt0133093.
                 ///
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/externalIds`.
@@ -15826,6 +16003,9 @@ extension Components {
                 ///   - contentRating:
                 ///   - studio:
                 ///   - genres:
+                ///   - styles: Music styles (albums and artists).
+                ///   - moods: Music moods.
+                ///   - countries: Countries of production (films and shows).
                 ///   - externalIds: Provider → ID, e.g. tmdb: 603, imdb: tt0133093.
                 ///   - versions:
                 ///   - chapters:
@@ -15844,6 +16024,9 @@ extension Components {
                     contentRating: Swift.String? = nil,
                     studio: Swift.String? = nil,
                     genres: [Swift.String],
+                    styles: [Swift.String]? = nil,
+                    moods: [Swift.String]? = nil,
+                    countries: [Swift.String]? = nil,
                     externalIds: Components.Schemas.ItemDetail.Value2Payload.ExternalIdsPayload,
                     versions: [Components.Schemas.MediaVersion],
                     chapters: [Components.Schemas.Chapter]
@@ -15862,6 +16045,9 @@ extension Components {
                     self.contentRating = contentRating
                     self.studio = studio
                     self.genres = genres
+                    self.styles = styles
+                    self.moods = moods
+                    self.countries = countries
                     self.externalIds = externalIds
                     self.versions = versions
                     self.chapters = chapters
@@ -15881,6 +16067,9 @@ extension Components {
                     case contentRating
                     case studio
                     case genres
+                    case styles
+                    case moods
+                    case countries
                     case externalIds
                     case versions
                     case chapters

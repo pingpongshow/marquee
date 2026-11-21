@@ -785,6 +785,47 @@ export interface paths {
         patch: operations["editItem"];
         trace?: never;
     };
+    "/items/{itemId}/artwork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** An item's artwork of one kind to choose from (META-13, admin only): what it has (its own, from files, uploaded, chosen) and, for matched films, shows, seasons and episodes, TMDB's alternatives. */
+        get: operations["listItemArtwork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/artwork/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+                kind: components["schemas"]["ArtworkKind"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Use one of the item's artwork (artworkId), or an image from the web (url: a TMDB alternative, or any https image link) (META-13, admin only). Kept through metadata refreshes until set back to automatic. */
+        put: operations["chooseItemArtwork"];
+        /** Upload an image (JPEG, PNG or WebP, up to 20 MB) and use it (META-13, admin only). Kept through metadata refreshes until set back to automatic. */
+        post: operations["uploadItemArtwork"];
+        /** Back to automatic (META-13, admin only): chosen and uploaded images of this kind go, and the item's own or the metadata agents' is used. */
+        delete: operations["resetItemArtwork"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{itemId}/match": {
         parameters: {
             query?: never;
@@ -8409,8 +8450,51 @@ export interface components {
             summary?: string;
             tagline?: string;
             contentRating?: string;
+            /** @description The studio or network; a record label for an album. */
             studio?: string;
-            unlock?: ("title" | "sortTitle" | "originalTitle" | "year" | "originallyAvailableAt" | "summary" | "tagline" | "contentRating" | "studio")[];
+            /** @description A season's, episode's or track's number (META-13). */
+            index?: number;
+            /** @description An album's or track's artist as shown (META-13). */
+            artistCredit?: string;
+            /** @description Replaces the genres (META-13). */
+            genres?: string[];
+            /** @description Replaces a music item's styles (META-13). */
+            styles?: string[];
+            /** @description Replaces a music item's moods (META-13). */
+            moods?: string[];
+            /** @description Replaces the countries (META-13). */
+            countries?: string[];
+            unlock?: ("title" | "sortTitle" | "originalTitle" | "year" | "originallyAvailableAt" | "summary" | "tagline" | "contentRating" | "studio" | "index" | "artistCredit" | "genres" | "styles" | "moods" | "countries")[];
+        };
+        /**
+         * @description poster (an album's cover too), backdrop (background), logo (clear logo), thumb (an episode's still).
+         * @enum {string}
+         */
+        ArtworkKind: "poster" | "backdrop" | "logo" | "thumb";
+        ArtworkOption: {
+            /**
+             * Format: int64
+             * @description The item's own artwork (choose it by id); absent for a TMDB alternative (choose it by url).
+             */
+            id?: number;
+            /** @description local (a file beside the media), embedded, tmdb, deezer, fanart, plex, upload, chosen, generated… */
+            source: string;
+            /** @description A small image to show: /api/v1/images/{id} for the item's own, a TMDB thumbnail for an alternative. */
+            previewUrl: string;
+            /** @description A TMDB alternative's full image, to choose it. */
+            url?: string;
+            width?: number;
+            height?: number;
+            language?: string;
+            selected: boolean;
+            /** @description TMDB's rating of an alternative (0–10). */
+            votes?: number;
+        };
+        ArtworkChoice: {
+            /** Format: int64 */
+            artworkId?: number;
+            /** @description An https image link. */
+            url?: string;
         };
         MatchCandidate: {
             /** @enum {string} */
@@ -8516,6 +8600,12 @@ export interface components {
             contentRating?: string;
             studio?: string;
             genres: string[];
+            /** @description Music styles (albums and artists). */
+            styles?: string[];
+            /** @description Music moods. */
+            moods?: string[];
+            /** @description Countries of production (films and shows). */
+            countries?: string[];
             /** @description Provider → ID, e.g. tmdb: 603, imdb: tt0133093. */
             externalIds: {
                 [key: string]: string;
@@ -10419,6 +10509,121 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listItemArtwork: {
+        parameters: {
+            query: {
+                kind: components["schemas"]["ArtworkKind"];
+            };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtworkOption"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    chooseItemArtwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+                kind: components["schemas"]["ArtworkKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArtworkChoice"];
+            };
+        };
+        responses: {
+            /** @description The item as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    uploadItemArtwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+                kind: components["schemas"]["ArtworkKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "image/*": string;
+            };
+        };
+        responses: {
+            /** @description The item as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    resetItemArtwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+                kind: components["schemas"]["ArtworkKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemDetail"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

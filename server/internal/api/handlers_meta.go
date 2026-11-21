@@ -2,7 +2,15 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -33,6 +41,16 @@ func (h *Handlers) EditItem(ctx context.Context, req EditItemRequestObject) (Edi
 	str("tagline", b.Tagline)
 	str("contentRating", b.ContentRating)
 	str("studio", b.Studio)
+	str("artistCredit", b.ArtistCredit)
+	if b.Index != nil {
+		set["index"] = *b.Index
+	}
+	tags := map[string][]string{}
+	for name, list := range map[string]*[]string{"genres": b.Genres, "styles": b.Styles, "moods": b.Moods, "countries": b.Countries} {
+		if list != nil {
+			tags[name] = *list
+		}
+	}
 	if t, ok := set["title"].(string); ok && t == "" {
 		return EditItem400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "title cannot be empty"))}, nil
 	}
@@ -51,7 +69,7 @@ func (h *Handlers) EditItem(ctx context.Context, req EditItemRequestObject) (Edi
 			unlock = append(unlock, string(u))
 		}
 	}
-	if err := h.Items.Edit(ctx, req.ItemId, set, unlock); errors.Is(err, items.ErrNotFound) {
+	if err := h.Items.Edit(ctx, req.ItemId, set, tags, unlock); errors.Is(err, items.ErrNotFound) {
 		return EditItem404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
 	} else if err != nil {
 		return nil, internal(ctx, "editItem", err)
@@ -276,4 +294,162 @@ func (h *Handlers) RefreshItem(ctx context.Context, req RefreshItemRequestObject
 		return nil, internal(ctx, "refresh", err)
 	}
 	return RefreshItem200JSONResponse(out), nil
+}
+
+// ---------- artwork (META-13) ----------
+
+// nzSlice is nil for an empty list (left out of the JSON).
+func nzSlice(v []string) *[]string {
+	if len(v) == 0 {
+		return nil
+	}
+	return &v
+}
+
+func (h *Handlers) ListItemArtwork(ctx context.Context, req ListItemArtworkRequestObject) (ListItemArtworkResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return ListItemArtwork401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return ListItemArtwork403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	kind := string(req.Params.Kind)
+	own, err := h.Items.ItemArtwork(ctx, req.ItemId, kind)
+	if errors.Is(err, items.ErrNotFound) {
+		return ListItemArtwork404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	if err != nil {
+		return nil, internal(ctx, "itemArtwork", err)
+	}
+	out := ListItemArtwork200JSONResponse{}
+	have := map[string]bool{}
+	for _, a := range own {
+		out = append(out, ArtworkOption{Id: ptr(a.ID), Source: a.Source, PreviewUrl: fmt.Sprintf("/api/v1/images/%d?w=360", a.ID),
+			Width: nz(a.Width), Height: nz(a.Height), Language: nz(a.Language), Selected: a.Selected})
+		if a.RemoteURL != "" {
+			have[a.RemoteURL] = true
+		}
+	}
+	// TMDB's other images: a failure there (no key, offline) leaves just the item's own.
+	if h.Metadata != nil {
+		alts, err := h.Metadata.ArtworkAlternatives(ctx, req.ItemId, kind)
+		if err != nil {
+			slog.WarnContext(ctx, "artwork alternatives", "item", req.ItemId, "err", err)
+		}
+		for _, a := range alts {
+			if have[a.URL] {
+				continue
+			}
+			out = append(out, ArtworkOption{Source: "tmdb", PreviewUrl: a.PreviewURL, Url: ptr(a.URL), Width: nz(a.Width), Height: nz(a.Height),
+				Language: nz(a.Language), Votes: nz(float32(a.Votes))})
+		}
+	}
+	return out, nil
+}
+
+func (h *Handlers) ChooseItemArtwork(ctx context.Context, req ChooseItemArtworkRequestObject) (ChooseItemArtworkResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return ChooseItemArtwork401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return ChooseItemArtwork403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	b, kind := req.Body, string(req.Kind)
+	var err error
+	switch {
+	case b.ArtworkId != nil:
+		err = h.Items.ChooseArtwork(ctx, req.ItemId, kind, *b.ArtworkId)
+	case b.Url != nil:
+		u, perr := url.Parse(strings.TrimSpace(*b.Url))
+		if perr != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			return ChooseItemArtwork400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "an image link starts with https://"))}, nil
+		}
+		err = h.Items.ChooseArtworkURL(ctx, req.ItemId, kind, u.String(), 0, 0)
+	default:
+		return ChooseItemArtwork400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "choose an image or give a link"))}, nil
+	}
+	if errors.Is(err, items.ErrNotFound) {
+		return ChooseItemArtwork404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item or image not found"))}, nil
+	}
+	if err != nil {
+		return nil, internal(ctx, "chooseArtwork", err)
+	}
+	out, err := h.detail(ctx, req.ItemId)
+	if err != nil {
+		return nil, internal(ctx, "chooseArtwork", err)
+	}
+	return ChooseItemArtwork200JSONResponse(out), nil
+}
+
+const maxArtworkUpload = 20 << 20
+
+func (h *Handlers) UploadItemArtwork(ctx context.Context, req UploadItemArtworkRequestObject) (UploadItemArtworkResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return UploadItemArtwork401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return UploadItemArtwork403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	bad := func(msg string) (UploadItemArtworkResponseObject, error) {
+		return UploadItemArtwork400JSONResponse{BadRequestJSONResponse(apiErr("invalid", msg))}, nil
+	}
+	data, err := io.ReadAll(io.LimitReader(req.Body, maxArtworkUpload+1))
+	if err != nil {
+		return bad("couldn't read the image")
+	}
+	if len(data) > maxArtworkUpload {
+		return bad("the image is larger than 20 MB")
+	}
+	ext := map[string]string{"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[http.DetectContentType(data)]
+	if ext == "" {
+		return bad("use a JPEG, PNG or WebP image")
+	}
+	if _, err := h.Items.ItemArtwork(ctx, req.ItemId, string(req.Kind)); errors.Is(err, items.ErrNotFound) {
+		return UploadItemArtwork404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	} else if err != nil {
+		return bad(err.Error())
+	}
+	sum := sha256.Sum256(data)
+	rel := filepath.Join("uploads", fmt.Sprintf("%d-%s-%x.%s", req.ItemId, req.Kind, sum[:8], ext))
+	abs := filepath.Join(h.Images.CacheDir, rel)
+	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+		return nil, internal(ctx, "uploadArtwork", err)
+	}
+	if err := os.WriteFile(abs, data, 0o644); err != nil {
+		return nil, internal(ctx, "uploadArtwork", err)
+	}
+	if err := h.Items.AddUploadedArtwork(ctx, req.ItemId, string(req.Kind), rel); err != nil {
+		return nil, internal(ctx, "uploadArtwork", err)
+	}
+	out, err := h.detail(ctx, req.ItemId)
+	if err != nil {
+		return nil, internal(ctx, "uploadArtwork", err)
+	}
+	return UploadItemArtwork200JSONResponse(out), nil
+}
+
+func (h *Handlers) ResetItemArtwork(ctx context.Context, req ResetItemArtworkRequestObject) (ResetItemArtworkResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return ResetItemArtwork401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return ResetItemArtwork403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	uploads, err := h.Items.ResetArtwork(ctx, req.ItemId, string(req.Kind))
+	if errors.Is(err, items.ErrNotFound) {
+		return ResetItemArtwork404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	if err != nil {
+		return nil, internal(ctx, "resetArtwork", err)
+	}
+	for _, p := range uploads {
+		if !filepath.IsAbs(p) && !strings.HasPrefix(filepath.Clean(p), "..") {
+			os.Remove(filepath.Join(h.Images.CacheDir, p))
+		}
+	}
+	out, err := h.detail(ctx, req.ItemId)
+	if err != nil {
+		return nil, internal(ctx, "resetArtwork", err)
+	}
+	return ResetItemArtwork200JSONResponse(out), nil
 }

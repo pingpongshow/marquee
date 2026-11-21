@@ -94,6 +94,9 @@ import kotlinx.serialization.Contextual
  * @param tagline 
  * @param contentRating 
  * @param studio 
+ * @param styles Music styles (albums and artists).
+ * @param moods Music moods.
+ * @param countries Countries of production (films and shows).
  */
 @Serializable
 
@@ -277,7 +280,19 @@ data class ItemDetail (
     val contentRating: kotlin.String? = null,
 
     @SerialName(value = "studio")
-    val studio: kotlin.String? = null
+    val studio: kotlin.String? = null,
+
+    /* Music styles (albums and artists). */
+    @SerialName(value = "styles")
+    val styles: kotlin.collections.List<kotlin.String>? = null,
+
+    /* Music moods. */
+    @SerialName(value = "moods")
+    val moods: kotlin.collections.List<kotlin.String>? = null,
+
+    /* Countries of production (films and shows). */
+    @SerialName(value = "countries")
+    val countries: kotlin.collections.List<kotlin.String>? = null
 
 ) {
 

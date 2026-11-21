@@ -186,7 +186,7 @@ func TestEditLocksSurviveFixMatch(t *testing.T) {
 	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, year, match_state) VALUES (10, 1, 'movie', 'Wrong', 'Wrong', 1999, 'failed')`)
 
 	st := items.NewStore(d)
-	if err := st.Edit(ctx, 10, map[string]any{"title": "My Matrix Cut"}, nil); err != nil {
+	if err := st.Edit(ctx, 10, map[string]any{"title": "My Matrix Cut"}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	svc := &Service{DB: d, Settings: store}
@@ -210,7 +210,7 @@ func TestEditLocksSurviveFixMatch(t *testing.T) {
 		t.Errorf("locked: %v", det.LockedFields)
 	}
 	// Unlocking hands the title back to the agent on refresh.
-	st.Edit(ctx, 10, map[string]any{}, []string{"title", "sortTitle"})
+	st.Edit(ctx, 10, map[string]any{}, nil, []string{"title", "sortTitle"})
 	if err := svc.Refresh(ctx, 10); err != nil {
 		t.Fatal(err)
 	}
