@@ -99,6 +99,10 @@ public final class VideoPlayback {
     /// Set by `stop()`: a start still under way (the player closed while it loaded) ends there
     /// rather than play on unseen with a server session nobody stops.
     @ObservationIgnored private var stopped = false
+    /// Watches the subtitle picked in the player's own menu (PLAY-8).
+    @ObservationIgnored private var subtitleWatch: NSObjectProtocol?
+    /// The subtitle the player shows (-1 = none), as the server last heard it.
+    @ObservationIgnored private var shownSubtitle: Int64 = -1
 
     public init(app: AppSession, playlistID: Int64? = nil, order: [Int64]? = nil) {
         self.app = app
@@ -198,6 +202,7 @@ public final class VideoPlayback {
             describe(playerItem)
             observe(playerItem)
             player.replaceCurrentItem(with: playerItem)
+            followSubtitles(playerItem, session: s)
             if s.startMs > 0 { await player.seek(to: CMTime(seconds: Double(s.startMs) / 1000, preferredTimescale: 600)) }
             // stop() ran during the seek: it has already let go of the item and ended the session.
             // A newer start has replaced the item and the session.
@@ -209,6 +214,80 @@ public final class VideoPlayback {
             guard generation == startGeneration, !Task.isCancelled, (error as? URLError)?.code != .cancelled else { return }
             errorMessage = (error as? MarqueeError)?.message ?? "Couldn't start playback: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Subtitles chosen in the player (PLAY-8)
+
+    /// The text subtitles of the session's file in the order the server lists them as HLS
+    /// renditions (by stream id; picture subtitles are burned in, not listed).
+    private func renditionStreams(_ s: PlaybackSession) -> [MediaStream] {
+        let files = item?.info.versions.flatMap(\.files) ?? []
+        let file = files.first { $0.id == s.fileId } ?? files.first
+        let image: Set<String> = ["hdmv_pgs_subtitle", "dvd_subtitle", "dvb_subtitle", "xsub"]
+        return (file?.streams ?? []).filter { $0.kind == .subtitle && !image.contains($0.codec) }.sorted { $0.id < $1.id }
+    }
+
+    /// The server's stream id for a rendition in the player's subtitle menu: by its place in the
+    /// list when the lists agree, else by language and the forced flag.
+    private static func streamID(for option: AVMediaSelectionOption, in group: AVMediaSelectionGroup, streams: [MediaStream]) -> Int64? {
+        let options = group.options
+        let forced = option.hasMediaCharacteristic(.containsOnlyForcedSubtitles)
+        if options.count == streams.count, let i = options.firstIndex(of: option) { return streams[i].id }
+        let lang = option.extendedLanguageTag ?? option.locale?.language.languageCode?.identifier
+        let candidates = streams.filter { s in
+            s.forced == forced && (lang == nil || Self.sameLanguage(s.language, lang))
+        }
+        return candidates.first { ($0.title ?? "").isEmpty == false && option.displayName.contains($0.title!) }?.id ?? candidates.first?.id
+    }
+
+    private static func sameLanguage(_ a: String?, _ b: String?) -> Bool {
+        func code(_ l: String?) -> String? {
+            guard let l, !l.isEmpty, l != "und" else { return nil }
+            return Locale(identifier: l).language.languageCode?.identifier(.alpha2) ?? l.lowercased()
+        }
+        return code(a) != nil && code(a) == code(b)
+    }
+
+    /// Shows the subtitle the server chose (its remembered choice for the show, or the person's
+    /// settings) instead of AVFoundation's own pick, and tells the server when the person picks
+    /// another in the player's menu, so the next episode has it too.
+    private func followSubtitles(_ playerItem: AVPlayerItem, session s: PlaybackSession) {
+        if let subtitleWatch { NotificationCenter.default.removeObserver(subtitleWatch) }
+        subtitleWatch = nil
+        shownSubtitle = (s.subtitleStreamId ?? 0) > 0 ? s.subtitleStreamId! : -1
+        guard s._protocol == .hls else { return }
+        let streams = renditionStreams(s)
+        let chosen = s.subtitleStreamId ?? 0
+        // A picture subtitle the server burns in isn't in the menu: the menu stays empty.
+        let burned = chosen > 0 && !streams.contains { $0.id == chosen }
+        Task { [weak self] in
+            guard let group = try? await playerItem.asset.loadMediaSelectionGroup(for: .legible) else { return }
+            guard let self, self.player.currentItem === playerItem, self.session?.id == s.id else { return }
+            let pick = streams.firstIndex { $0.id == chosen }.flatMap { i in
+                group.options.count == streams.count ? group.options[i] : nil
+            } ?? group.options.first { Self.streamID(for: $0, in: group, streams: streams) == chosen && chosen > 0 }
+            if pick != nil || !burned { playerItem.select(pick, in: group) }
+            self.subtitleWatch = NotificationCenter.default.addObserver(forName: AVPlayerItem.mediaSelectionDidChangeNotification,
+                                                                        object: playerItem, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.subtitleChanged(playerItem, group: group, streams: streams, burned: burned, session: s) }
+            }
+        }
+    }
+
+    private func subtitleChanged(_ playerItem: AVPlayerItem, group: AVMediaSelectionGroup, streams: [MediaStream], burned: Bool, session s: PlaybackSession) {
+        guard session?.id == s.id, player.currentItem === playerItem else { return }
+        let option = playerItem.currentMediaSelection.selectedMediaOption(in: group)
+        // Nothing in the menu while a burned-in subtitle shows isn't "subtitles off".
+        if option == nil, burned { return }
+        let id: Int64 = option.map { Self.streamID(for: $0, in: group, streams: streams) ?? 0 } ?? -1
+        guard id != 0, id != shownSubtitle else { return } // 0: a rendition it couldn't place
+        shownSubtitle = id
+        // A restart (an audio or timing change) keeps it.
+        selection.subtitle = id
+        guard let client = app.client else { return }
+        let pos = Int64(max(0, player.currentTime().seconds) * 1000)
+        let state: Schemas.PlaybackProgress.StatePayload = player.timeControlStatus == .paused ? .paused : .playing
+        Task { _ = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: state, subtitleStreamId: id))) }
     }
 
     /// Restarts at the current position with different tracks (audio changes and image
@@ -304,6 +383,8 @@ public final class VideoPlayback {
 
     public func stop() async {
         stopped = true
+        if let subtitleWatch { NotificationCenter.default.removeObserver(subtitleWatch) }
+        subtitleWatch = nil
         offsetRestart?.cancel()
         // The final position reaches the server before the session ends.
         let last = report(.paused, force: true)

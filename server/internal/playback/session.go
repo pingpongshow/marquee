@@ -110,6 +110,9 @@ type Session struct {
 	historyID  int64
 	transcoder *Transcoder
 	rungs      []Rung // lower ABR variants of a remote transcode
+	// The tracks last remembered from the player's reports (RememberChoice), so a report
+	// that repeats them writes nothing.
+	rememberedAudio, rememberedSub int64
 }
 
 // Snapshot is a copy of a session's live state.
@@ -540,24 +543,48 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	}
 	rows.Close()
 
+	// A track id that isn't this file's (one carried over from the last episode) counts as
+	// automatic, so the show's remembered choice applies.
+	if r.AudioStreamID > 0 && !hasStream(auds, r.AudioStreamID, func(st stream) int64 { return st.id }) {
+		r.AudioStreamID = 0
+	}
+	if r.SubtitleStreamID > 0 && !hasStream(subs, r.SubtitleStreamID, func(st stream) int64 { return st.id }) {
+		r.SubtitleStreamID = 0
+	}
+
 	// Track choices are remembered per show (or per movie) and reused when the client asks
-	// for automatic selection (PLAY-8).
+	// for automatic selection (PLAY-8): the same language, and of those the track with the
+	// same title (SDH, Commentary) and, for subtitles, the forced one or not as chosen.
 	memoryID := r.ItemID
 	if typ == "episode" && grandID.Valid {
 		memoryID = grandID.Int64
 	}
+	var memAudioPick, memSubPick *stream
 	if typ != "track" && r.UserID > 0 {
-		var memAudio, memSub sql.NullString
-		m.DB.QueryRowContext(ctx, `SELECT audio_language, subtitle_language FROM user_item_state WHERE user_id = ? AND item_id = ?`,
-			r.UserID, memoryID).Scan(&memAudio, &memSub)
+		var memAudio, memSub, memAudioTitle, memSubTitle sql.NullString
+		var memSubForced sql.NullBool
+		m.DB.QueryRowContext(ctx, `SELECT audio_language, subtitle_language, audio_title, subtitle_title, subtitle_forced
+			FROM user_item_state WHERE user_id = ? AND item_id = ?`, r.UserID, memoryID).
+			Scan(&memAudio, &memSub, &memAudioTitle, &memSubTitle, &memSubForced)
+		info := func(st *stream) (string, string, bool) { return st.lang, st.title, st.forced }
 		if r.AudioStreamID == 0 && memAudio.String != "" {
-			r.UserAudioLang = memAudio.String
+			memAudioPick = rememberedTrack(auds, memAudio.String, memAudioTitle.String, nil, info)
+			if memAudioPick == nil && memAudio.String != undLang {
+				r.UserAudioLang = memAudio.String
+			}
 		}
 		if r.SubtitleStreamID == 0 && memSub.String != "" {
 			if memSub.String == "off" {
 				r.UserSubMode = "off"
 			} else {
-				r.UserSubMode, r.UserSubLang = "always", memSub.String
+				var forced *bool
+				if memSubForced.Valid {
+					forced = &memSubForced.Bool
+				}
+				memSubPick = rememberedTrack(textFirst(subs, func(st stream) string { return st.codec }), memSub.String, memSubTitle.String, forced, info)
+				if memSubPick == nil && memSub.String != undLang {
+					r.UserSubMode, r.UserSubLang = "always", memSub.String
+				}
 			}
 		}
 	}
@@ -568,9 +595,13 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 			BitrateKbps: v.kbps, FrameRate: v.fps, Tag: codecTag(probeJSON, v.index)}
 	}
 
-	// Audio: the requested track, else the user's language, else the default, else the first.
-	var audio *stream
+	// Audio: the requested track, else the one remembered for the show, else the user's
+	// language, else the default, else the first.
+	audio := memAudioPick
 	for i := range auds {
+		if audio != nil && r.AudioStreamID == 0 {
+			break
+		}
 		a := &auds[i]
 		switch {
 		case r.AudioStreamID > 0 && a.id == r.AudioStreamID:
@@ -603,6 +634,8 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 				sub = &subs[i]
 			}
 		}
+	} else if r.SubtitleStreamID == 0 && memSubPick != nil {
+		sub = memSubPick
 	} else if r.SubtitleStreamID == 0 {
 		sub = autoSubtitle(textFirst(subs, func(st stream) string { return st.codec }), r, audio, func(st *stream) (string, bool) { return st.lang, st.forced })
 	}
@@ -618,7 +651,14 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	}
 
 	if typ != "track" && r.UserID > 0 && (r.AudioStreamID != 0 || r.SubtitleStreamID != 0) {
-		rememberTracks(ctx, m, r, memoryID, audio, sub, func(st *stream) string { return st.lang })
+		rememberTracks(ctx, m, r.UserID, memoryID, r.AudioStreamID > 0, audio, r.SubtitleStreamID, sub,
+			func(st *stream) (string, string, bool) { return st.lang, st.title, st.forced })
+	}
+
+	// What the player reports later counts as a choice only when it differs from these.
+	s.rememberedAudio, s.rememberedSub = s.AudioStreamID, s.SubtitleStreamID
+	if s.rememberedSub == 0 {
+		s.rememberedSub = -1
 	}
 
 	s.StartMS = r.StartMS
@@ -691,27 +731,165 @@ func autoSubtitle[T any](subs []T, r Request, audio *T, info func(*T) (string, b
 	return nil
 }
 
-// rememberTracks stores the languages of explicitly chosen tracks on the show or movie.
-func rememberTracks[T any](ctx context.Context, m *Manager, r Request, itemID int64, audio, sub *T, lang func(*T) string) {
-	audioLang, subLang := "", ""
-	if r.AudioStreamID > 0 && audio != nil {
-		audioLang = lang(audio)
+// undLang stands for a track without a language in the remembered choices.
+const undLang = "und"
+
+// rememberTracks stores explicitly chosen tracks on the show or movie (PLAY-8): the audio when
+// audioChosen, and the subtitles when subChoice isn't 0 (-1 = off). Each keeps its language
+// ("und" when it has none), title and, for subtitles, whether it's the forced track.
+func rememberTracks[T any](ctx context.Context, m *Manager, userID, itemID int64, audioChosen bool, audio *T, subChoice int64, sub *T,
+	info func(*T) (lang, title string, forced bool)) {
+	var audioLang, audioTitle, subLang, subTitle string
+	var subForced any
+	if audioChosen && audio != nil {
+		audioLang, audioTitle, _ = info(audio)
+		if audioLang == "" {
+			audioLang = undLang
+		}
 	}
 	switch {
-	case r.SubtitleStreamID < 0:
+	case subChoice < 0:
 		subLang = "off"
-	case r.SubtitleStreamID > 0 && sub != nil:
-		subLang = lang(sub)
+	case subChoice > 0 && sub != nil:
+		var f bool
+		subLang, subTitle, f = info(sub)
+		if subLang == "" {
+			subLang = undLang
+		}
+		subForced = f
 	}
 	if audioLang == "" && subLang == "" {
 		return
 	}
-	_, err := m.DB.ExecContext(ctx, `INSERT INTO user_item_state (user_id, item_id, audio_language, subtitle_language) VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''))
-		ON CONFLICT (user_id, item_id) DO UPDATE SET audio_language = COALESCE(excluded.audio_language, audio_language),
-		subtitle_language = COALESCE(excluded.subtitle_language, subtitle_language)`, r.UserID, itemID, audioLang, subLang)
+	_, err := m.DB.ExecContext(ctx, `INSERT INTO user_item_state (user_id, item_id, audio_language, audio_title, subtitle_language, subtitle_title, subtitle_forced)
+		VALUES (?1, ?2, NULLIF(?3, ''), NULLIF(?4, ''), NULLIF(?5, ''), NULLIF(?6, ''), ?7)
+		ON CONFLICT (user_id, item_id) DO UPDATE SET
+		audio_title = CASE WHEN ?3 != '' THEN NULLIF(?4, '') ELSE audio_title END,
+		audio_language = COALESCE(excluded.audio_language, audio_language),
+		subtitle_title = CASE WHEN ?5 != '' THEN NULLIF(?6, '') ELSE subtitle_title END,
+		subtitle_forced = CASE WHEN ?5 != '' THEN ?7 ELSE subtitle_forced END,
+		subtitle_language = COALESCE(excluded.subtitle_language, subtitle_language)`,
+		userID, itemID, audioLang, audioTitle, subLang, subTitle, subForced)
 	if err != nil {
 		slog.WarnContext(ctx, "remember tracks", "err", err)
 	}
+}
+
+// rememberedTrack finds the track like the one remembered: of those in its language ("und" =
+// none), the one with the same title and forced flag, else the same forced flag, else the
+// first. nil when no track is in that language.
+func rememberedTrack[T any](tracks []T, lang, title string, forced *bool, info func(*T) (string, string, bool)) *T {
+	var best *T
+	bestScore := -1
+	for i := range tracks {
+		l, t, f := info(&tracks[i])
+		if !(sameLanguage(l, lang) || (lang == undLang && l == "")) {
+			continue
+		}
+		score := 0
+		if forced != nil && f == *forced {
+			score += 2
+		}
+		if title != "" && strings.EqualFold(strings.TrimSpace(t), strings.TrimSpace(title)) {
+			score++
+		}
+		if forced == nil && f {
+			score-- // an audio track has no forced flag; nor do older remembered subtitles
+		}
+		if score > bestScore {
+			best, bestScore = &tracks[i], score
+		}
+	}
+	return best
+}
+
+func hasStream[T any](list []T, id int64, idOf func(T) int64) bool {
+	for _, st := range list {
+		if idOf(st) == id {
+			return true
+		}
+	}
+	return false
+}
+
+// sameLanguage compares language tags across their forms: ISO 639-1 (en), and 639-2's
+// bibliographic and terminology codes (fre, fra).
+func sameLanguage(a, b string) bool {
+	a, b = canonicalLang(a), canonicalLang(b)
+	return a != "" && a == b
+}
+
+var langAliases = map[string]string{
+	"en": "eng", "fr": "fre", "fra": "fre", "de": "ger", "deu": "ger", "es": "spa", "it": "ita", "pt": "por", "nl": "dut",
+	"nld": "dut", "ja": "jpn", "ko": "kor", "zh": "chi", "zho": "chi", "ru": "rus", "sv": "swe", "no": "nor", "nb": "nob",
+	"da": "dan", "fi": "fin", "pl": "pol", "cs": "cze", "ces": "cze", "el": "gre", "ell": "gre", "tr": "tur", "ar": "ara",
+	"he": "heb", "hi": "hin", "hu": "hun", "ro": "rum", "ron": "rum", "th": "tha", "vi": "vie", "id": "ind", "uk": "ukr",
+	"fa": "per", "fas": "per", "ms": "may", "msa": "may", "is": "ice", "isl": "ice", "sk": "slo", "slk": "slo",
+}
+
+func canonicalLang(l string) string {
+	l = strings.ToLower(strings.TrimSpace(l))
+	if c, ok := langAliases[l]; ok {
+		return c
+	}
+	return l
+}
+
+// RememberChoice stores tracks a player switched to by itself (a subtitle picked in the
+// player's own menu, which doesn't start a new session) on the session's show or movie, so
+// the next episode plays with them (PLAY-8). audioID 0 and subtitleID 0 leave that choice as
+// it is; subtitleID -1 is subtitles off. Ids that aren't the session's file's are ignored.
+func (m *Manager) RememberChoice(ctx context.Context, s *Session, audioID, subtitleID int64) {
+	if s.External || s.UserID == 0 || s.ItemType == "track" || (audioID == 0 && subtitleID == 0) {
+		return
+	}
+	s.mu.Lock()
+	same := (audioID == 0 || audioID == s.rememberedAudio) && (subtitleID == 0 || subtitleID == s.rememberedSub)
+	if !same {
+		if audioID != 0 {
+			s.rememberedAudio = audioID
+		}
+		if subtitleID != 0 {
+			s.rememberedSub = subtitleID
+		}
+	}
+	s.mu.Unlock()
+	if same {
+		return
+	}
+	type track struct {
+		lang, title string
+		forced      bool
+	}
+	load := func(id int64, kind string) *track {
+		var t track
+		if err := m.DB.QueryRowContext(ctx, `SELECT COALESCE(language, ''), COALESCE(title, ''), is_forced FROM streams WHERE id = ? AND file_id = ? AND kind = ?`,
+			id, s.FileID, kind).Scan(&t.lang, &t.title, &t.forced); err != nil {
+			return nil
+		}
+		return &t
+	}
+	var audio, sub *track
+	if audioID > 0 {
+		if audio = load(audioID, "audio"); audio == nil {
+			audioID = 0
+		}
+	}
+	if subtitleID > 0 {
+		if sub = load(subtitleID, "subtitle"); sub == nil {
+			subtitleID = 0
+		}
+	}
+	memoryID := s.ItemID
+	if s.ItemType == "episode" {
+		var show sql.NullInt64
+		m.DB.QueryRowContext(ctx, `SELECT grandparent_id FROM items WHERE id = ?`, s.ItemID).Scan(&show)
+		if show.Valid {
+			memoryID = show.Int64
+		}
+	}
+	rememberTracks(ctx, m, s.UserID, memoryID, audioID > 0, audio, subtitleID, sub,
+		func(t *track) (string, string, bool) { return t.lang, t.title, t.forced })
 }
 
 func (m *Manager) subtitleRelIndex(ctx context.Context, fileID int64, index int) int {

@@ -194,6 +194,13 @@ func (h *Handlers) ReportPlayback(ctx context.Context, req ReportPlaybackRequest
 			return timeLimitResponse{*e}, nil
 		}
 	}
+	// A track picked in the player's own menu: the show's next episode gets the same (PLAY-8).
+	if s.UserID == me.User.ID && (req.Body.AudioStreamId != nil || req.Body.SubtitleStreamId != nil) {
+		var a, sub int64
+		set(&a, req.Body.AudioStreamId)
+		set(&sub, req.Body.SubtitleStreamId)
+		h.Playback.RememberChoice(ctx, s, a, sub)
+	}
 	if req.Body.State == PlaybackProgressStateError {
 		msg := ""
 		set(&msg, req.Body.Error)

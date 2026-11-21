@@ -164,6 +164,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     var detail by remember { mutableStateOf<ItemDetail?>(null) }
     var thumbs by remember { mutableStateOf<TrickplayThumbs?>(null) }
     var choice by remember { mutableStateOf(Choice()) }
+    // The session whose tracks the player was last set to (see applyServerTracks).
+    var tracksApplied by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
@@ -276,12 +278,13 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 if (old != null) closeSession(old, player.currentPosition)
                 session = s
                 error = null
+                tracksApplied = null
                 val item = MediaItem.Builder().setUri(marquee.absolute(s.url))
                 // Text subtitles come as a WebVTT sidecar.
                 s.subtitleUrl?.takeIf { s.subtitleFormat == PlaybackSession.SubtitleFormat.VTT }?.let { u ->
                     item.setSubtitleConfigurations(listOf(
                         MediaItem.SubtitleConfiguration.Builder(Uri.parse(marquee.absolute(u))).setMimeType(MimeTypes.TEXT_VTT)
-                            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT or C.SELECTION_FLAG_FORCED).build(),
+                            .setId(SERVER_SUBTITLE_ID).setSelectionFlags(C.SELECTION_FLAG_DEFAULT or C.SELECTION_FLAG_FORCED).build(),
                     ))
                 }
                 player.setMediaItem(item.build())
@@ -396,6 +399,15 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     PauseInBackground(player)
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
+            // Once the file's tracks are known, the player uses the ones the server chose for
+            // this session (PLAY-8): the show's remembered audio and subtitles, or the viewer's.
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                val s = session ?: return
+                if (tracksApplied == s.id || tracks.groups.isEmpty() || local != null || roll >= 0) return
+                tracksApplied = s.id
+                val streams = detail?.versions.orEmpty().flatMap { it.files }.firstOrNull { it.id == s.fileId }?.streams.orEmpty()
+                applyServerTracks(player, tracks, s, streams)
+            }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
                 if (!isPlaying) recordLocal()

@@ -317,6 +317,41 @@ export function VideoPlayer({
     [],
   );
 
+  // Subtitles turned off or back on in the browser's own player (iPhone's full screen has its
+  // own subtitle menu), which doesn't start a new session: the server remembers it for the show,
+  // so the next episode plays the same way (PLAY-8). Choices in this player's menu restart the
+  // session with the track asked for, which the server remembers by itself.
+  useEffect(() => {
+    const v = videoRef.current;
+    const subId = sess?.subtitleStreamId;
+    if (!v || !sess || !subId || sess.subtitleFormat === "ass") return;
+    let last: number | undefined;
+    const onChange = () => {
+      const t = trackRef.current?.track;
+      if (!t) return;
+      const choice = t.mode === "showing" ? subId : -1;
+      if (choice === last) return;
+      const first = last === undefined;
+      last = choice;
+      if (first && choice === subId) return; // as the session started
+      const s = sessionRef.current;
+      if (!s || s.id !== sess.id) return;
+      api
+        .PATCH("/playback/sessions/{sessionId}", {
+          params: { path: { sessionId: s.id } },
+          body: {
+            positionMs: Math.round(v.currentTime * 1000),
+            state: v.paused ? "paused" : "playing",
+            subtitleStreamId: choice,
+          },
+        })
+        .catch(() => {});
+    };
+    onChange();
+    v.textTracks.addEventListener("change", onChange);
+    return () => v.textTracks.removeEventListener("change", onChange);
+  }, [sess]);
+
   const stopSession = useCallback(() => {
     const s = sessionRef.current;
     if (!s) return;
