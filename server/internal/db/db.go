@@ -116,3 +116,18 @@ func ApplyPendingRestore(dbPath, configDir, backupDir string) error {
 	slog.Info("restored database from backup")
 	return nil
 }
+
+// ReapplySpokenLanguages gives a file's audio streams without a language the languages
+// Soundprint heard on them before (PLAY-19), after a rescan wrote the streams again, while the
+// file is the same (its size and time).
+func ReapplySpokenLanguages(ctx context.Context, q interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}, fileID int64) error {
+	_, err := q.ExecContext(ctx, `UPDATE streams SET language = (SELECT d.language FROM spoken_languages d JOIN media_files f ON f.id = d.file_id
+			WHERE d.file_id = streams.file_id AND d.stream_index = streams.stream_index AND d.size = f.size AND d.mtime = f.mtime),
+		language_detected = 1
+		WHERE file_id = ? AND kind = 'audio' AND COALESCE(language, '') IN ('', 'und') AND EXISTS (SELECT 1 FROM spoken_languages d
+			JOIN media_files f ON f.id = d.file_id WHERE d.file_id = streams.file_id AND d.stream_index = streams.stream_index
+			AND d.size = f.size AND d.mtime = f.mtime AND d.language IS NOT NULL)`, fileID)
+	return err
+}

@@ -37,6 +37,8 @@ type Health struct {
 	// analysis ids; Traits is the traits analysis id. Empty from an older sidecar.
 	Models map[string]string `json:"models"`
 	Traits string            `json:"traits"`
+	// Speech is the spoken-language analysis id (PLAY-19); empty from an older sidecar.
+	Speech string `json:"speech"`
 }
 
 // ModelID is the analysis id of a sound model by name ("" when the sidecar doesn't offer it).

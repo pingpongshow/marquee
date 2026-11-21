@@ -9535,6 +9535,7 @@ components:
         codec: { type: string }
         profile: { type: string }
         language: { type: string, description: ISO 639-2 code. }
+        languageDetected: { type: boolean, description: "The language was heard by Soundprint because the file doesn't say (PLAY-19), not read from the file. Absent or false when it was read from the file." }
         title: { type: string }
         default: { type: boolean }
         forced: { type: boolean }

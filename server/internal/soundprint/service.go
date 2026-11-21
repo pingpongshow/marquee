@@ -174,6 +174,11 @@ func (s *Service) Analyze(ctx context.Context) (string, error) {
 	} else if n > 0 {
 		summary = append(summary, fmt.Sprintf("read the language of %d tracks' lyrics", n))
 	}
+	if msg, err := s.spokenPass(ctx, h); err != nil {
+		return "", err
+	} else if msg != "" {
+		summary = append(summary, msg)
+	}
 	if msg, err := s.trialPass(ctx, h); err != nil {
 		return "", err
 	} else if msg != "" {

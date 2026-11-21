@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"database/sql"
+	"marquee/internal/db"
 	"path/filepath"
 	"strings"
 	"time"
@@ -217,6 +218,10 @@ func (w *writer) writeStreams(ctx context.Context, fileID int64, c candidate, re
 			nullStr(s.ColorTransfer), nullStr(s.ColorPrimaries)); err != nil {
 			return err
 		}
+	}
+	// Languages Soundprint heard on this file's audio before (PLAY-19), while it's the same file.
+	if err := db.ReapplySpokenLanguages(ctx, w.tx, fileID); err != nil {
+		return err
 	}
 	dirFiles := w.dirs[filepath.Dir(c.Path)]
 	if w.lib.Type != library.Music {

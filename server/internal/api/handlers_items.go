@@ -457,7 +457,7 @@ func toAPIMediaFile(f items.File) MediaFile {
 			Title: nz(st.Title), Default: st.Default, Forced: st.Forced, HearingImpaired: st.HearingImpaired,
 			External: st.External, Channels: nz(st.Channels), ChannelLayout: nz(st.ChannelLayout),
 			SampleRate: nz(st.SampleRate), BitrateKbps: nz(st.BitrateKbps), Width: nz(st.Width), Height: nz(st.Height),
-			FrameRate: nz(float32(st.FrameRate)), BitDepth: nz(st.Depth),
+			FrameRate: nz(float32(st.FrameRate)), BitDepth: nz(st.Depth), LanguageDetected: nz(st.LanguageDetected),
 		}
 	}
 	return mf

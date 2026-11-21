@@ -40,6 +40,7 @@ import kotlinx.serialization.Contextual
  * @param `external` Sidecar subtitle file.
  * @param profile 
  * @param language ISO 639-2 code.
+ * @param languageDetected The language was heard by Soundprint because the file doesn't say (PLAY-19), not read from the file. Absent or false when it was read from the file.
  * @param title 
  * @param channels 
  * @param channelLayout 
@@ -82,6 +83,10 @@ data class MediaStream (
     /* ISO 639-2 code. */
     @SerialName(value = "language")
     val language: kotlin.String? = null,
+
+    /* The language was heard by Soundprint because the file doesn't say (PLAY-19), not read from the file. Absent or false when it was read from the file. */
+    @SerialName(value = "languageDetected")
+    val languageDetected: kotlin.Boolean? = null,
 
     @SerialName(value = "title")
     val title: kotlin.String? = null,

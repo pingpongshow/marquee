@@ -99,11 +99,20 @@ export function audioCodecName(codec: string, profile?: string) {
 // Track titles worth showing: what the track is, not the release group or its format again.
 const usefulTrackTitle = /commentary|descripti|narrat|isolated|score|brazil|latin|castil|european|canad|quebec|mandarin|cantonese/i;
 
+/**
+ * An audio track's language, "English (detected)" when Soundprint heard it because the file
+ * doesn't say (PLAY-19).
+ */
+export function spokenLanguage(s: { language?: string; languageDetected?: boolean }) {
+  const name = languageName(s.language);
+  return name && s.languageDetected ? `${name} (detected)` : name;
+}
+
 /** An audio track on a title's page: "English · Dolby TrueHD 7.1 · Commentary". */
-export function audioTrackLabel(s: { language?: string; codec: string; profile?: string; channels?: number; title?: string }) {
+export function audioTrackLabel(s: { language?: string; languageDetected?: boolean; codec: string; profile?: string; channels?: number; title?: string }) {
   const codec = [audioCodecName(s.codec, s.profile), s.channels === 2 ? "Stereo" : channelsLabel(s.channels)].filter(Boolean).join(" ");
   const title = s.title?.trim();
-  return [languageName(s.language), codec, title && usefulTrackTitle.test(title) ? title : ""].filter(Boolean).join(" · ");
+  return [spokenLanguage(s), codec, title && usefulTrackTitle.test(title) ? title : ""].filter(Boolean).join(" · ");
 }
 
 /** A title's subtitles by language, each once: "English", "English (SDH)", "French (Forced)". */

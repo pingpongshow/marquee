@@ -110,6 +110,7 @@ type Stream struct {
 	ID                                                      int64
 	Kind, Codec, Profile, Language, Title, ChannelLayout    string
 	Default, Forced, HearingImpaired, External              bool
+	LanguageDetected                                        bool // heard by Soundprint, not read from the file (PLAY-19)
 	Channels, SampleRate, BitrateKbps, Width, Height, Depth int
 	FrameRate                                               float64
 }
@@ -582,7 +583,7 @@ func (s *Store) loadStreams(ctx context.Context, idx map[int64]*File) error {
 	return eachRow(ctx, s.db, `SELECT id, file_id, kind, codec, COALESCE(profile, ''), COALESCE(language, ''), COALESCE(title, ''),
 			is_default, is_forced, is_hearing_impaired, external_path IS NOT NULL, COALESCE(channels, 0), COALESCE(channel_layout, ''),
 			COALESCE(sample_rate, 0), COALESCE(bitrate_kbps, 0), COALESCE(width, 0), COALESCE(height, 0), COALESCE(frame_rate, 0),
-			COALESCE(bit_depth, 0)
+			COALESCE(bit_depth, 0), language_detected
 		FROM streams WHERE file_id IN (`+in+`)
 		ORDER BY CASE kind WHEN 'video' THEN 0 WHEN 'audio' THEN 1 ELSE 2 END, external_path IS NOT NULL, stream_index, id`,
 		ids, func(r *sql.Rows) error {
@@ -590,7 +591,7 @@ func (s *Store) loadStreams(ctx context.Context, idx map[int64]*File) error {
 			var fileID int64
 			if err := r.Scan(&st.ID, &fileID, &st.Kind, &st.Codec, &st.Profile, &st.Language, &st.Title, &st.Default, &st.Forced,
 				&st.HearingImpaired, &st.External, &st.Channels, &st.ChannelLayout, &st.SampleRate, &st.BitrateKbps,
-				&st.Width, &st.Height, &st.FrameRate, &st.Depth); err != nil {
+				&st.Width, &st.Height, &st.FrameRate, &st.Depth, &st.LanguageDetected); err != nil {
 				return err
 			}
 			f := idx[fileID]

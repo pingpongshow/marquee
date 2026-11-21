@@ -11,7 +11,9 @@ Runs next to the Marquee server on the same host and is only reachable from it
 - traits: how happy, sad, tender, exciting, angry, danceable, sung, electronic, acoustic and
   ambient a track sounds, from AudioSet's classes (MIT/ast-finetuned-audioset, see traits.py);
 - text embeddings of movie and show descriptions (BAAI/bge-base-en-v1.5, 768-d, unit
-  length) for Muse for movies, recommendations and related items (USER-15, USER-16).
+  length) for Muse for movies, recommendations and related items (USER-15, USER-16);
+- the language a film's or episode's audio track is spoken in, for tracks whose file doesn't
+  say (openai/whisper-base's language identification, see speech.py) (PLAY-19).
 
 Nothing leaves the machine except the one-time model download from Hugging Face.
 
@@ -31,8 +33,9 @@ import torch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from transformers import (ASTFeatureExtractor, ASTForAudioClassification, AutoModel, AutoTokenizer,
-                          ClapConfig, ClapModel, ClapProcessor)
+                          ClapConfig, ClapModel, ClapProcessor, WhisperForConditionalGeneration, WhisperProcessor)
 
+import speech
 import traits as trait_classes
 from idle import IdleModel, start_reaper
 
@@ -56,6 +59,9 @@ SR = 48_000          # CLAP's sample rate
 WINDOW = 10.0        # seconds per CLAP window
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 DOC_MODEL_ID = env("DOC_MODEL", "BAAI/bge-base-en-v1.5")
+# A multilingual Whisper (not a ".en" one): base tells languages apart well, small better.
+SPEECH_MODEL_ID = env("SPEECH_MODEL", "openai/whisper-base")
+SPEECH_ID = f"{SPEECH_MODEL_ID}#2"
 # bge wants this instruction on short queries (not on the documents they search).
 DOC_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 
@@ -201,8 +207,9 @@ def analyze_one(path: str, with_features: bool = True):
 
 @app.get("/health")
 def health():
-    return {"model": ANALYSIS_ID, "models": ANALYSIS_IDS, "traits": TRAITS_ID, "device": device, "dims": CLAP_DIMS,
-            "loaded": {"clap": clap.loaded, "music": claps["music"].loaded, "traits": ast.loaded, "docs": docs.loaded}}
+    return {"model": ANALYSIS_ID, "models": ANALYSIS_IDS, "traits": TRAITS_ID, "speech": SPEECH_ID, "device": device,
+            "dims": CLAP_DIMS, "loaded": {"clap": clap.loaded, "music": claps["music"].loaded, "traits": ast.loaded,
+                                          "docs": docs.loaded, "speech": whisper.loaded}}
 
 
 @app.post("/analyze")
@@ -334,3 +341,83 @@ def embed_docs(req: DocsRequest):
         e = m(**inputs).last_hidden_state[:, 0].float()
         e = torch.nn.functional.normalize(e, dim=-1)
     return {"model": DOC_MODEL_ID, "embeddings": [[round(float(x), 6) for x in v] for v in e.cpu().numpy()]}
+
+
+# ---------- spoken language (PLAY-19) ----------
+
+def load_whisper():
+    proc = WhisperProcessor.from_pretrained(SPEECH_MODEL_ID)
+    m = WhisperForConditionalGeneration.from_pretrained(SPEECH_MODEL_ID).to(device).eval()
+    if device == "cuda":
+        m = m.half()
+    # Whisper's language tokens, "<|en|>" → its id, as "en" → id; and its no-speech token.
+    langs = {tok.strip("<|>"): i for tok, i in m.generation_config.lang_to_id.items()}
+    no_speech = proc.tokenizer.convert_tokens_to_ids("<|nocaptions|>")
+    return m, proc, langs, no_speech
+
+
+whisper = IdleModel(f"{SPEECH_MODEL_ID} on {device}", load_whisper, IDLE_SECONDS)
+
+
+class SpeechItem(BaseModel):
+    path: str
+    stream: int  # the audio stream's index in the file (as ffprobe numbers them)
+
+
+class SpeechRequest(BaseModel):
+    items: list[SpeechItem]
+
+
+def decode_stream(path: str, stream: int, start: float, seconds: float) -> np.ndarray:
+    """One audio stream's excerpt, mono at Whisper's rate."""
+    cmd = [FFMPEG, "-v", "error", "-ss", f"{max(start, 0):.2f}", "-t", f"{seconds:.2f}", "-i", path,
+           "-map", f"0:{stream}", "-vn", "-ac", "1", "-ar", str(speech.SR), "-f", "f32le", "pipe:1"]
+    out = subprocess.run(cmd, capture_output=True, timeout=90)
+    if out.returncode != 0:
+        raise RuntimeError(out.stderr.decode(errors="replace").strip()[:300])
+    return np.frombuffer(out.stdout, dtype=np.float32)
+
+
+def speech_clips(path: str, stream: int):
+    d = duration(path)
+    if d <= 0:
+        raise RuntimeError("unreadable file")
+    clips = [decode_stream(path, stream, t, speech.CLIP) for t in speech.spots(d)]
+    return [c for c in clips if speech.loud_enough(c)]
+
+
+@app.post("/spoken_language")
+def spoken_language(req: SpeechRequest):
+    """The language each audio stream is spoken in, from three short stretches of it: the
+    language at least two of them agree on, with its averaged share of Whisper's odds (0–1).
+    No language when nothing could be heard (a silent or music-only track) or the stretches
+    don't agree."""
+    if len(req.items) > 16:
+        raise HTTPException(400, "at most 16 items per request")
+    jobs = [decoders.submit(speech_clips, it.path, it.stream) for it in req.items]
+    results = []
+    for it, job in zip(req.items, jobs):
+        try:
+            clips = job.result()
+            odds = []
+            if clips:
+                with gpu_lock, torch.inference_mode():
+                    m, proc, langs, no_speech = whisper.get()
+                    feats = proc.feature_extractor(clips, sampling_rate=speech.SR, return_tensors="pt").input_features.to(device)
+                    if device == "cuda":
+                        feats = feats.half()
+                    start = torch.full((feats.shape[0], 1), m.generation_config.decoder_start_token_id, device=device)
+                    logits = m(input_features=feats, decoder_input_ids=start).logits[:, -1, :].float()
+                    silent = torch.softmax(logits, dim=-1)[:, no_speech].cpu().numpy()
+                    ids = torch.tensor(list(langs.values()), device=device)
+                    probs = torch.softmax(logits[:, ids], dim=-1).cpu().numpy()
+                names = list(langs.keys())
+                # Stretches with speech only: music and effects would otherwise get a language.
+                odds = [{names[j]: float(p[j]) for j in np.argsort(p)[-5:]}
+                        for p, ns in zip(probs, silent) if ns < speech.NO_SPEECH]
+            lang, share, heard, agree = speech.combine(odds)
+            results.append({"path": it.path, "stream": it.stream, "language": lang or "", "confidence": round(share, 4),
+                            "heard": heard, "agree": agree})
+        except Exception as e:  # noqa: BLE001 — report per item, keep the batch going
+            results.append({"path": it.path, "stream": it.stream, "error": str(e)[:300]})
+    return {"model": SPEECH_ID, "results": results}

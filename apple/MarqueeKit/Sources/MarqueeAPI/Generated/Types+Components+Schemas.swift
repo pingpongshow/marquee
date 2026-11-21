@@ -16076,6 +16076,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MediaStream/language`.
             public var language: Swift.String?
+            /// The language was heard by Soundprint because the file doesn't say (PLAY-19), not read from the file. Absent or false when it was read from the file.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaStream/languageDetected`.
+            public var languageDetected: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/MediaStream/title`.
             public var title: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MediaStream/default`.
@@ -16112,6 +16116,7 @@ extension Components {
             ///   - codec:
             ///   - profile:
             ///   - language: ISO 639-2 code.
+            ///   - languageDetected: The language was heard by Soundprint because the file doesn't say (PLAY-19), not read from the file. Absent or false when it was read from the file.
             ///   - title:
             ///   - _default:
             ///   - forced:
@@ -16131,6 +16136,7 @@ extension Components {
                 codec: Swift.String,
                 profile: Swift.String? = nil,
                 language: Swift.String? = nil,
+                languageDetected: Swift.Bool? = nil,
                 title: Swift.String? = nil,
                 _default: Swift.Bool,
                 forced: Swift.Bool,
@@ -16150,6 +16156,7 @@ extension Components {
                 self.codec = codec
                 self.profile = profile
                 self.language = language
+                self.languageDetected = languageDetected
                 self.title = title
                 self._default = _default
                 self.forced = forced
@@ -16170,6 +16177,7 @@ extension Components {
                 case codec
                 case profile
                 case language
+                case languageDetected
                 case title
                 case _default = "default"
                 case forced

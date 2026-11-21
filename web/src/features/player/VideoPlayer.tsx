@@ -32,7 +32,7 @@ import type {
   Trickplay,
 } from "@/api/types";
 import { Spinner } from "@/components/ui";
-import { languageName, versionLabel } from "../browse/format";
+import { spokenLanguage, versionLabel } from "../browse/format";
 import { isFullscreen, onFullscreenChange, toggleFullscreen } from "@/lib/fullscreen";
 import { ignoreShortcut } from "@/lib/keys";
 import { Thumbs } from "../music/Rating";
@@ -108,7 +108,7 @@ function fmt(sec: number) {
 
 function trackLabel(s: MediaStream) {
   return [
-    languageName(s.language),
+    spokenLanguage(s),
     s.title,
     s.codec.toUpperCase(),
     s.channels ? `${s.channels > 2 ? `${s.channels - 1}.1` : "Stereo"}` : "",

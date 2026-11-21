@@ -8562,6 +8562,8 @@ export interface components {
             profile?: string;
             /** @description ISO 639-2 code. */
             language?: string;
+            /** @description The language was heard by Soundprint because the file doesn't say (PLAY-19), not read from the file. Absent or false when it was read from the file. */
+            languageDetected?: boolean;
             title?: string;
             default: boolean;
             forced: boolean;
