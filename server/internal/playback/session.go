@@ -1,6 +1,7 @@
 package playback
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -13,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -416,8 +418,19 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 	m.init()
 	m.sessions[s.ID] = s
 	m.mu.Unlock()
+	// Which audio and subtitles it started with, and whether the player asked for them or they
+	// were chosen here (remembered for the show, or the person's languages): what to look at when
+	// a choice didn't carry on to the next episode (PLAY-8).
+	audio, subs := "none", "none"
+	if a := s.Media.Audio; a != nil {
+		audio = cmp.Or(a.Language, "und")
+	}
+	if s.SubtitleStreamID > 0 {
+		subs = strconv.FormatInt(s.SubtitleStreamID, 10)
+	}
 	slog.Info("playback started", "user", s.UserName, "title", s.Title, "method", s.Decision.Method,
-		"remote", s.Remote, "limitKbps", s.LimitKbps, "reasons", strings.Join(s.Decision.Reasons, "; "))
+		"remote", s.Remote, "limitKbps", s.LimitKbps, "reasons", strings.Join(s.Decision.Reasons, "; "),
+		"audio", audio, "audioAsked", r.AudioStreamID != 0, "subtitle", subs, "subtitleAsked", r.SubtitleStreamID != 0)
 	return s, nil
 }
 
