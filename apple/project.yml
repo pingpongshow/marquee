@@ -13,8 +13,8 @@ packages:
     path: MarqueeKit
 settings:
   base:
-    MARKETING_VERSION: "1.11.7"
-    CURRENT_PROJECT_VERSION: "76"
+    MARKETING_VERSION: "1.11.11"
+    CURRENT_PROJECT_VERSION: "77"
     SWIFT_VERSION: "5.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
