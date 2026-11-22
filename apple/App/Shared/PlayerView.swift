@@ -11,7 +11,18 @@ struct PlayerView: View {
     @Environment(VideoPresenter.self) private var presenter
     @Environment(MusicPlayer.self) private var music
     @Environment(\.dismiss) private var dismiss
-    let request: VideoRequest
+    /// The video the player was opened with.
+    private let opened: VideoRequest
+    /// The next episode, once Up Next moved on to it: it plays in this same player. (Changing
+    /// the presented request instead swapped the player while it was on screen, and on the TV
+    /// the new one never started: a spinner until Back.)
+    @State private var nextRequest: VideoRequest?
+    /// What's playing: the video opened, or the episode Up Next moved on to.
+    private var request: VideoRequest { nextRequest ?? opened }
+
+    init(request: VideoRequest) {
+        opened = request
+    }
     @State private var playback: VideoPlayback?
     /// Up Next, once a video with something after it has played to its end.
     @State private var upNext: UpNextContent?
@@ -92,7 +103,15 @@ struct PlayerView: View {
             presenter.failedLibraryItem = request.itemID
             close()
         }
-        .task {
+        .task(id: request.id) {
+            if nextRequest != nil {
+                // The next episode, in this player: what belonged to the last one goes.
+                trailers = []
+                trailerIndex = nil
+                prompted = false
+                endPrompt = nil
+                thumbs = nil
+            }
             music.pause() // a video takes over from the music
             Task { await app.refreshInfo() } // the rating request switch may have changed (USER-19)
             let p = VideoPlayback(app: app, playlistID: request.playlistID, order: request.order)
@@ -126,7 +145,7 @@ struct PlayerView: View {
             // of it here (each step does nothing the second time).
             askAfterClosing()
             endUpNext()
-            if presenter.request?.id == request.id { presenter.request = nil }
+            if presenter.request?.id == opened.id { presenter.request = nil }
             #endif
             #if os(iOS)
             let cast = CastController.shared
@@ -503,9 +522,17 @@ struct PlayerView: View {
     private func playNext() {
         guard let next = playback?.nextUp else { return }
         endUpNext()
+        let old = playback, oldTogether = together
+        let following = VideoRequest(itemID: next.id, startMs: 0, playlistID: request.playlistID, order: request.order)
         Task {
-            await playback?.stop()
-            presenter.play(next.id, startMs: 0, playlistID: request.playlistID, order: request.order)
+            await old?.stop()
+            oldTogether?.leave()
+            #if os(macOS)
+            if let old { MacVideo.shared.ended(player: old.player) }
+            #endif
+            // Its watched state is the server's again, as when a player closes.
+            WatchStore.shared.played(request.itemID)
+            nextRequest = following
         }
     }
 

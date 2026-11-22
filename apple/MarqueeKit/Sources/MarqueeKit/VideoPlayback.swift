@@ -103,6 +103,10 @@ public final class VideoPlayback {
     @ObservationIgnored private var subtitleWatch: NSObjectProtocol?
     /// The subtitle the player shows (-1 = none), as the server last heard it.
     @ObservationIgnored private var shownSubtitle: Int64 = -1
+    /// Direct play: the audio track AVPlayer plays (the server's stream id), and the watch on
+    /// the player's own Audio menu (PLAY-8).
+    @ObservationIgnored private var audioWatch: NSObjectProtocol?
+    @ObservationIgnored private var shownAudio: Int64 = 0
 
     public init(app: AppSession, playlistID: Int64? = nil, order: [Int64]? = nil) {
         self.app = app
@@ -203,6 +207,7 @@ public final class VideoPlayback {
             observe(playerItem)
             player.replaceCurrentItem(with: playerItem)
             followSubtitles(playerItem, session: s)
+            followAudio(playerItem, session: s)
             if s.startMs > 0 { await player.seek(to: CMTime(seconds: Double(s.startMs) / 1000, preferredTimescale: 600)) }
             // stop() ran during the seek: it has already let go of the item and ended the session.
             // A newer start has replaced the item and the session.
@@ -288,6 +293,61 @@ public final class VideoPlayback {
         let pos = Int64(max(0, player.currentTime().seconds) * 1000)
         let state: Schemas.PlaybackProgress.StatePayload = player.timeControlStatus == .paused ? .paused : .playing
         Task { _ = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: state, subtitleStreamId: id))) }
+    }
+
+    // MARK: - Audio chosen in the player (PLAY-8)
+
+    /// The audio tracks of the session's file, in the file's order.
+    private func fileAudioStreams(_ s: PlaybackSession) -> [MediaStream] {
+        let files = item?.info.versions.flatMap(\.files) ?? []
+        let file = files.first { $0.id == s.fileId } ?? files.first
+        return (file?.streams ?? []).filter { $0.kind == .audio }.sorted { $0.id < $1.id }
+    }
+
+    /// A file played as it is holds every audio track, and AVPlayer plays the file's default
+    /// one whatever the server chose: this plays the server's choice (the show's remembered
+    /// audio, or the person's language), and tells the server when the person picks another in
+    /// the player's own Audio menu, so the next episode has it too. (A converted stream has the
+    /// chosen track alone.)
+    private func followAudio(_ playerItem: AVPlayerItem, session s: PlaybackSession) {
+        if let audioWatch { NotificationCenter.default.removeObserver(audioWatch) }
+        audioWatch = nil
+        shownAudio = s.audioStreamId ?? 0
+        guard s._protocol == .file else { return }
+        let streams = fileAudioStreams(s)
+        guard streams.count > 1 else { return }
+        let chosen = s.audioStreamId ?? 0
+        Task { [weak self] in
+            guard let group = try? await playerItem.asset.loadMediaSelectionGroup(for: .audible) else { return }
+            guard let self, self.player.currentItem === playerItem, self.session?.id == s.id else { return }
+            if let i = streams.firstIndex(where: { $0.id == chosen }) {
+                let pick = group.options.count == streams.count ? group.options[i]
+                    : group.options.first { Self.sameLanguage(streams[i].language, $0.extendedLanguageTag ?? $0.locale?.language.languageCode?.identifier) }
+                if let pick { playerItem.select(pick, in: group) }
+            }
+            self.audioWatch = NotificationCenter.default.addObserver(forName: AVPlayerItem.mediaSelectionDidChangeNotification,
+                                                                     object: playerItem, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.audioChanged(playerItem, group: group, streams: streams, session: s) }
+            }
+        }
+    }
+
+    private func audioChanged(_ playerItem: AVPlayerItem, group: AVMediaSelectionGroup, streams: [MediaStream], session s: PlaybackSession) {
+        guard session?.id == s.id, player.currentItem === playerItem,
+              let option = playerItem.currentMediaSelection.selectedMediaOption(in: group) else { return }
+        let id: Int64? = {
+            if group.options.count == streams.count, let i = group.options.firstIndex(of: option) { return streams[i].id }
+            let lang = option.extendedLanguageTag ?? option.locale?.language.languageCode?.identifier
+            return streams.first { Self.sameLanguage($0.language, lang) }?.id
+        }()
+        guard let id, id != shownAudio else { return }
+        shownAudio = id
+        // A restart (a subtitle or timing change) keeps it.
+        selection.audio = id
+        guard let client = app.client else { return }
+        let pos = Int64(max(0, player.currentTime().seconds) * 1000)
+        let state: Schemas.PlaybackProgress.StatePayload = player.timeControlStatus == .paused ? .paused : .playing
+        Task { _ = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: state, audioStreamId: id))) }
     }
 
     /// Restarts at the current position with different tracks (audio changes and image
@@ -385,6 +445,8 @@ public final class VideoPlayback {
         stopped = true
         if let subtitleWatch { NotificationCenter.default.removeObserver(subtitleWatch) }
         subtitleWatch = nil
+        if let audioWatch { NotificationCenter.default.removeObserver(audioWatch) }
+        audioWatch = nil
         offsetRestart?.cancel()
         // The final position reaches the server before the session ends.
         let last = report(.paused, force: true)

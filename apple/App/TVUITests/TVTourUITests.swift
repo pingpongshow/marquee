@@ -206,6 +206,142 @@ final class TVTourUITests: XCTestCase {
         }
     }
 
+    /// Opens a show from the Anime library (Search matches any word, so it can't single one out).
+    private func openAnime(_ title: String) {
+        app.openSection("Anime")
+        let show = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+        guard show.waitForExistence(timeout: 10), reach(show) else { return XCTFail("no \(title) in Anime") }
+        remote.press(.select)
+    }
+
+    /// Back from an episode's page to its season's: the page shows at once with the focus on the
+    /// episode that was opened, not a grey screen until the remote moves.
+    func testBackFromEpisodePageKeepsFocus() throws {
+        try signIn()
+        openAnime("Test Anime")
+        let season = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Season'")).firstMatch
+        guard season.waitForExistence(timeout: 10), reach(season) else { return XCTFail("no season on the show's page") }
+        remote.press(.select)
+        let episode = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '1. '")).firstMatch
+        guard episode.waitForExistence(timeout: 10), reach(episode) else { return XCTFail("no episode on the season's page") }
+        let opened = focusedLabel
+        remote.press(.select)
+        sleep(2)
+        shot("back-1-episode-page")
+        remote.press(.menu)
+        var seen: [String] = []
+        for i in 0..<6 {
+            usleep(250_000)
+            seen.append(focusedLabel)
+            if i == 1 { shot("back-2-after-menu") }
+        }
+        shot("back-3-settled")
+        print("BACK-FOCUS opened=\(opened) after=\(seen)")
+        XCTAssertFalse(seen.dropFirst(2).contains(""), "nothing had the focus after Back: \(seen)")
+        XCTAssertEqual(seen.last, opened, "the focus didn't come back to the episode that was opened")
+    }
+
+    /// The sessions playing on the server: title → position (ms).
+    private func playing() -> [String: Int] {
+        guard let admin = adminToken else { return [:] }
+        var req = URLRequest(url: URL(string: server + "/api/v1/playback/sessions")!)
+        req.setValue("Bearer \(admin)", forHTTPHeaderField: "Authorization")
+        var out: [String: Int] = [:]
+        let done = expectation(description: "sessions")
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            if let data, let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                for s in list { out[s["title"] as? String ?? ""] = s["positionMs"] as? Int ?? 0 }
+            }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 10)
+        return out
+    }
+
+    /// English chosen on a show's first episode: when it ends, Up Next plays the second episode
+    /// by itself (no stall), in English (the show's remembered audio, PLAY-8).
+    func testUpNextPlaysNextEpisodeInChosenLanguage() throws {
+        try signIn()
+        openAnime("Dub Test")
+        let season = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Season'")).firstMatch
+        guard season.waitForExistence(timeout: 10), reach(season) else { return XCTFail("no season") }
+        remote.press(.select)
+        let episode = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '1. '")).firstMatch
+        guard episode.waitForExistence(timeout: 10), reach(episode) else { return XCTFail("no episode 1") }
+        remote.press(.select)
+        let audio = app.buttons["trackChip.audio"]
+        guard audio.waitForExistence(timeout: 10), reach(audio) else { return XCTFail("no audio chip") }
+        remote.press(.select)
+        sleep(2)
+        shot("upnext-0-audio-menu")
+        print("UPNEXT menu: " + app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] 'english' OR label CONTAINS[c] 'japan' OR label CONTAINS[c] 'automatic'"))
+            .allElementsBoundByIndex.map { "\($0.elementType.rawValue):\($0.label)" }.joined(separator: " | ") + " focus=\(focusedLabel)")
+        // The menu's option ("English · 1 ch · AAC"), not the page's track list ("English · AAC Mono").
+        let english = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'English' AND label CONTAINS ' ch '")).firstMatch
+        guard english.waitForExistence(timeout: 5), reach(english) else { return XCTFail("no English in the audio menu") }
+        remote.press(.select)
+        sleep(1)
+        shot("upnext-1-english-chosen")
+        let play = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
+        guard play.waitForExistence(timeout: 5), reach(play) else { return XCTFail("no Play") }
+        remote.press(.select)
+        // 45 s of episode 1, then the 10 s Up Next countdown, then episode 2 starting.
+        sleep(50)
+        shot("upnext-2-countdown")
+        sleep(15)
+        shot("upnext-3-episode-2")
+        // The player reports its position about every ten seconds.
+        let first = playing()
+        sleep(12)
+        let second = playing()
+        print("UPNEXT sessions \(first) → \(second)")
+        let ep2 = second.keys.first { $0.contains("Episode 2") || $0.contains("E02") }
+        XCTAssertNotNil(ep2, "episode 2 isn't playing: \(second)")
+        if let ep2 { XCTAssertGreaterThan(second[ep2] ?? 0, first[ep2] ?? 0, "episode 2 is stalled") }
+        remote.press(.menu)
+        remote.press(.menu)
+    }
+
+    /// Back from pages reached other ways: a Home card, and Back twice from an episode to its show.
+    func testBackFromEpisodePageOtherPaths() throws {
+        try signIn()
+        func quick(_ name: String) {
+            let a = XCTAttachment(screenshot: app.screenshot())
+            a.name = name
+            a.lifetime = .keepAlways
+            add(a)
+        }
+        func afterBack(_ name: String) {
+            remote.press(.menu)
+            usleep(500_000)
+            quick("paths-\(name)-a-0.5s")
+            sleep(3)
+            quick("paths-\(name)-b-3.5s")
+            print("BACK-FOCUS \(name) focus=\(focusedLabel)")
+        }
+        // From Home: the first card that opens a page, then Back to Home.
+        remote.press(.down)
+        sleep(1)
+        let homeCard = focusedLabel
+        remote.press(.select)
+        sleep(2)
+        quick("paths-home-card-page")
+        afterBack("home")
+        print("BACK-FOCUS home card=\(homeCard)")
+        // Show → season → episode, then Back twice.
+        openAnime("Test Anime")
+        let season = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Season'")).firstMatch
+        guard season.waitForExistence(timeout: 10), reach(season) else { return XCTFail("no season") }
+        remote.press(.select)
+        let episode = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '1. '")).firstMatch
+        guard episode.waitForExistence(timeout: 10), reach(episode) else { return XCTFail("no episode") }
+        remote.press(.select)
+        sleep(2)
+        afterBack("to-season")
+        sleep(1)
+        afterBack("to-show")
+    }
+
     /// A film playing: the transport bar, its menus (up from the scrubber) and the info panel
     /// (down), then back to the page.
     func testTour3Player() throws {

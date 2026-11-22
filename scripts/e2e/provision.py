@@ -20,8 +20,8 @@ steps that give the same ids as the original hand-made environment:
   359      00 Preview Test (2024)
   360      Test Saga (collection of 4, 5, 6)
   361, 362 the featurette and Trailers/Official Trailer.mkv of 00 Preview Test
-After that ids don't matter: the Extended Cut version, the Hi-Res FLAC, Getz/Gilberto, and
-the Recorded TV library.
+After that ids don't matter: the Extended Cut version, the Hi-Res FLAC, Getz/Gilberto, the
+Recorded TV library, and Dub Test (three episodes in Japanese and English).
 """
 import base64
 import hashlib
@@ -125,6 +125,18 @@ Dialogue: 0,0:00:01.00,0:00:20.00,Sign,,0,0,0,,{\\pos(640,120)}Rotated magenta s
        "-i", ass, *attach, "-map", "0:v", "-map", "1:a", "-map", "2:s", "-c:v", "libx264", "-preset", "ultrafast",
        "-c:a", "aac", "-c:s", "ass", os.path.join(d, "Test Anime - S01E01.mkv"))
     os.remove(ass)
+
+    # Dub Test: three short episodes with Japanese (the default) and English audio, for Up Next
+    # and the audio remembered for a show (PLAY-8). Added after everything else (fixed ids).
+    d = os.path.join(st, "anime/Dub Test/Season 01")
+    os.makedirs(d)
+    for n in (1, 2, 3):
+        ff("-f", "lavfi", "-i", "testsrc=size=640x360:rate=24:duration=45", "-f", "lavfi", "-i", "sine=frequency=330:duration=45",
+           "-f", "lavfi", "-i", "sine=frequency=550:duration=45", "-map", "0:v", "-map", "1:a", "-map", "2:a",
+           "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
+           "-metadata:s:a:0", "language=jpn", "-metadata:s:a:0", "title=Japanese", "-disposition:a:0", "default",
+           "-metadata:s:a:1", "language=eng", "-metadata:s:a:1", "title=English", "-disposition:a:1", "0",
+           os.path.join(d, f"Dub Test - S01E0{n}.mkv"))
 
     # Movies: 300 tiny generated ones, plus the long test and the preview test with extras.
     base = os.path.join(st, "base.mp4")
@@ -383,6 +395,16 @@ def provision(e):
     env.move("recordings/TV", dest_root=e)
     lib = a.call("POST", "/libraries", {"name": "Recorded TV", "type": "shows", "paths": [os.path.join(e, "recordings/TV")]})
     env.libs["Recorded TV"] = lib["id"]
+
+    # Dub Test (two audio languages, three episodes), after the fixed ids.
+    env.move("anime/Dub Test")
+    a.call("POST", f"/libraries/{env.libs['Anime']}/scan")
+    for _ in range(120):
+        time.sleep(1)
+        if any(i["title"] == "Dub Test" for i in a.call("GET", f"/libraries/{env.libs['Anime']}/items")["items"]) and env.idle():
+            break
+    else:
+        raise SystemExit("Dub Test didn't show up in Anime")
 
     # Integrations: OpenSubtitles (dummy key), the fake IPTV source and the fake Bazarr.
     a.call("PATCH", "/settings", {"metadata": {"openSubtitlesApiKey": "test-key"}})
