@@ -276,8 +276,8 @@ struct LiveTVView: View {
         let group = ["all", "favorites", "recent", "hidden"].contains(filter) ? nil : filter
         do {
             channels = try await app.liveChannels(group: group, favorites: filter == "favorites", recent: filter == "recent", hidden: filter == "hidden")
-            guide = filter == "hidden" ? [:] : try await app.liveGuide(from: start, to: start.addingTimeInterval(GuideGrid.hours * 3600), group: group,
-                                                                       favorites: filter == "favorites", recent: filter == "recent")
+            guide = try await app.liveGuide(from: start, to: start.addingTimeInterval(GuideGrid.hours * 3600), group: group,
+                                            favorites: filter == "favorites", recent: filter == "recent", hidden: filter == "hidden")
             error = nil
         } catch {
             self.error = error.localizedDescription

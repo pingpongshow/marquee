@@ -53,8 +53,8 @@ public extension AppSession {
         try await liveAPI.listLiveGroups().ok.body.json.map(\.name)
     }
 
-    func liveGuide(from: Date, to: Date, group: String? = nil, favorites: Bool = false, recent: Bool = false) async throws -> [Int64: [LiveProgramme]] {
-        let rows = try await liveAPI.liveGuide(query: .init(start: from, end: to, group: group, favorites: favorites ? true : nil, recent: recent ? true : nil)).ok.body.json
+    func liveGuide(from: Date, to: Date, group: String? = nil, favorites: Bool = false, recent: Bool = false, hidden: Bool = false) async throws -> [Int64: [LiveProgramme]] {
+        let rows = try await liveAPI.liveGuide(query: .init(start: from, end: to, group: group, favorites: favorites ? true : nil, recent: recent ? true : nil, hidden: hidden ? true : nil)).ok.body.json
         // A channel listed twice is merged rather than crashing the guide.
         return Dictionary(rows.map { ($0.channelId, $0.programmes) }, uniquingKeysWith: { $0 + $1 })
     }

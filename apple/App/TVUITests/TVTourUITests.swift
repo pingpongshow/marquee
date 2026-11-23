@@ -241,6 +241,77 @@ final class TVTourUITests: XCTestCase {
         XCTAssertEqual(seen.last, opened, "the focus didn't come back to the episode that was opened")
     }
 
+    /// How much of a screenshot is drawn on: the share of sampled pixels that differ from the
+    /// commonest colour (the page's background). A blank page is near 0.
+    private func drawnShare(_ shot: XCUIScreenshot) -> Double {
+        guard let image = shot.image.cgImage else { return 0 }
+        let w = 192, h = 108
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        guard let ctx = CGContext(data: &pixels, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return 0 }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var counts: [Int: Int] = [:]
+        for i in 0..<(w * h) {
+            // Colours in steps of 16 a channel, so a gradient's neighbours count as one.
+            counts[Int(pixels[i * 4] >> 4) << 8 | Int(pixels[i * 4 + 1] >> 4) << 4 | Int(pixels[i * 4 + 2] >> 4), default: 0] += 1
+        }
+        return 1 - Double(counts.values.max() ?? 0) / Double(w * h)
+    }
+
+    /// Back from a late episode's page of a long season, the season's page scrolled well down
+    /// its list: the episode rows are on screen at once, without moving the focus, and the focus
+    /// is on the episode that was opened. (Reported on an Apple TV as a grey screen until the
+    /// remote moved.)
+    func testBackFromLateEpisodeShowsTheList() throws {
+        try signIn()
+        openAnime("Long Season")
+        let season = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Season'")).firstMatch
+        guard season.waitForExistence(timeout: 10), reach(season) else { return XCTFail("no season on the show's page") }
+        remote.press(.select)
+        // The list is lazy: the tenth row exists once the page has scrolled down to it.
+        let episode = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '10. '")).firstMatch
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH '1. '")).firstMatch.waitForExistence(timeout: 10), "no episodes")
+        for _ in 0..<40 where !focusedLabel.hasPrefix("10. ") {
+            // Down the list to its row, then along the row to its title (the still comes first).
+            guard episode.exists, focused.exists else { remote.press(.down); continue }
+            let dy = episode.frame.midY - focused.frame.midY
+            remote.press(abs(dy) < 30 ? .right : dy > 0 ? .down : .up)
+        }
+        let opened = focusedLabel
+        guard opened.hasPrefix("10. ") else { return XCTFail("couldn't get to episode 10; focus is on \(opened)") }
+        sleep(2)
+        let before = app.screenshot()
+        let drawnBefore = drawnShare(before)
+        let a = XCTAttachment(screenshot: before)
+        a.name = "tour-late-0-season-page"
+        a.lifetime = .keepAlways
+        add(a)
+        remote.press(.select)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch.waitForExistence(timeout: 10), "the episode's page didn't open")
+        sleep(2)
+        shot("late-1-episode-page")
+        remote.press(.menu)
+        // Nothing is pressed from here on: what shows is what Back alone brought.
+        var drawn: [Double] = [], focus: [String] = [], rows: [Int] = []
+        let screen = app.windows.firstMatch.frame
+        for i in 0..<4 {
+            usleep(i == 0 ? 1_000_000 : 1_500_000)
+            let s = app.screenshot()
+            drawn.append(drawnShare(s))
+            focus.append(focusedLabel)
+            rows.append(app.buttons.matching(NSPredicate(format: "label MATCHES '^[0-9]+\\. .*'")).allElementsBoundByIndex
+                .filter { $0.frame.height > 0 && screen.contains(CGPoint(x: $0.frame.midX, y: $0.frame.midY)) }.count)
+            let a = XCTAttachment(screenshot: s)
+            a.name = "tour-late-2-after-back-\(i)"
+            a.lifetime = .keepAlways
+            add(a)
+        }
+        print("BACK-LATE opened=\(opened) drawnBefore=\(drawnBefore) drawnAfter=\(drawn) rows=\(rows) focus=\(focus)")
+        XCTAssertGreaterThanOrEqual(rows.first ?? 0, 3, "episode rows aren't on screen after Back: \(rows)")
+        XCTAssertGreaterThan(drawn.first ?? 0, drawnBefore * 0.6, "the page is mostly blank after Back: \(drawn) (was \(drawnBefore))")
+        XCTAssertEqual(focus.last, opened, "the focus didn't come back to the episode that was opened: \(focus)")
+    }
+
     /// The sessions playing on the server: title → position (ms).
     private func playing() -> [String: Int] {
         guard let admin = adminToken else { return [:] }

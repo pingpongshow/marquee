@@ -31,8 +31,9 @@ final class FavoriteStore {
                 HomeChanges.shared.version += 1
             } catch is CancellationError {
             } catch {
-                overrides[id] = old
-                DislikeStore.shared.note(id, oldDislike)
+                // Only what this change set goes back: a newer one made meanwhile stays.
+                if overrides[id] == on { overrides[id] = old }
+                if on, DislikeStore.shared.override(id) == false { DislikeStore.shared.note(id, oldDislike) }
                 ActionError.shared.message = "Couldn't save the favourite: \(error.localizedDescription)"
             }
         }
@@ -107,12 +108,14 @@ final class DislikeStore {
                 if on, track, overrides[id] == true { music.thumbedDown(id) }
             } catch is CancellationError {
             } catch {
-                overrides[id] = old
+                // Only what this change set goes back: a newer one made meanwhile (a thumbs up
+                // right after it) stays.
+                if overrides[id] == on { overrides[id] = old }
                 if on {
-                    favorites.note(id, oldFavorite)
-                    likes.note(id, oldLike)
+                    if favorites.override(id) == false { favorites.note(id, oldFavorite) }
+                    if likes.override(id) == false { likes.note(id, oldLike) }
                 }
-                if clearsRating { ratings.set(id, oldRating) }
+                if clearsRating, ratings.rating(id, nil) == nil { ratings.set(id, oldRating) }
                 ActionError.shared.message = "Couldn't save the thumbs down: \(error.localizedDescription)"
             }
         }
@@ -157,8 +160,9 @@ final class LikeStore {
                 HomeChanges.shared.version += 1
             } catch is CancellationError {
             } catch {
-                overrides[id] = old
-                if on { dislikes.note(id, oldDislike) }
+                // Only what this change set goes back: a newer one made meanwhile stays.
+                if overrides[id] == on { overrides[id] = old }
+                if on, dislikes.override(id) == false { dislikes.note(id, oldDislike) }
                 ActionError.shared.message = "Couldn't save the thumbs up: \(error.localizedDescription)"
             }
         }

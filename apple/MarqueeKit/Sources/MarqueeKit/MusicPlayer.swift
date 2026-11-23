@@ -1375,8 +1375,10 @@ public final class MusicPlayer {
 
     /// Who the saved music belongs to: the server and the person signed in.
     private var saveOwner: String? {
-        guard let base = app.baseURL, let me = app.me?.id else { return nil }
-        return "\(base.absoluteString)|\(me)"
+        // The server itself, not the address it was reached at: saved at home, the music is
+        // still theirs when the app next connects from outside (another address).
+        guard let server = app.server?.id, let me = app.me?.id else { return nil }
+        return "\(server)|\(me)"
     }
 
     private static var savedQueueFile: URL {

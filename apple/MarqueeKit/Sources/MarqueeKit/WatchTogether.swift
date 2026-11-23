@@ -34,6 +34,10 @@ public final class WatchTogether {
     @ObservationIgnored private var buffering = false
     /// Set while the player restarts its stream; cleared once it plays again.
     @ObservationIgnored private var restartingUntil = Date.distantPast
+    /// Counts leaves: a start or join still on its way to the server when the viewer left (the
+    /// player closed, or moved on to the next episode) leaves the group it gets instead of
+    /// following it on a closed player, where nothing would ever tell the server.
+    @ObservationIgnored private var leaves = 0
 
     /// How far apart players may drift before being pulled back.
     static let drift: Double = 1.5
@@ -64,7 +68,9 @@ public final class WatchTogether {
     public func start() async {
         do {
             let pos = Int64(max(0, player.currentTime().seconds) * 1000)
+            let left = leaves
             let g = try await client.createWatchGroup(body: .json(.init(itemId: itemID, positionMs: pos))).created.body.json
+            guard left == leaves else { return abandon(g) }
             begin(g)
         } catch {
             self.error = error.localizedDescription
@@ -74,7 +80,9 @@ public final class WatchTogether {
     /// Joins a group someone else started.
     public func join(_ id: String) async {
         do {
+            let left = leaves
             let g = try await client.joinWatchGroup(path: .init(groupId: id)).ok.body.json
+            guard left == leaves else { return abandon(g) }
             begin(g)
         } catch {
             self.error = "Couldn't join: \(error.localizedDescription)"
@@ -82,9 +90,16 @@ public final class WatchTogether {
     }
 
     public func leave() {
+        leaves += 1
         guard let g = group else { return }
         group = nil
         stopObserving()
+        let c = app.client
+        Task { _ = try? await c?.leaveWatchGroup(path: .init(groupId: g.id)) }
+    }
+
+    /// A group joined after the viewer had already left: left again, without following it.
+    private func abandon(_ g: WatchGroup) {
         let c = app.client
         Task { _ = try? await c?.leaveWatchGroup(path: .init(groupId: g.id)) }
     }
@@ -215,6 +230,9 @@ public final class WatchTogether {
         let pos = Int64(max(0, player.currentTime().seconds) * 1000)
         do {
             let next = try await client.watchGroupCommand(path: .init(groupId: g.id), body: .json(.init(action: action, positionMs: pos))).ok.body.json
+            // Left (or the group ended) while it was sent: the answer mustn't bring the group
+            // back. Nor may it replace a newer state the poll brought meanwhile.
+            guard let now = group, now.id == g.id, next.version >= now.version else { return }
             group = next
         } catch {
             self.error = error.localizedDescription

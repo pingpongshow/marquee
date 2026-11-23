@@ -593,9 +593,9 @@ struct PlaylistView: View {
         } else if shuffle {
             // Every item once, in a random order, one after another.
             let order = items.map(\.id).shuffled()
-            video.play(order[0], startMs: 0, playlistID: id, order: order)
+            video.play(order[0], startMs: 0, playlistID: id, order: order, position: 0)
         } else {
-            video.play(items[start].id, startMs: 0, playlistID: id)
+            video.play(items[start].id, startMs: 0, playlistID: id, position: start)
         }
     }
 }
@@ -768,7 +768,11 @@ struct PlaylistEditSheet: View {
                     row(e).tag(e.entryId)
                 }
                 .onMove { entries.move(fromOffsets: $0, toOffset: $1) }
-                .onDelete { entries.remove(atOffsets: $0) }
+                .onDelete { offsets in
+                    // Out of the selection too: "Delete 2" went on counting a row that was gone.
+                    selection.subtract(offsets.map { entries[$0].entryId })
+                    entries.remove(atOffsets: offsets)
+                }
             }
             #if os(iOS)
             .environment(\.editMode, .constant(.active))

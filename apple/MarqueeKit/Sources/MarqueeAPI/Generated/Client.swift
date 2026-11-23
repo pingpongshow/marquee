@@ -22741,6 +22741,13 @@ public struct Client: APIProtocol {
                     name: "recent",
                     value: input.query.recent
                 )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "hidden",
+                    value: input.query.hidden
+                )
                 converter.setAcceptHeader(
                     in: &request.headerFields,
                     contentTypes: input.headers.accept

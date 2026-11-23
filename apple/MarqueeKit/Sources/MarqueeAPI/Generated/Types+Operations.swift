@@ -36319,6 +36319,10 @@ public enum Operations {
                 public var favorites: Swift.Bool?
                 /// - Remark: Generated from `#/paths/livetv/guide/GET/query/recent`.
                 public var recent: Swift.Bool?
+                /// Only the channels the caller hid (otherwise they're left out).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/guide/GET/query/hidden`.
+                public var hidden: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
@@ -36327,18 +36331,21 @@ public enum Operations {
                 ///   - group:
                 ///   - favorites:
                 ///   - recent:
+                ///   - hidden: Only the channels the caller hid (otherwise they're left out).
                 public init(
                     start: Foundation.Date,
                     end: Foundation.Date,
                     group: Swift.String? = nil,
                     favorites: Swift.Bool? = nil,
-                    recent: Swift.Bool? = nil
+                    recent: Swift.Bool? = nil,
+                    hidden: Swift.Bool? = nil
                 ) {
                     self.start = start
                     self.end = end
                     self.group = group
                     self.favorites = favorites
                     self.recent = recent
+                    self.hidden = hidden
                 }
             }
             public var query: Operations.LiveGuide.Input.Query

@@ -6,8 +6,9 @@ struct SignInView: View {
     @Environment(AppSession.self) private var app
     @State private var profiles: [Schemas.Profile] = []
     @State private var chosen: Schemas.Profile?
-    /// The profile picked that signs in with a password: its name goes in the username field.
-    @State private var passwordProfile: String?
+    /// The profile picked that signs in with a password: its name goes in the username field,
+    /// and it signs in as that profile (its username may be something else).
+    @State private var passwordProfile: Schemas.Profile?
     @State private var mode: Mode = .profiles
     @State private var error: String?
     @State private var busy = false
@@ -26,7 +27,7 @@ struct SignInView: View {
                     if let lastError = app.lastError { ErrorBanner(message: lastError).frame(maxWidth: 520) }
                     switch mode {
                     case .profiles: profilePicker
-                    case .password: PasswordForm(prefill: passwordProfile, onError: { error = $0 })
+                    case .password: PasswordForm(profile: passwordProfile, onError: { error = $0 }).id(passwordProfile?.id)
                     case .quickConnect: QuickConnectView(onError: { error = $0 })
                     }
                     modeButtons
@@ -65,7 +66,7 @@ struct SignInView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: avatarSize + 30), spacing: 24)], spacing: 24) {
                 ForEach(profiles, id: \.id) { p in
                     Button {
-                        if p.requires == .none { Task { await pinSignIn(p, pin: nil) } } else if p.requires == .password { chosen = nil; passwordProfile = p.displayName; mode = .password } else { chosen = p }
+                        if p.requires == .none { Task { await pinSignIn(p, pin: nil) } } else { ask(p) }
                     } label: {
                         VStack(spacing: 8) {
                             AvatarView(name: p.displayName, url: p.avatarUrl, size: avatarSize)
@@ -99,6 +100,17 @@ struct SignInView: View {
     private let avatarSize: CGFloat = 76
     #endif
 
+    /// The PIN pad or the password form for a profile that needs one.
+    private func ask(_ p: Schemas.Profile) {
+        if p.requires == .password {
+            chosen = nil
+            passwordProfile = p
+            mode = .password
+        } else {
+            chosen = p
+        }
+    }
+
     /// Signs in as the profile. A refused PIN's reason is returned for the PIN pad to show
     /// (the page's own banner is behind its sheet); anything else shows on the page.
     @discardableResult
@@ -111,6 +123,19 @@ struct SignInView: View {
             return nil
         } catch {
             if pin != nil { return error.localizedDescription }
+            // A profile that opened without a PIN when the list was loaded (at home) and was
+            // refused: the list is old (the device has left home since, or the profile changed).
+            // With a fresh one it asks for what the profile needs now, rather than refusing
+            // every tap until the server locks the profile.
+            if let fresh = try? await app.profiles() {
+                profiles = fresh
+                if let now = fresh.first(where: { $0.id == p.id }), now.requires != .none {
+                    self.error = nil
+                    ask(now)
+                    return nil
+                }
+                if fresh.isEmpty { mode = isTV ? .quickConnect : .password }
+            }
             self.error = error.localizedDescription
             return nil
         }
@@ -165,7 +190,8 @@ struct PinEntry: View {
 
 private struct PasswordForm: View {
     @Environment(AppSession.self) private var app
-    var prefill: String?
+    /// The profile picked on Who's watching?, if any: its name is filled in.
+    var profile: Schemas.Profile?
     let onError: (String) -> Void
     @State private var username = ""
     @State private var password = ""
@@ -194,7 +220,13 @@ private struct PasswordForm: View {
                 busy = true
                 Task {
                     do {
-                        try await app.signIn(username: username, password: password, totpCode: needsCode ? code : nil)
+                        if let profile, username == profile.displayName {
+                            // The profile that was picked, by its id: the name filled in is its
+                            // display name, and the username it signs in with may be another.
+                            try await app.pinSignIn(userID: profile.id, pin: nil, password: password, totpCode: needsCode ? code : nil)
+                        } else {
+                            try await app.signIn(username: username, password: password, totpCode: needsCode ? code : nil)
+                        }
                     } catch is TwoFactorRequired {
                         needsCode = true
                         onError("Enter the code from your authenticator app, or a recovery code.")
@@ -211,7 +243,7 @@ private struct PasswordForm: View {
         .textFieldStyle(.roundedBorder)
         #endif
         .frame(maxWidth: 420)
-        .onAppear { if let prefill { username = prefill } }
+        .onAppear { if let profile { username = profile.displayName } }
     }
 }
 

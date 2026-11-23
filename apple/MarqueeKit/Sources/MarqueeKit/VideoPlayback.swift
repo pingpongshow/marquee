@@ -30,6 +30,8 @@ public final class VideoPlayback {
     public private(set) var session: PlaybackSession?
     public private(set) var item: ItemDetail?
     public private(set) var nextUp: Item?
+    /// Where `nextUp` is in the playlist's play order (nil outside a playlist).
+    public private(set) var nextUpPosition: Int?
     public private(set) var activeMarker: Marker?
     public private(set) var errorMessage: String?
     /// Set when the profile's time limit or viewing hours refused or ended playback (kids'
@@ -62,6 +64,9 @@ public final class VideoPlayback {
     private let playlistID: Int64?
     /// A shuffled playlist's play order (item ids); nil = the playlist's own order.
     private let order: [Int64]?
+    /// Where this video is in the playlist's play order, when the player was told (Up Next
+    /// moved on to it); otherwise its first place there.
+    private let playlistPosition: Int?
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var endObserver: NSObjectProtocol?
@@ -106,12 +111,17 @@ public final class VideoPlayback {
     /// Direct play: the audio track AVPlayer plays (the server's stream id), and the watch on
     /// the player's own Audio menu (PLAY-8).
     @ObservationIgnored private var audioWatch: NSObjectProtocol?
-    @ObservationIgnored private var shownAudio: Int64 = 0
+    /// 0 = not known. Observed: the TV's own Audio menu ticks it.
+    private var shownAudio: Int64 = 0
+    /// The option of the player's Audio menu that is playing, as last seen: a change from it is
+    /// the person's pick. Nil until the player has settled on one.
+    @ObservationIgnored private var shownAudioOption: AVMediaSelectionOption?
 
-    public init(app: AppSession, playlistID: Int64? = nil, order: [Int64]? = nil) {
+    public init(app: AppSession, playlistID: Int64? = nil, order: [Int64]? = nil, position: Int? = nil) {
         self.app = app
         self.playlistID = playlistID
         self.order = order
+        playlistPosition = position
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] t in
             MainActor.assumeIsolated { self?.tick(t.seconds) }
         }
@@ -313,6 +323,7 @@ public final class VideoPlayback {
         if let audioWatch { NotificationCenter.default.removeObserver(audioWatch) }
         audioWatch = nil
         shownAudio = s.audioStreamId ?? 0
+        shownAudioOption = nil
         guard s._protocol == .file else { return }
         let streams = fileAudioStreams(s)
         guard streams.count > 1 else { return }
@@ -320,10 +331,15 @@ public final class VideoPlayback {
         Task { [weak self] in
             guard let group = try? await playerItem.asset.loadMediaSelectionGroup(for: .audible) else { return }
             guard let self, self.player.currentItem === playerItem, self.session?.id == s.id else { return }
-            if let i = streams.firstIndex(where: { $0.id == chosen }) {
-                let pick = group.options.count == streams.count ? group.options[i]
-                    : group.options.first { Self.sameLanguage(streams[i].language, $0.extendedLanguageTag ?? $0.locale?.language.languageCode?.identifier) }
-                if let pick { playerItem.select(pick, in: group) }
+            let pick = streams.first { $0.id == chosen }.flatMap { Self.audioOption(for: $0, in: group, streams: streams) }
+            if let pick { playerItem.select(pick, in: group) }
+            // What plays now is where the person's own picks are told from: the server's choice
+            // when it could be selected, else whatever the player chose (the file's default).
+            // The id is that track's, not the server's choice it couldn't select: otherwise the
+            // first change of any menu reported the default as the person's pick.
+            self.shownAudioOption = pick ?? playerItem.currentMediaSelection.selectedMediaOption(in: group)
+            if let now = self.shownAudioOption {
+                self.shownAudio = Self.audioStreamID(for: now, in: group, streams: streams) ?? 0
             }
             self.audioWatch = NotificationCenter.default.addObserver(forName: AVPlayerItem.mediaSelectionDidChangeNotification,
                                                                      object: playerItem, queue: .main) { [weak self] _ in
@@ -332,15 +348,43 @@ public final class VideoPlayback {
         }
     }
 
+    /// The server's stream for an option of the player's Audio menu: by its place when the lists
+    /// agree, else by language, and only when one track alone has that language (of two
+    /// English tracks, the film and its commentary, it can't say which).
+    private static func audioStreamID(for option: AVMediaSelectionOption, in group: AVMediaSelectionGroup, streams: [MediaStream]) -> Int64? {
+        if group.options.count == streams.count, let i = group.options.firstIndex(of: option) { return streams[i].id }
+        let lang = option.extendedLanguageTag ?? option.locale?.language.languageCode?.identifier
+        let same = streams.filter { sameLanguage($0.language, lang) }
+        return same.count == 1 ? same[0].id : nil
+    }
+
+    /// The other way: the Audio menu's option for one of the file's tracks, as surely.
+    private static func audioOption(for stream: MediaStream, in group: AVMediaSelectionGroup, streams: [MediaStream]) -> AVMediaSelectionOption? {
+        if group.options.count == streams.count, let i = streams.firstIndex(where: { $0.id == stream.id }) { return group.options[i] }
+        guard streams.filter({ sameLanguage($0.language, stream.language) }).count == 1 else { return nil }
+        let same = group.options.filter { sameLanguage(stream.language, $0.extendedLanguageTag ?? $0.locale?.language.languageCode?.identifier) }
+        return same.count == 1 ? same[0] : nil
+    }
+
     private func audioChanged(_ playerItem: AVPlayerItem, group: AVMediaSelectionGroup, streams: [MediaStream], session s: PlaybackSession) {
         guard session?.id == s.id, player.currentItem === playerItem,
               let option = playerItem.currentMediaSelection.selectedMediaOption(in: group) else { return }
-        let id: Int64? = {
-            if group.options.count == streams.count, let i = group.options.firstIndex(of: option) { return streams[i].id }
-            let lang = option.extendedLanguageTag ?? option.locale?.language.languageCode?.identifier
-            return streams.first { Self.sameLanguage($0.language, lang) }?.id
-        }()
-        guard let id, id != shownAudio else { return }
+        // The player hadn't settled on a track when the watch began: this is its own first
+        // choice (or ours arriving), not the person's.
+        guard let before = shownAudioOption else {
+            shownAudioOption = option
+            shownAudio = Self.audioStreamID(for: option, in: group, streams: streams) ?? 0
+            return
+        }
+        // Another menu changed (subtitles), or our own selection came round again.
+        guard option != before else { return }
+        shownAudioOption = option
+        // A track it can't place isn't reported (0), and stays off the TV's Audio menu's tick.
+        guard let id = Self.audioStreamID(for: option, in: group, streams: streams) else {
+            shownAudio = 0
+            return
+        }
+        guard id != shownAudio else { return }
         shownAudio = id
         // A restart (a subtitle or timing change) keeps it.
         selection.audio = id
@@ -443,10 +487,7 @@ public final class VideoPlayback {
 
     public func stop() async {
         stopped = true
-        if let subtitleWatch { NotificationCenter.default.removeObserver(subtitleWatch) }
-        subtitleWatch = nil
-        if let audioWatch { NotificationCenter.default.removeObserver(audioWatch) }
-        audioWatch = nil
+        unfollow()
         offsetRestart?.cancel()
         // The final position reaches the server before the session ends.
         let last = report(.paused, force: true)
@@ -462,9 +503,32 @@ public final class VideoPlayback {
         itemStatus = nil
     }
 
+    /// Stops watching the player's own Subtitles and Audio menus. Each watch holds its player
+    /// item, so one left behind kept a stream that had ended in memory.
+    private func unfollow() {
+        if let subtitleWatch { NotificationCenter.default.removeObserver(subtitleWatch) }
+        subtitleWatch = nil
+        if let audioWatch { NotificationCenter.default.removeObserver(audioWatch) }
+        audioWatch = nil
+        shownAudioOption = nil
+    }
+
+    /// The audio tracks of the file that's playing (the version chosen, not always the first),
+    /// for the TV's Audio menu.
+    public var audioStreams: [MediaStream] {
+        let files = item?.info.versions.flatMap(\.files) ?? []
+        let file = files.first { $0.id == (session?.fileId ?? fileID) } ?? files.first
+        return (file?.streams ?? []).filter { $0.kind == .audio }
+    }
+
+    /// The audio track playing: the one picked in the player's own Audio menu on a file played
+    /// as it is, else the one the stream was started with.
+    public var playingAudioID: Int64? { shownAudio > 0 ? shownAudio : session?.audioStreamId }
+
     /// Hands playback to another device (Chromecast): ends this stream but stays ready for
     /// `start` to carry on here later.
     public func handOff() async {
+        unfollow()
         let last = report(.paused, force: true)
         player.pause()
         player.replaceCurrentItem(with: nil)
@@ -486,6 +550,7 @@ public final class VideoPlayback {
         timeLimitReason = reached.reason
         errorMessage = nil
         offsetRestart?.cancel()
+        unfollow()
         player.pause()
         player.replaceCurrentItem(with: nil)
         await stopSession()
@@ -515,18 +580,23 @@ public final class VideoPlayback {
         Task {
             if let playlistID, let entries = try? await app.playlistItems(playlistID) {
                 // Up next in the playlist (shuffled or in order); nothing after its last item.
-                if let order {
-                    let next = order.firstIndex(of: itemID).flatMap { $0 + 1 < order.count ? order[$0 + 1] : nil }
-                    nextUp = next.flatMap { id in entries.first { $0.item.id == id }?.item }
-                } else if let i = entries.firstIndex(where: { $0.item.id == itemID }), i + 1 < entries.count {
-                    nextUp = entries[i + 1].item
+                // From its own place when that's known: found by id alone, a video that's in the
+                // playlist twice led back to what follows its first place, for ever.
+                let ids = order ?? entries.map(\.item.id)
+                let at = playlistPosition.flatMap { ids.indices.contains($0) && ids[$0] == itemID ? $0 : nil } ?? ids.firstIndex(of: itemID)
+                let next = at.flatMap { $0 + 1 < ids.count ? $0 + 1 : nil }
+                if let next, order == nil {
+                    nextUp = entries[next].item
                 } else {
-                    nextUp = nil
+                    nextUp = next.flatMap { i in entries.first { $0.item.id == ids[i] }?.item }
                 }
+                nextUpPosition = nextUp == nil ? nil : next
             } else if item?.type == .episode {
                 nextUp = await app.next(after: itemID)
+                nextUpPosition = nil
             } else {
                 nextUp = nil
+                nextUpPosition = nil
             }
         }
     }

@@ -28,7 +28,7 @@ the fake VOD sources answer each video request that late, like a slow IPTV sourc
   - `twofa` / `correct horse battery`, with two-factor sign-in on (the secret is in `.e2e/twofa.secret`)
 - **Tokens:** the admin's in `.e2e/token` and Kiddo's in `.e2e/kid.token`.
 - **Libraries:**
-  - Anime: Test Anime, with styled ASS subtitles and an embedded font; Dub Test, three 45 s episodes with Japanese and English audio (Up Next, remembered audio)
+  - Anime: Test Anime, with styled ASS subtitles and an embedded font; Dub Test, three 45 s episodes with Japanese and English audio (Up Next, remembered audio); Long Season, fourteen 5 s episodes (a season page scrolled down its list)
   - Movies: 300 generated titles, plus `00 Long Test` and `00 Preview Test` (featurette, trailer, Extended Cut), and the Test Saga collection
   - Music: Test Artist 1-3, six 40-second albums (Calm Pads/Floating has an `.lrc`), a 24-bit/96 kHz FLAC, and Getz/Gilberto with cover art
   - Recorded TV: one Weather Watch episode

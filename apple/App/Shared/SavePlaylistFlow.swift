@@ -78,6 +78,7 @@ private struct SavePlaylistFlow: ViewModifier {
         Task {
             do {
                 saved = try await app.createPlaylist(title: name, kind: .audio, items: req.itemIDs)
+                PlaylistChanges.shared.changed() // the Playlists page lists it
             } catch {
                 self.error = error.localizedDescription
             }

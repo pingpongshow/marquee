@@ -140,7 +140,9 @@ struct MacQueueList: View {
 struct MacSongActions: View {
     @Environment(MusicPlayer.self) private var music
     @Environment(AppSession.self) private var app
-    @State private var adding = false
+    /// The song being added to a playlist: the one playing when + was pressed, not whichever
+    /// plays by the time a playlist is chosen.
+    @State private var adding: Item?
     @State private var showingQueue = false
     var showsDislike = false
 
@@ -148,9 +150,9 @@ struct MacSongActions: View {
         HStack(spacing: 2) {
             if let t = music.current?.item {
                 if !app.offlineUI {
-                    MacBarButton(systemImage: "plus", label: "Add to Playlist", identifier: "bar.addToPlaylist") { adding = true }
-                        .popover(isPresented: $adding, arrowEdge: .top) {
-                            AddToPlaylistSheet(item: t).macEnvironment().frame(width: 360, height: 420).preferredColorScheme(.dark)
+                    MacBarButton(systemImage: "plus", label: "Add to Playlist", identifier: "bar.addToPlaylist") { adding = t }
+                        .popover(item: $adding, arrowEdge: .top) { song in
+                            AddToPlaylistSheet(item: song).macEnvironment().frame(width: 360, height: 420).preferredColorScheme(.dark)
                         }
                     MacBarButton(systemImage: "music.note", label: "Track Radio", identifier: "bar.trackRadio") {
                         music.startRadio(itemID: t.id, app: app)

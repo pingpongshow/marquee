@@ -161,6 +161,9 @@ struct AddToPlaylistSheet: View {
     @State private var newTitle = ""
     @State private var error: String?
     @State private var done: String?
+    /// From a tap until the sheet closes: a second tap would add the item twice (or make two
+    /// playlists).
+    @State private var working = false
 
     private var kind: Schemas.PlaylistKind { item.isMusic ? .audio : .video }
 
@@ -173,28 +176,23 @@ struct AddToPlaylistSheet: View {
                     HStack {
                         TextField("Name", text: $newTitle)
                         Button("Create") {
-                            Task {
-                                do {
-                                    let p = try await app.createPlaylist(title: newTitle, kind: kind, items: [item.id])
-                                    finish(p.title)
-                                } catch { self.error = error.localizedDescription }
-                            }
+                            let title = newTitle.trimmingCharacters(in: .whitespaces)
+                            run { try await app.createPlaylist(title: title, kind: kind, items: [item.id]).title }
                         }
-                        .disabled(newTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(working || newTitle.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
                 Section(kind == .audio ? "Music playlists" : "Video playlists") {
                     ForEach(playlists, id: \.id) { p in
                         Button {
-                            Task {
-                                do {
-                                    try await app.addToPlaylist(p.id, items: [item.id])
-                                    finish(p.title)
-                                } catch { self.error = error.localizedDescription }
+                            run {
+                                try await app.addToPlaylist(p.id, items: [item.id])
+                                return p.title
                             }
                         } label: {
                             LabeledContent(p.title, value: "\(p.itemCount)")
                         }
+                        .disabled(working)
                     }
                 }
             }
@@ -205,8 +203,23 @@ struct AddToPlaylistSheet: View {
         }
     }
 
-    private func finish(_ title: String) {
-        done = title
-        Task { try? await Task.sleep(for: .milliseconds(700)); dismiss() }
+    /// Adds (or creates), once: says where it went and closes. A failure lets the person try again.
+    private func run(_ add: @escaping @MainActor () async throws -> String) {
+        guard !working else { return }
+        working = true
+        error = nil
+        Task {
+            do {
+                done = try await add()
+                // Playlist pages that are open show it (an editor saving a list from before the
+                // add would take it out again).
+                PlaylistChanges.shared.changed()
+                try? await Task.sleep(for: .milliseconds(700))
+                dismiss()
+            } catch {
+                self.error = error.localizedDescription
+                working = false
+            }
+        }
     }
 }

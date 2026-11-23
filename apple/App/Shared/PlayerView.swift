@@ -112,9 +112,20 @@ struct PlayerView: View {
                 endPrompt = nil
                 thumbs = nil
             }
+            #if os(iOS)
+            // Casting follows this video's player from here: the last episode's (stopped) one
+            // must not be handed to a Cast device that connects now. A video played from a
+            // download never casts.
+            let cast = CastController.shared
+            cast.onVideoConnected = nil
+            cast.onVideoEnded = nil
+            cast.onVideoFinished = nil
+            casting = false
+            castError = nil
+            #endif
             music.pause() // a video takes over from the music
             Task { await app.refreshInfo() } // the rating request switch may have changed (USER-19)
-            let p = VideoPlayback(app: app, playlistID: request.playlistID, order: request.order)
+            let p = VideoPlayback(app: app, playlistID: request.playlistID, order: request.order, position: request.position)
             playback = p
             #if os(macOS)
             MacVideo.shared.began(player: p.player, playback: p, close: close)
@@ -140,6 +151,9 @@ struct PlayerView: View {
         }
         .onDisappear {
             life.closed = true
+            // After Up Next moved on, the presenter still holds the video the player opened
+            // with: the one playing now has its watched state from the server again too.
+            if nextRequest != nil { WatchStore.shared.played(request.itemID) }
             #if !os(tvOS)
             // AVKit's own close button (iOS 26) dismisses the cover without close(): do the rest
             // of it here (each step does nothing the second time).
@@ -284,6 +298,9 @@ struct PlayerView: View {
         cast.onVideoConnected = { handOff(p) }
         cast.onVideoFinished = { close() }
         cast.onVideoEnded = { at in
+            // Only a video that was on the device carries on here from where the device was: one
+            // that never got there (the cast failed) is already playing here.
+            guard casting else { return }
             casting = false
             let s = p.session
             Task { await begin(p) { await p.start(itemID: request.itemID, startMs: Int64(at * 1000), audio: s?.audioStreamId, subtitle: s?.subtitleStreamId, fileID: s?.fileId) } }
@@ -523,7 +540,9 @@ struct PlayerView: View {
         guard let next = playback?.nextUp else { return }
         endUpNext()
         let old = playback, oldTogether = together
-        let following = VideoRequest(itemID: next.id, startMs: 0, playlistID: request.playlistID, order: request.order)
+        // Not the watch-together group: a group watches one video, and the others are still on it.
+        let following = VideoRequest(itemID: next.id, startMs: 0, playlistID: request.playlistID, order: request.order,
+                                     position: playback?.nextUpPosition, advance: request.advance + 1)
         Task {
             await old?.stop()
             oldTogether?.leave()
@@ -867,10 +886,10 @@ struct PlayerController: UIViewControllerRepresentable {
     #if os(tvOS)
     /// Everything the transport bar menus depend on.
     private var menuSignature: String {
-        let audio = playback.item?.info.versions.first?.files.first?.streams.filter { $0.kind == .audio }.map { String($0.id) } ?? []
+        let audio = playback.audioStreams.map { String($0.id) }
         let group = together?.group.map { g in "\(g.id):" + g.members.map(\.name).joined(separator: ",") } ?? "-"
         return [trailer != nil ? "T" : "", "\(playback.speed)", "\(playback.subtitleOffsetMs)", "\(playback.audioOffsetMs)",
-                playback.offlineTitle == nil ? "" : "off", audio.joined(separator: ","), "\(playback.session?.audioStreamId ?? -1)",
+                playback.offlineTitle == nil ? "" : "off", audio.joined(separator: ","), "\(playback.playingAudioID ?? -1)",
                 playback.nightMode ? "night" : "",
                 together == nil ? "" : "t", group,
                 thumbs.map { "\($0.target.id)\($0.target.isLiked)\($0.target.isDisliked)" } ?? ""].joined(separator: "|")
@@ -929,8 +948,10 @@ struct PlayerController: UIViewControllerRepresentable {
     /// Audio tracks and night mode (switching either restarts the stream at the same position).
     private func audioMenu() -> [UIMenuElement] {
         guard playback.offlineTitle == nil else { return [] }
-        let streams = playback.item?.info.versions.first?.files.first?.streams.filter { $0.kind == .audio } ?? []
-        let current = playback.session?.audioStreamId
+        // The file that's playing (the version chosen on the page, not always the first), and
+        // the track playing now, a pick in the player's own Audio menu included.
+        let streams = playback.audioStreams
+        let current = playback.playingAudioID
         let tracks: [UIMenuElement] = streams.count > 1 ? [UIMenu(options: .displayInline, children: streams.map { s in
             UIAction(title: [s.title ?? languageName(s.language), s.codec.uppercased()].joined(separator: " · "),
                      state: s.id == current ? .on : .off) { _ in Task { await playback.change(audio: s.id) } }

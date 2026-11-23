@@ -21,7 +21,8 @@ steps that give the same ids as the original hand-made environment:
   360      Test Saga (collection of 4, 5, 6)
   361, 362 the featurette and Trailers/Official Trailer.mkv of 00 Preview Test
 After that ids don't matter: the Extended Cut version, the Hi-Res FLAC, Getz/Gilberto, the
-Recorded TV library, and Dub Test (three episodes in Japanese and English).
+Recorded TV library, Dub Test (three episodes in Japanese and English) and Long Season
+(fourteen episodes).
 """
 import base64
 import hashlib
@@ -137,6 +138,16 @@ Dialogue: 0,0:00:01.00,0:00:20.00,Sign,,0,0,0,,{\\pos(640,120)}Rotated magenta s
            "-metadata:s:a:0", "language=jpn", "-metadata:s:a:0", "title=Japanese", "-disposition:a:0", "default",
            "-metadata:s:a:1", "language=eng", "-metadata:s:a:1", "title=English", "-disposition:a:1", "0",
            os.path.join(d, f"Dub Test - S01E0{n}.mkv"))
+
+    # Long Season: fourteen short episodes, for a season page scrolled well down its list (Back
+    # from a late episode's page on the TV). Added after everything else (fixed ids).
+    d = os.path.join(st, "anime/Long Season/Season 01")
+    os.makedirs(d)
+    first = os.path.join(d, "Long Season - S01E01.mkv")
+    ff("-f", "lavfi", "-i", "testsrc=size=640x360:rate=24:duration=5", "-f", "lavfi", "-i", "sine=frequency=440:duration=5",
+       "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", first)
+    for n in range(2, 15):
+        shutil.copy(first, os.path.join(d, f"Long Season - S01E{n:02d}.mkv"))
 
     # Movies: 300 tiny generated ones, plus the long test and the preview test with extras.
     base = os.path.join(st, "base.mp4")
@@ -396,15 +407,18 @@ def provision(e):
     lib = a.call("POST", "/libraries", {"name": "Recorded TV", "type": "shows", "paths": [os.path.join(e, "recordings/TV")]})
     env.libs["Recorded TV"] = lib["id"]
 
-    # Dub Test (two audio languages, three episodes), after the fixed ids.
+    # Dub Test (two audio languages, three episodes) and Long Season (fourteen episodes), after
+    # the fixed ids.
     env.move("anime/Dub Test")
+    env.move("anime/Long Season")
     a.call("POST", f"/libraries/{env.libs['Anime']}/scan")
     for _ in range(120):
         time.sleep(1)
-        if any(i["title"] == "Dub Test" for i in a.call("GET", f"/libraries/{env.libs['Anime']}/items")["items"]) and env.idle():
+        titles = {i["title"] for i in a.call("GET", f"/libraries/{env.libs['Anime']}/items")["items"]}
+        if {"Dub Test", "Long Season"} <= titles and env.idle():
             break
     else:
-        raise SystemExit("Dub Test didn't show up in Anime")
+        raise SystemExit("Dub Test and Long Season didn't show up in Anime")
 
     # Integrations: OpenSubtitles (dummy key), the fake IPTV source and the fake Bazarr.
     a.call("PATCH", "/settings", {"metadata": {"openSubtitlesApiKey": "test-key"}})

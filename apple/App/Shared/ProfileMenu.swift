@@ -160,6 +160,16 @@ struct ProfilesPage: View {
             } catch {
                 self.error = error.localizedDescription
                 if pin != nil { pinFailures += 1 }
+                // Refused without a PIN or password: the list is old (it opened freely at home,
+                // and the device has left since). With a fresh one it asks for what the profile
+                // needs now.
+                if pin == nil, password == nil, let fresh = try? await app.switchableProfiles() {
+                    profiles = fresh
+                    if let now = fresh.first(where: { $0.id == p.id }), needsSecret(now) {
+                        self.error = nil
+                        target = now
+                    }
+                }
             }
         }
     }

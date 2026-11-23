@@ -202,8 +202,20 @@ public extension AppSession {
         }
     }
 
+    /// Every entry of the playlist. The server sends at most 2000 at a time: the rest are asked
+    /// for until its total is reached (the editor saves the list it was given, and one page of a
+    /// longer playlist dropped everything after it; Up Next stopped there too).
     func playlistItems(_ id: Int64) async throws -> [PlaylistEntry] {
-        try await api.listPlaylistItems(path: .init(playlistId: id), query: .init(limit: 2000)).ok.body.json.items
+        var all: [PlaylistEntry] = []
+        var seen = Set<Int64>()
+        var offset = 0
+        while true {
+            let page = try await api.listPlaylistItems(path: .init(playlistId: id), query: .init(offset: offset, limit: 2000)).ok.body.json
+            // An entry sent twice (the playlist changed between pages) is kept once.
+            for e in page.items where seen.insert(e.entryId).inserted { all.append(e) }
+            offset += page.items.count
+            if page.items.isEmpty || offset >= page.total { return all }
+        }
     }
 
     func addToPlaylist(_ playlist: Int64, items: [Int64]) async throws {
