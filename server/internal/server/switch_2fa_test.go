@@ -54,3 +54,34 @@ func TestRemoteSwitchIntoTwoFactorAccountRefused(t *testing.T) {
 		t.Errorf("local switch: %d", code)
 	}
 }
+
+// Switching to the profile already signed in on this device gives a token that works: the
+// session it renewed used to be ended as "the previous profile's".
+func TestSwitchToOwnProfileKeepsSession(t *testing.T) {
+	h := newHarness(t)
+	var res api.AuthResult
+	if code := h.do("POST", "/setup", map[string]any{"serverName": "Tower", "username": "admin", "password": "correct horse", "device": device}, &res); code != 200 {
+		t.Fatalf("setup: %d", code)
+	}
+	h.token = res.Token
+	var sw api.AuthResult
+	if code := h.do("POST", fmt.Sprintf("/profiles/%d/switch", res.User.Id), map[string]any{"password": "correct horse", "device": device}, &sw); code != 200 {
+		t.Fatalf("switch to own profile: %d", code)
+	}
+	h.token = sw.Token
+	if code := h.do("GET", "/me", nil, nil); code != 200 {
+		t.Fatalf("the new token: %d", code)
+	}
+	// Switching to someone else still ends this profile's session here.
+	var kid api.User
+	if code := h.do("POST", "/users", map[string]any{"username": "kid", "isManaged": true}, &kid); code != 201 {
+		t.Fatalf("create: %d", code)
+	}
+	var other api.AuthResult
+	if code := h.do("POST", fmt.Sprintf("/profiles/%d/switch", kid.Id), map[string]any{"device": device}, &other); code != 200 {
+		t.Fatalf("switch to another profile: %d", code)
+	}
+	if code := h.do("GET", "/me", nil, nil); code != 401 {
+		t.Fatalf("the previous profile's token: %d", code)
+	}
+}

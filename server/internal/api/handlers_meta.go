@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"marquee/internal/images"
 	"marquee/internal/items"
 	"marquee/internal/metadata"
 	"marquee/internal/metadata/tmdb"
@@ -364,12 +365,34 @@ func (h *Handlers) ChooseItemArtwork(ctx context.Context, req ChooseItemArtworkR
 		if perr != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 			return ChooseItemArtwork400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "an image link starts with https://"))}, nil
 		}
-		err = h.Items.ChooseArtworkURL(ctx, req.ItemId, kind, u.String(), 0, 0)
+		// The link is fetched now, so one that isn't an image (a page about it, say) is
+		// refused here rather than chosen and shown as a broken picture.
+		var width, height int
+		if _, aerr := h.Items.ItemArtwork(ctx, req.ItemId, kind); aerr != nil {
+			err = aerr
+			break
+		}
+		if h.Images != nil {
+			width, height, err = h.Images.CheckChosen(ctx, kind, u.String())
+			switch {
+			case errors.Is(err, images.ErrPrivateAddress):
+				return ChooseItemArtwork400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "that link leads to this server or your home network: use an image on the web, or upload it"))}, nil
+			case errors.Is(err, images.ErrNotImage):
+				return ChooseItemArtwork400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "that link isn't a JPEG, PNG or WebP image: use the image's own address"))}, nil
+			case err != nil:
+				slog.WarnContext(ctx, "artwork link", "item", req.ItemId, "err", err)
+				return ChooseItemArtwork400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "the image couldn't be downloaded from that link"))}, nil
+			}
+		}
+		err = h.Items.ChooseArtworkURL(ctx, req.ItemId, kind, u.String(), width, height)
 	default:
 		return ChooseItemArtwork400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "choose an image or give a link"))}, nil
 	}
 	if errors.Is(err, items.ErrNotFound) {
 		return ChooseItemArtwork404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item or image not found"))}, nil
+	}
+	if errors.Is(err, items.ErrArtworkKind) {
+		return ChooseItemArtwork400JSONResponse{BadRequestJSONResponse(apiErr("invalid", err.Error()))}, nil
 	}
 	if err != nil {
 		return nil, internal(ctx, "chooseArtwork", err)
@@ -403,6 +426,10 @@ func (h *Handlers) UploadItemArtwork(ctx context.Context, req UploadItemArtworkR
 	ext := map[string]string{"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[http.DetectContentType(data)]
 	if ext == "" {
 		return bad("use a JPEG, PNG or WebP image")
+	}
+	// Its header must read too: a cut-short or damaged file would be chosen and never show.
+	if _, _, err := images.CheckImage(data); err != nil {
+		return bad("that image couldn't be read: use a JPEG, PNG or WebP image")
 	}
 	if _, err := h.Items.ItemArtwork(ctx, req.ItemId, string(req.Kind)); errors.Is(err, items.ErrNotFound) {
 		return UploadItemArtwork404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil

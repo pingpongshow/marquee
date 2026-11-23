@@ -307,3 +307,72 @@ func TestConnectionLimit(t *testing.T) {
 		t.Errorf("before connect: %q", heard)
 	}
 }
+
+// On a source with one connection, the stream a device is watching doesn't make the other
+// channels unavailable to that device: changing channel there gives the connection up, and
+// tuning does replace its stream. For everyone else the limit holds.
+func TestOwnStreamDoesNotBlockChangingChannel(t *testing.T) {
+	ff, fp := tools(t)
+	s, _, uid := setup(t)
+	src := newLiveSource(t, ff)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s.Settings.Update(ctx, func(x *settings.Settings) error { x.Integrations.LiveTVSources[0].MaxStreams = 1; return nil })
+	add := func(key, name string) Channel {
+		res, _ := s.DB.Exec(`INSERT INTO live_channels (source_id, source_key, name, stream_url) VALUES ('d', ?, ?, ?)`, key, name, src.srv.URL+"/"+key)
+		id, _ := res.LastInsertId()
+		c, _ := s.Channel(ctx, id)
+		return c
+	}
+	gold, news := add("gold", "Discovery"), add("news", "News One")
+	s.Sessions = &Sessions{FFmpeg: ff, FFprobe: fp, Dir: filepath.Join(t.TempDir(), "live")}
+	const tv, phone = 7, 8
+	on := func(device int64) Options {
+		return Options{VideoCodecs: []string{"h264"}, AudioCodecs: []string{"aac"}, DeviceID: device}
+	}
+
+	first, err := s.Tune(ctx, gold, uid, on(tv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, why := s.AvailabilityFor(uid, tv)(news); !ok {
+		t.Fatalf("the device watching sees the other channel as unavailable: %q", why)
+	}
+	// Another device, even the same person's, and a listing for nobody in particular: in use.
+	if ok, why := s.AvailabilityFor(uid, phone)(news); ok || why != "All connections are in use: watching Discovery" {
+		t.Fatalf("another device: %v %q", ok, why)
+	}
+	if ok, _ := s.Availability()(news); ok {
+		t.Fatal("the limit should hold for a listing that's nobody's")
+	}
+	if _, err := s.Tune(ctx, news, uid, on(phone)); !IsNoTuner(err) {
+		t.Fatalf("another device tuning another channel: %v", err)
+	}
+	if s.Sessions.Get(first.ID) == nil {
+		t.Fatal("a refused tune ended the stream that was playing")
+	}
+
+	// Changing channel on the device that's watching replaces its stream.
+	second, err := s.Tune(ctx, news, uid, on(tv))
+	if err != nil {
+		t.Fatalf("changing channel: %v", err)
+	}
+	if s.Sessions.Get(first.ID) != nil || s.Sessions.Get(second.ID) == nil || s.InUse("d") != 1 {
+		t.Fatalf("after changing channel: first still there=%v, in use %d", s.Sessions.Get(first.ID) != nil, s.InUse("d"))
+	}
+
+	// A stream someone else joined isn't the device's alone: it stays, and the limit holds.
+	if _, err := s.Tune(ctx, news, uid+1, on(phone)); err != nil {
+		t.Fatalf("joining the running stream: %v", err)
+	}
+	if ok, _ := s.AvailabilityFor(uid, tv)(gold); ok {
+		t.Fatal("a stream someone else is watching too was counted as the device's own")
+	}
+	if _, err := s.Tune(ctx, gold, uid, on(tv)); !IsNoTuner(err) {
+		t.Fatalf("changing channel away from a shared stream: %v", err)
+	}
+	if s.Sessions.Get(second.ID) == nil {
+		t.Fatal("the stream someone else is watching was ended")
+	}
+	s.Sessions.Stop(second.ID)
+}

@@ -66,6 +66,7 @@ type Session struct {
 	ID         string
 	ChannelID  int64
 	UserID     int64
+	DeviceID   int64  // the device that tuned it (0 = unknown)
 	Method     string // copy, transcode
 	VideoCodec string
 	AudioCodec string
@@ -97,6 +98,9 @@ type Options struct {
 	// SourceID and ChannelName label the stream for connection accounting (Tune).
 	SourceID    string
 	ChannelName string
+	// DeviceID is the viewer's device (0 = unknown): changing channel on it gives up the
+	// connection of the stream it was watching (Tune).
+	DeviceID int64
 }
 
 type probe struct {
@@ -222,7 +226,7 @@ func (m *Sessions) start(ctx context.Context, channelID, userID int64, url strin
 	}
 	var last error
 	for _, enc := range encoders {
-		s := &Session{ID: newID(), ChannelID: channelID, UserID: userID, Encoder: enc, last: time.Now(), done: make(chan struct{}),
+		s := &Session{ID: newID(), ChannelID: channelID, UserID: userID, DeviceID: o.DeviceID, Encoder: enc, last: time.Now(), done: make(chan struct{}),
 			SourceID: o.SourceID, ChannelName: o.ChannelName, Shared: input != nil, users: map[int64]int{userID: 1}}
 		s.Method, s.VideoCodec, s.AudioCodec = "transcode", "h264", "aac"
 		if copyVideo {
@@ -461,6 +465,17 @@ func (m *Sessions) join(s *Session, userID int64) {
 	s.users[userID]++
 	s.last = time.Now()
 	s.mu.Unlock()
+}
+
+// heldOnlyBy reports whether the stream was tuned by this viewer's device and nobody else
+// has joined it, so the device changing channel leaves it with no one watching.
+func (s *Session) heldOnlyBy(userID, deviceID int64) bool {
+	if deviceID == 0 || s.DeviceID != deviceID || s.UserID != userID {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.users) == 1 && s.users[userID] == 1
 }
 
 // Viewers returns who holds the stream and when it was last fetched (time limits).

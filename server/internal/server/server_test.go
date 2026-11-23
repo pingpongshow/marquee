@@ -503,6 +503,37 @@ func TestArtworkUploadAndReset(t *testing.T) {
 	if code := h.do("PUT", fmt.Sprintf("/items/%d/artwork/poster", film), map[string]any{"url": "file:///etc/passwd"}, nil); code != 400 {
 		t.Fatalf("a file link: %d", code)
 	}
+	// A file that starts like a PNG but can't be read isn't taken.
+	if code, _ := upload(res.Token, pic.Bytes()[:20]); code != 400 {
+		t.Fatalf("a cut-short image: %d", code)
+	}
+	// An image link is fetched when it's chosen: not from this machine or the home network, and
+	// not a link that isn't an image.
+	web := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/poster.png" {
+			w.Write(pic.Bytes())
+			return
+		}
+		w.Write([]byte("<html>a page</html>"))
+	}))
+	defer web.Close()
+	if code := h.do("PUT", fmt.Sprintf("/items/%d/artwork/poster", film), map[string]any{"url": web.URL + "/poster.png"}, nil); code != 400 {
+		t.Fatalf("a link to this machine: %d", code)
+	}
+	h.handlers.Images.AllowPrivateURLs = true
+	if code := h.do("PUT", fmt.Sprintf("/items/%d/artwork/poster", film), map[string]any{"url": web.URL + "/page"}, nil); code != 400 {
+		t.Fatalf("a link to a page: %d", code)
+	}
+	h.do("GET", fmt.Sprintf("/items/%d/artwork?kind=poster", film), nil, &opts)
+	if len(opts) != 2 || !opts[0].Selected || opts[0].Source != "upload" {
+		t.Fatalf("a refused link changed the artwork: %+v", opts)
+	}
+	if code := h.do("PUT", fmt.Sprintf("/items/%d/artwork/poster", film), map[string]any{"url": web.URL + "/poster.png"}, &d); code != 200 {
+		t.Fatalf("an image link: %d", code)
+	}
+	if resp, _ := h.raw("GET", fmt.Sprintf("/api/v1/images/%d?w=120", *d.Images.Poster), nil); resp.StatusCode != 200 {
+		t.Fatalf("serving the chosen image: %d", resp.StatusCode)
+	}
 	if code := h.do("DELETE", fmt.Sprintf("/items/%d/artwork/poster", film), nil, &d); code != 200 {
 		t.Fatalf("reset: %d", code)
 	}

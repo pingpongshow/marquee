@@ -101,7 +101,9 @@ func (h *Handlers) ListLiveChannels(ctx context.Context, req ListLiveChannelsReq
 		return nil, internal(ctx, "liveChannels", err)
 	}
 	out := make(ListLiveChannels200JSONResponse, len(list))
-	avail := h.LiveTV.Availability()
+	// As this device sees it: the stream it's watching itself doesn't make other channels
+	// unavailable, since changing channel gives that connection up.
+	avail := h.LiveTV.AvailabilityFor(s.User.ID, s.DeviceID)
 	for i, c := range list {
 		ok, why := avail(c)
 		out[i] = LiveChannel{Id: c.ID, Number: nz(c.Number), Name: c.Name, Group: nz(c.Group), Favorite: c.Favorite, Hidden: nz(c.Hidden),
@@ -147,7 +149,7 @@ func (h *Handlers) LiveGuide(ctx context.Context, req LiveGuideRequestObject) (L
 	if !to.After(from) || to.Sub(from) > 24*time.Hour {
 		return LiveGuide400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "end must be after start and at most 24 hours later"))}, nil
 	}
-	rows, err := h.LiveTV.Guide(ctx, s.User.ID, liveFilter(s, req.Params.Group, req.Params.Favorites, req.Params.Recent, nil), from, to)
+	rows, err := h.LiveTV.Guide(ctx, s.User.ID, liveFilter(s, req.Params.Group, req.Params.Favorites, req.Params.Recent, req.Params.Hidden), from, to)
 	if err != nil {
 		return nil, internal(ctx, "liveGuide", err)
 	}
@@ -257,7 +259,7 @@ func (h *Handlers) PlayLiveChannel(ctx context.Context, req PlayLiveChannelReque
 	if e := h.timeLimitRefusal(ctx, u); e != nil {
 		return PlayLiveChannel403JSONResponse{ForbiddenJSONResponse(*e)}, nil
 	}
-	o := livetv.Options{VideoCodecs: req.Body.Profile.HlsVideoCodecs, AudioCodecs: req.Body.Profile.HlsAudioCodecs, Remote: remote, UserAgent: h.LiveTV.UserAgent(c.SourceID)}
+	o := livetv.Options{VideoCodecs: req.Body.Profile.HlsVideoCodecs, AudioCodecs: req.Body.Profile.HlsAudioCodecs, Remote: remote, UserAgent: h.LiveTV.UserAgent(c.SourceID), DeviceID: s.DeviceID}
 	if req.Body.MaxBitrateKbps != nil {
 		o.MaxKbps = *req.Body.MaxBitrateKbps
 	}

@@ -209,9 +209,14 @@ func (s *Store) BecauseYouWatched(ctx context.Context, acc Access, idx *VideoInd
 		ranked = Boosted(ranked, recs)
 		ranked = PenaliseSimilar(ranked, idx, neg)
 		ranked = FavourSimilar(ranked, idx, favIDs)
+		// The index can lose a title while this runs (a pass after something was deleted):
+		// one that's gone counts as another type rather than being read through nil.
+		sameType := func(id int64) bool {
+			c := idx.Get(id)
+			return c != nil && c.Type == v.Type
+		}
 		sort.SliceStable(ranked, func(i, j int) bool {
-			ti, tj := idx.Get(ranked[i].ItemID).Type == v.Type, idx.Get(ranked[j].ItemID).Type == v.Type
-			return ti && !tj
+			return sameType(ranked[i].ItemID) && !sameType(ranked[j].ItemID)
 		})
 		items, err := s.visibleTop(ctx, acc, scoredIDs(ranked, 400), n)
 		if err != nil {

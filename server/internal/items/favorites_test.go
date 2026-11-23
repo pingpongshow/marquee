@@ -93,3 +93,44 @@ func TestFavoritesInRecommendations(t *testing.T) {
 		t.Errorf("like my favourites: %s %v", ids(res.Items), err)
 	}
 }
+
+// A Not interested made on its own stays when the film is hearted, rated highly or has a
+// thumbs down that was never given taken back; one a thumbs down made goes with it.
+func TestStandaloneNotInterestedStays(t *testing.T) {
+	d := testDB(t)
+	ctx := context.Background()
+	s := NewStore(d)
+	uid := mustExec(t, d, `INSERT INTO users(username, display_name) VALUES ('ann', 'Ann')`)
+	lib := mustExec(t, d, `INSERT INTO libraries(name, type) VALUES ('Movies', 'movies')`)
+	film := mustExec(t, d, `INSERT INTO items(library_id, type, title, sort_title) VALUES (?, 'movie', 'Film', 'Film')`, lib)
+	five := 10.0
+	steps := map[string]func() error{
+		"no thumbs down taken back": func() error { return s.SetDisliked(ctx, uid, film, false) },
+		"a heart":                   func() error { return s.SetFavorite(ctx, uid, film, true) },
+		"five stars":                func() error { return s.SetRating(ctx, uid, film, &five) },
+		"a thumbs up":               func() error { return s.SetLiked(ctx, uid, film, true) },
+	}
+	for name, step := range steps {
+		mustExec(t, d, `DELETE FROM user_item_state`)
+		if err := s.SetNotInterested(ctx, uid, film, true); err != nil {
+			t.Fatal(err)
+		}
+		if err := step(); err != nil {
+			t.Fatal(name, err)
+		}
+		if !s.NotInterested(ctx, uid, film) {
+			t.Errorf("%s took back a Not interested made on its own", name)
+		}
+		// The same after a thumbs down: its Not interested goes with it.
+		s.SetNotInterested(ctx, uid, film, false)
+		if err := s.SetDisliked(ctx, uid, film, true); err != nil || !s.NotInterested(ctx, uid, film) {
+			t.Fatal(name, "a thumbs down marks the film Not interested", err)
+		}
+		if err := step(); err != nil {
+			t.Fatal(name, err)
+		}
+		if s.NotInterested(ctx, uid, film) {
+			t.Errorf("%s left the Not interested its thumbs down made", name)
+		}
+	}
+}

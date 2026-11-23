@@ -584,9 +584,16 @@ func (h *Handlers) SwitchProfile(ctx context.Context, req SwitchProfileRequestOb
 	if err != nil {
 		return nil, internal(ctx, "switch", err)
 	}
-	// The previous profile's session on this device ends.
-	if err := h.Auth.RevokeDevice(ctx, s.DeviceID); err != nil {
+	// The previous profile's session on this device ends. Switching to the profile already
+	// signed in on this device renewed that same session: ending it would end the new one.
+	var issued int64
+	if err := h.DB.QueryRowContext(ctx, `SELECT id FROM devices WHERE user_id = ? AND client_id = ?`, target.ID, b.Device.ClientId).Scan(&issued); err != nil {
 		return nil, internal(ctx, "switch", err)
+	}
+	if issued != s.DeviceID {
+		if err := h.Auth.RevokeDevice(ctx, s.DeviceID); err != nil {
+			return nil, internal(ctx, "switch", err)
+		}
 	}
 	return SwitchProfile200JSONResponse{Token: token, User: toAPIUser(target)}, nil
 }

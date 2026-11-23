@@ -25,10 +25,11 @@ func favoriteCond(uid int64, alias string) string {
 // keeps the original time.
 func (s *Store) SetFavorite(ctx context.Context, uid, itemID int64, on bool) error {
 	if on {
+		wasDisliked := s.isDisliked(ctx, uid, itemID)
 		_, err := s.db.ExecContext(ctx, `INSERT INTO user_item_state (user_id, item_id, favorite_at)
 			VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			ON CONFLICT(user_id, item_id) DO UPDATE SET favorite_at = COALESCE(favorite_at, excluded.favorite_at), disliked_at = NULL`, uid, itemID)
-		if err == nil {
+		if err == nil && wasDisliked {
 			err = s.clearNotInterestedFromThumb(ctx, uid, itemID)
 		}
 		return err
@@ -57,11 +58,21 @@ func (s *Store) SetDisliked(ctx context.Context, uid, itemID int64, on bool) err
 		}
 		return err
 	}
+	// Only a thumbs down that was there takes its Not interested with it: one made on its own
+	// stays.
+	wasDisliked := s.isDisliked(ctx, uid, itemID)
 	_, err := s.db.ExecContext(ctx, `UPDATE user_item_state SET disliked_at = NULL WHERE user_id = ? AND item_id = ?`, uid, itemID)
-	if err == nil && s.isVideoTitle(ctx, itemID) {
+	if err == nil && wasDisliked && s.isVideoTitle(ctx, itemID) {
 		err = s.SetNotInterested(ctx, uid, itemID, false)
 	}
 	return err
+}
+
+// isDisliked reports whether uid gave the item a thumbs down.
+func (s *Store) isDisliked(ctx context.Context, uid, itemID int64) bool {
+	var disliked bool
+	s.db.QueryRowContext(ctx, `SELECT disliked_at IS NOT NULL FROM user_item_state WHERE user_id = ? AND item_id = ?`, uid, itemID).Scan(&disliked)
+	return disliked
 }
 
 // isVideoTitle reports whether the item is a film or show (what a thumbs down keeps out of
@@ -74,14 +85,13 @@ func (s *Store) isVideoTitle(ctx context.Context, itemID int64) bool {
 
 // clearNotInterestedFromThumb takes back the Not interested a thumbs down made, when
 // something that likes the title (a heart, a thumbs up, a high rating) took the thumbs down
-// back. A Not interested made on its own, with no thumbs down, stays.
+// back. A Not interested made on its own, with no thumbs down, stays: callers come here only
+// when there was a thumbs down before their change.
 func (s *Store) clearNotInterestedFromThumb(ctx context.Context, uid, itemID int64) error {
 	if !s.isVideoTitle(ctx, itemID) || !s.NotInterested(ctx, uid, itemID) {
 		return nil
 	}
-	var disliked bool
-	s.db.QueryRowContext(ctx, `SELECT disliked_at IS NOT NULL FROM user_item_state WHERE user_id = ? AND item_id = ?`, uid, itemID).Scan(&disliked)
-	if disliked {
+	if s.isDisliked(ctx, uid, itemID) {
 		return nil
 	}
 	return s.SetNotInterested(ctx, uid, itemID, false)
@@ -99,8 +109,7 @@ func (s *Store) SetLiked(ctx context.Context, uid, itemID int64, on bool) error 
 		_, err := s.db.ExecContext(ctx, `UPDATE user_item_state SET liked_at = NULL WHERE user_id = ? AND item_id = ?`, uid, itemID)
 		return err
 	}
-	var wasDisliked bool
-	s.db.QueryRowContext(ctx, `SELECT disliked_at IS NOT NULL FROM user_item_state WHERE user_id = ? AND item_id = ?`, uid, itemID).Scan(&wasDisliked)
+	wasDisliked := s.isDisliked(ctx, uid, itemID)
 	_, err := s.db.ExecContext(ctx, `INSERT INTO user_item_state (user_id, item_id, liked_at)
 		VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 		ON CONFLICT(user_id, item_id) DO UPDATE SET liked_at = COALESCE(liked_at, excluded.liked_at), disliked_at = NULL`, uid, itemID)

@@ -27,7 +27,12 @@ func TestImageKey(t *testing.T) {
 	if again := NewService(d).ImageKey(ctx, 7); again != key {
 		t.Errorf("key changed: %s vs %s", again, key)
 	}
-	for _, bad := range []string{"8" + key[1:], key[:len(key)-1] + "0", "7.", "x", ""} {
+	// The last character changed to another (a key ending in 0 was "changed" to itself).
+	last := "0"
+	if key[len(key)-1] == '0' {
+		last = "1"
+	}
+	for _, bad := range []string{"8" + key[1:], key[:len(key)-1] + last, "7.", "x", ""} {
 		if _, ok := s.ResolveImageKey(ctx, bad); ok {
 			t.Errorf("accepted %q", bad)
 		}

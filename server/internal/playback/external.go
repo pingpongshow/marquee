@@ -136,7 +136,7 @@ func (m *Manager) StartExternal(ctx context.Context, r ExternalRequest) (*Sessio
 	p.HLS = true
 	q := r.Quality
 	q.Remote = r.Remote
-	q.OtherRemoteKbps, q.OtherRemoteCount = m.remoteUsage("")
+	q.OtherRemoteKbps, q.OtherRemoteCount = m.remoteUsage(nil)
 	s.LimitKbps, s.LimitReason = MaxKbps(q, cfg.RemoteAccess)
 	limits := Limits{MaxKbps: s.LimitKbps, Remote: r.Remote, PreferHEVC: r.Remote && cfg.Transcoder.PreferHEVCRemote}
 	s.Decision = Decide(s.Media, p, limits)

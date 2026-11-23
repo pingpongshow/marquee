@@ -169,3 +169,91 @@ func TestSpokenLanguagePass(t *testing.T) {
 		t.Fatal("codes")
 	}
 }
+
+// A track the sidecar fails on its own is tried on a few runs, then left alone until its file
+// changes; answers are matched to tracks by id, whatever order they come back in.
+func TestSpokenLanguageTrackFailures(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	d, err := db.Open(ctx, filepath.Join(dir, "t.db"), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	exec := func(q string, args ...any) int64 {
+		t.Helper()
+		r, err := d.Exec(q, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, _ := r.LastInsertId()
+		return id
+	}
+	lib := exec(`INSERT INTO libraries (name, type) VALUES ('Movies', 'movies')`)
+	film := exec(`INSERT INTO items (library_id, type, title, sort_title) VALUES (?, 'movie', 'Film', 'Film')`, lib)
+	v := exec(`INSERT INTO media_versions (item_id) VALUES (?)`, film)
+	f := exec(`INSERT INTO media_files (version_id, library_id, path, size, mtime, available) VALUES (?, ?, '/m/film.mkv', 10, 100, 1)`, v, lib)
+	exec(`INSERT INTO streams (file_id, stream_index, kind, codec) VALUES (?, 1, 'audio', 'aac')`, f)
+	exec(`INSERT INTO streams (file_id, stream_index, kind, codec) VALUES (?, 2, 'audio', 'aac')`, f)
+	ff := filepath.Join(dir, "ffmpeg")
+	os.WriteFile(ff, []byte("#!/bin/sh\nhead -c 32000 /dev/zero\n"), 0o755)
+
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Items []struct{ ID string } }
+		json.NewDecoder(r.Body).Decode(&req)
+		calls++
+		out := struct {
+			Model   string         `json:"model"`
+			Results []SpokenResult `json:"results"`
+		}{Model: "whisper#3"}
+		// Last first: stream 1 (id "0") is German, stream 2 (id "1") can't be heard.
+		for i := len(req.Items) - 1; i >= 0; i-- {
+			res := SpokenResult{ID: req.Items[i].ID}
+			if res.ID == "0" && len(req.Items) == 2 {
+				res.Language, res.Confidence, res.Heard, res.Agree = "de", 0.95, 3, 3
+			} else {
+				res.Error = "couldn't decode the clip"
+			}
+			out.Results = append(out.Results, res)
+		}
+		json.NewEncoder(w).Encode(out)
+	}))
+	defer srv.Close()
+	s := &Service{DB: d, FFmpeg: ff, Client: &Client{BaseURL: srv.URL}, Enabled: func() bool { return true }}
+	h := Health{Speech: "whisper#3"}
+
+	if _, err := s.spokenPass(ctx, h); err != nil {
+		t.Fatal(err)
+	}
+	var lang sql.NullString
+	d.QueryRow(`SELECT language FROM streams WHERE file_id = ? AND stream_index = 1`, f).Scan(&lang)
+	if lang.String != "ger" {
+		t.Fatalf("stream 1 is %q: answers should be matched by id", lang.String)
+	}
+	d.QueryRow(`SELECT language FROM streams WHERE file_id = ? AND stream_index = 2`, f).Scan(&lang)
+	if lang.Valid {
+		t.Fatalf("the failed track got %q", lang.String)
+	}
+	failures := func() (n int) {
+		d.QueryRow(`SELECT failures FROM spoken_languages WHERE file_id = ? AND stream_index = 2`, f).Scan(&n)
+		return n
+	}
+	if failures() != 1 {
+		t.Fatalf("failures %d after one run", failures())
+	}
+	// Tried again on the next runs, then left alone.
+	for i := 0; i < 4; i++ {
+		s.spokenPass(ctx, h)
+	}
+	if calls != spokenAttempts || failures() != spokenAttempts {
+		t.Fatalf("asked %d times, %d failures, want %d of each", calls, failures(), spokenAttempts)
+	}
+	// The file changed: its tries start again.
+	exec(`UPDATE media_files SET mtime = 200 WHERE id = ?`, f)
+	exec(`UPDATE streams SET language = 'ger' WHERE file_id = ? AND stream_index = 1`, f)
+	s.spokenPass(ctx, h)
+	if calls != spokenAttempts+1 || failures() != 1 {
+		t.Fatalf("after the file changed: asked %d times, %d failures", calls, failures())
+	}
+}

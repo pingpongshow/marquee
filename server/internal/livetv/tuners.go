@@ -75,6 +75,18 @@ func (u sourceUse) receiving(channelID int64) bool {
 	return false
 }
 
+// own are the streams with a connection of their own that only this viewer's device holds:
+// the ones it gives up by tuning something else.
+func (u sourceUse) own(userID, deviceID int64) []*Session {
+	var out []*Session
+	for _, l := range u.live {
+		if l.heldOnlyBy(userID, deviceID) {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
 // reason says what holds the connections: "All connections are in use: recording Gold
 // Rush, watching News One".
 func (u sourceUse) reason() string {
@@ -143,8 +155,18 @@ func (s *Service) beforeConnect(sourceID string) {
 
 // Availability returns a function telling whether a channel can be tuned now, and why
 // not. Usage is read once, so call it once per listing.
-func (s *Service) Availability() func(c Channel) (bool, string) {
-	uses := map[string]*sourceUse{}
+func (s *Service) Availability() func(c Channel) (bool, string) { return s.AvailabilityFor(0, 0) }
+
+// AvailabilityFor is Availability as one viewer's device sees it: the stream it's watching
+// itself doesn't count, since tuning another channel gives that connection up (Tune). Without
+// this, on a source with one connection, watching a channel made every other one unavailable
+// to the very device that would free it.
+func (s *Service) AvailabilityFor(userID, deviceID int64) func(c Channel) (bool, string) {
+	type sourceState struct {
+		use  sourceUse
+		free int // connections in use that aren't this device's own
+	}
+	uses := map[string]*sourceState{}
 	return func(c Channel) (bool, string) {
 		limit := s.MaxStreams(c.SourceID)
 		if limit <= 0 {
@@ -153,22 +175,24 @@ func (s *Service) Availability() func(c Channel) (bool, string) {
 		u, ok := uses[c.SourceID]
 		if !ok {
 			x := s.use(c.SourceID)
-			u = &x
+			u = &sourceState{use: x, free: x.n() - len(x.own(userID, deviceID))}
 			uses[c.SourceID] = u
 		}
-		if u.n() < limit || u.receiving(c.ID) {
+		if u.free < limit || u.use.receiving(c.ID) {
 			return true, ""
 		}
-		return false, u.reason()
+		return false, u.use.reason()
 	}
 }
 
 // Tune starts watching a channel within its source's connection limit: from a recording
 // of it in progress (no connection of its own), else on a connection of its own while one
-// is free, else by joining a stream of it that's running; otherwise NoTunerError.
+// is free, else by joining a stream of it that's running, else on the connection of the
+// stream this device (o.DeviceID) was watching, which ends; otherwise NoTunerError.
 func (s *Service) Tune(ctx context.Context, c Channel, userID int64, o Options) (*Session, error) {
 	o.SourceID, o.ChannelName = c.SourceID, c.Name
 	limit := s.MaxStreams(c.SourceID)
+	replaced := false
 	s.tuneMu.Lock()
 	if limit > 0 {
 		u := s.use(c.SourceID)
@@ -187,13 +211,29 @@ func (s *Service) Tune(ctx context.Context, c Channel, userID int64, o Options) 
 					return l, nil
 				}
 			}
-			s.tuneMu.Unlock()
-			return nil, &NoTunerError{u.reason()}
+			// Changing channel: the device's own stream gives its connection to this one, when
+			// that's enough to make room (players don't always stop the old stream first).
+			own := u.own(userID, o.DeviceID)
+			if len(own) == 0 || u.n()-len(own) >= limit {
+				s.tuneMu.Unlock()
+				return nil, &NoTunerError{u.reason()}
+			}
+			for _, l := range own {
+				slog.Info("live TV: changing channel on the connection in use", "from", l.ChannelID, "to", c.ID, "source", c.SourceID)
+				replaced = s.Sessions.Stop(l.ID) || replaced
+			}
 		}
 	}
 	s.Sessions.addPending(c.SourceID, 1) // holds the connection while it tunes
 	s.tuneMu.Unlock()
 	defer s.Sessions.addPending(c.SourceID, -1)
+	if replaced {
+		select { // let the provider see the connection close
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
 	s.beforeConnect(c.SourceID)
 	return s.Sessions.Start(ctx, c.ID, userID, c.StreamURL, o)
 }

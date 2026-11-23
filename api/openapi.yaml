@@ -3611,6 +3611,7 @@ paths:
         - { name: group, in: query, schema: { type: string } }
         - { name: favorites, in: query, schema: { type: boolean } }
         - { name: recent, in: query, schema: { type: boolean } }
+        - { name: hidden, in: query, schema: { type: boolean }, description: Only the channels the caller hid (otherwise they're left out). }
       responses:
         "200":
           description: Rows, one per channel.

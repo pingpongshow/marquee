@@ -15,12 +15,15 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/image/draw"
@@ -28,6 +31,16 @@ import (
 )
 
 var ErrNotFound = errors.New("image not found")
+
+// ErrNotImage is returned for data that isn't a JPEG, PNG or WebP image this server can read.
+var ErrNotImage = errors.New("not a JPEG, PNG or WebP image")
+
+// ErrPrivateAddress is returned for an image link that leads to this machine or the home
+// network.
+var ErrPrivateAddress = errors.New("image links to this server or the home network aren't fetched")
+
+// maxDownload bounds a downloaded image; a larger one is refused rather than cut short.
+const maxDownload = 30 << 20
 
 // Widths are the sizes images are resized to; requests snap up to the next one.
 var Widths = []int{120, 240, 360, 480, 720, 960, 1280, 1920}
@@ -40,10 +53,14 @@ type Service struct {
 	CacheDir string
 	FFmpeg   string
 	HTTP     *http.Client
+	// AllowPrivateURLs lets image links an administrator chose lead to private addresses
+	// (tests serve them from loopback).
+	AllowPrivateURLs bool
 
-	mu       sync.Mutex
-	inflight map[string]*call
-	sem      chan struct{}
+	chosenHTTP *http.Client // for links an administrator chose: public addresses only
+	mu         sync.Mutex
+	inflight   map[string]*call
+	sem        chan struct{}
 }
 
 type call struct {
@@ -53,8 +70,59 @@ type call struct {
 }
 
 func New(db *sql.DB, cacheDir, ffmpeg string) *Service {
-	return &Service{DB: db, CacheDir: cacheDir, FFmpeg: ffmpeg, HTTP: &http.Client{Timeout: 30 * time.Second},
+	s := &Service{DB: db, CacheDir: cacheDir, FFmpeg: ffmpeg, HTTP: &http.Client{Timeout: 30 * time.Second},
 		inflight: map[string]*call{}, sem: make(chan struct{}, 6)}
+	// The address is checked as each connection is made, so a redirect or a name that
+	// resolves to a private address is refused too.
+	dialer := &net.Dialer{Timeout: 10 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
+		if s.AllowPrivateURLs {
+			return nil
+		}
+		ap, err := netip.ParseAddrPort(address)
+		if err != nil || !publicAddr(ap.Addr()) {
+			return ErrPrivateAddress
+		}
+		return nil
+	}}
+	// No proxy: one would be dialled in the link's place, and fetch for it unchecked.
+	s.chosenHTTP = &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{DialContext: dialer.DialContext,
+		TLSHandshakeTimeout: 10 * time.Second, ResponseHeaderTimeout: 20 * time.Second, MaxIdleConns: 4, IdleConnTimeout: time.Minute}}
+	return s
+}
+
+// cgnat is the shared address space Tailscale uses, as private as the home network.
+var cgnat = netip.MustParsePrefix("100.64.0.0/10")
+
+// publicAddr reports whether a is an address on the internet: not this machine, the home
+// network, a link-local address (cloud metadata) or Tailscale.
+func publicAddr(a netip.Addr) bool {
+	a = a.Unmap()
+	return a.IsValid() && a.IsGlobalUnicast() && !a.IsPrivate() && !a.IsLoopback() && !a.IsLinkLocalUnicast() && !cgnat.Contains(a)
+}
+
+// CheckImage reads data's header: its size, or ErrNotImage when it isn't an image this server
+// can decode (or is too large to).
+func CheckImage(data []byte) (width, height int, err error) {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
+		return 0, 0, ErrNotImage
+	}
+	if cfg.Width*cfg.Height > maxPixels {
+		return 0, 0, fmt.Errorf("%w: %dx%d is too large", ErrNotImage, cfg.Width, cfg.Height)
+	}
+	return cfg.Width, cfg.Height, nil
+}
+
+// CheckChosen downloads an image link an administrator chose for an item's artwork (META-13)
+// and reports its size, so a link that isn't an image is refused when chosen rather than
+// showing as a broken picture. The download is kept: showing the image doesn't fetch it again.
+func (s *Service) CheckChosen(ctx context.Context, kind, url string) (width, height int, err error) {
+	a := artwork{kind: kind, source: "chosen", remoteURL: url}
+	data, err := s.original(ctx, a, cacheKey(a))
+	if err != nil {
+		return 0, 0, err
+	}
+	return CheckImage(data)
 }
 
 // SnapWidth rounds w up to a cached width; 0 means the largest.
@@ -214,23 +282,41 @@ func (s *Service) original(ctx context.Context, a artwork, key string) ([]byte, 
 	}
 	cached := filepath.Join(s.CacheDir, "originals", key[:2], key)
 	if data, err := os.ReadFile(cached); err == nil {
-		return data, nil
+		// Something kept before downloads were checked that isn't an image is fetched again.
+		if _, _, cerr := image.DecodeConfig(bytes.NewReader(data)); cerr == nil {
+			return data, nil
+		}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, providerSized(a.kind, a.remoteURL), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := s.HTTP.Do(req)
+	client := s.HTTP
+	if a.source == "chosen" && s.chosenHTTP != nil {
+		client = s.chosenHTTP // any link an administrator gave (META-13)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
+		if errors.Is(err, ErrPrivateAddress) {
+			return nil, ErrPrivateAddress
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download %s: HTTP %d", a.remoteURL, resp.StatusCode)
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 30<<20))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxDownload+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(data) > maxDownload {
+		return nil, fmt.Errorf("download %s: larger than %d MB", a.remoteURL, maxDownload>>20)
+	}
+	// Only an image is kept: a page or an error body cached here would stay the item's
+	// picture for good, whatever the link served later.
+	if _, _, err := CheckImage(data); err != nil {
+		return nil, fmt.Errorf("download %s: %w", a.remoteURL, err)
 	}
 	os.MkdirAll(filepath.Dir(cached), 0o755)
 	os.WriteFile(cached, data, 0o644)

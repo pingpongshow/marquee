@@ -321,7 +321,6 @@ def load_doc_model():
 
 
 docs = IdleModel(f"{DOC_MODEL_ID} on {device}", load_doc_model, IDLE_SECONDS)
-start_reaper([*claps.values(), ast, docs], gpu_lock)
 
 
 @app.post("/embed_docs")
@@ -358,6 +357,8 @@ def load_whisper():
 
 
 whisper = IdleModel(f"{SPEECH_MODEL_ID} on {device}", load_whisper, IDLE_SECONDS)
+# Every model, Whisper too: started here, once they all exist, so none is left on the GPU.
+start_reaper([*claps.values(), ast, docs, whisper], gpu_lock)
 
 
 class SpeechItem(BaseModel):

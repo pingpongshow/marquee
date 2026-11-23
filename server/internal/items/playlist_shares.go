@@ -20,6 +20,12 @@ const acceptedShare = `EXISTS (SELECT 1 FROM playlist_shares sh WHERE sh.playlis
 const invitedShare = `pl.user_id != ? AND (EXISTS (SELECT 1 FROM playlist_shares sh WHERE sh.playlist_id = pl.id AND sh.user_id = ? AND sh.status = 'pending')
 	OR (pl.shared_with_all = 1 AND NOT EXISTS (SELECT 1 FROM playlist_shares sh WHERE sh.playlist_id = pl.id AND sh.user_id = ?)))`
 
+// shareTarget is the SQL test for user u being someone the owner in its one parameter can
+// share with, by the profile picker's rule (USER-13): the household doesn't see friends, and
+// a friend sees only themselves.
+const shareTarget = `COALESCE(json_extract(u.restrictions, '$.friend'), 0) = 0
+	AND COALESCE((SELECT json_extract(me.restrictions, '$.friend') FROM users me WHERE me.id = ?), 0) = 0`
+
 // PlaylistShare is someone a playlist is shared with; Status is pending or accepted.
 type PlaylistShare struct {
 	UserID int64
@@ -116,19 +122,23 @@ func (s *Store) SetPlaylistShares(ctx context.Context, owner, id int64, userIDs 
 		}
 	}
 	for u := range wanted {
-		// Unknown ids are skipped: someone can be deleted while the owner is choosing.
-		if _, err := tx.ExecContext(ctx, `INSERT INTO playlist_shares (playlist_id, user_id, status) SELECT ?, id, 'pending' FROM users WHERE id = ?
-			ON CONFLICT(playlist_id, user_id) DO UPDATE SET status = 'pending' WHERE status = 'removed'`, id, u); err != nil {
+		// Unknown ids are skipped: someone can be deleted while the owner is choosing. So are
+		// ids the owner isn't offered (PlaylistShareTargets), which would name a profile they
+		// can't see.
+		if _, err := tx.ExecContext(ctx, `INSERT INTO playlist_shares (playlist_id, user_id, status) SELECT ?, u.id, 'pending' FROM users u WHERE u.id = ? AND `+shareTarget+`
+			ON CONFLICT(playlist_id, user_id) DO UPDATE SET status = 'pending' WHERE status = 'removed'`, id, u, owner); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
 }
 
-// PlaylistShareTargets lists everyone a user could share a playlist with.
+// PlaylistShareTargets lists everyone a user could share a playlist with: the profiles they
+// see on the profile picker, so the household for one of the household and nobody for a friend.
 func (s *Store) PlaylistShareTargets(ctx context.Context, uid int64) ([]PlaylistShare, error) {
 	out := []PlaylistShare{}
-	err := eachRow(ctx, s.db, `SELECT id, display_name FROM users WHERE id != ? ORDER BY display_name COLLATE NOCASE`, []any{uid}, func(r *sql.Rows) error {
+	err := eachRow(ctx, s.db, `SELECT u.id, u.display_name FROM users u WHERE u.id != ? AND `+shareTarget+`
+		ORDER BY u.display_name COLLATE NOCASE`, []any{uid, uid}, func(r *sql.Rows) error {
 		var t PlaylistShare
 		if err := r.Scan(&t.UserID, &t.Name); err != nil {
 			return err

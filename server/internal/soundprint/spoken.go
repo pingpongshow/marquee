@@ -22,6 +22,10 @@ import (
 // for a detected language to be used.
 const SpokenConfidence = 0.7
 
+// spokenAttempts is how many runs try a track the sidecar fails on its own before it's left
+// alone (until its file or the model changes).
+const spokenAttempts = 3
+
 // SpokenResult is one track's detected language (ISO 639-1, "" when nothing clear).
 type SpokenResult struct {
 	ID         string  `json:"id"`
@@ -119,9 +123,10 @@ func (s *Service) cutSpeech(ctx context.Context, path string, stream int, durati
 }
 
 // spokenPass hears the audio tracks of films, episodes and videos that have no language and
-// haven't been heard by this model since their file last changed. Failures of the sidecar
-// itself aren't kept (the tracks are tried again next run); a file FFmpeg can't read is kept as
-// heard with no language, until it changes.
+// haven't been heard by this model since their file last changed. A file FFmpeg can't read is
+// kept as heard with no language, until it changes. A track the sidecar fails on its own is
+// tried again on the next runs, spokenAttempts times in all; when it fails everything it was
+// sent the fault is the sidecar's, so nothing is counted and the run stops.
 func (s *Service) spokenPass(ctx context.Context, h Health) (string, error) {
 	if speechVersion(h.Speech) < 3 || s.FFmpeg == "" {
 		return "", nil
@@ -138,8 +143,8 @@ func (s *Service) spokenPass(ctx context.Context, h Health) (string, error) {
 		JOIN items i ON i.id = v.item_id AND i.type IN ('movie', 'episode', 'video') AND i.extra_type IS NULL
 		WHERE st.kind = 'audio' AND COALESCE(st.language, '') IN ('', 'und') AND st.stream_index IS NOT NULL
 		  AND NOT EXISTS (SELECT 1 FROM spoken_languages d WHERE d.file_id = f.id AND d.stream_index = st.stream_index
-			AND d.size = f.size AND d.mtime = f.mtime AND d.model = ?)
-		ORDER BY i.added_at DESC, f.id, st.stream_index`, h.Speech)
+			AND d.size = f.size AND d.mtime = f.mtime AND d.model = ? AND (d.failures = 0 OR d.failures >= ?))
+		ORDER BY i.added_at DESC, f.id, st.stream_index`, h.Speech, spokenAttempts)
 	if err != nil {
 		return "", err
 	}
@@ -163,8 +168,19 @@ func (s *Service) spokenPass(ctx context.Context, h Health) (string, error) {
 		_, err := s.DB.ExecContext(ctx, `INSERT INTO spoken_languages (file_id, stream_index, size, mtime, language, confidence, model)
 			VALUES (?, ?, ?, ?, NULLIF(?, ''), ?, ?)
 			ON CONFLICT (file_id, stream_index) DO UPDATE SET size = excluded.size, mtime = excluded.mtime, language = excluded.language,
-			confidence = excluded.confidence, model = excluded.model, checked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+			confidence = excluded.confidence, model = excluded.model, failures = 0, checked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
 			t.fileID, t.index, t.size, t.mtime, lang, confidence, model)
+		return err
+	}
+	// A try the sidecar failed: counted while the file and the model are the same, else the first.
+	recordFailure := func(t todo) error {
+		_, err := s.DB.ExecContext(ctx, `INSERT INTO spoken_languages (file_id, stream_index, size, mtime, model, failures)
+			VALUES (?, ?, ?, ?, ?, 1)
+			ON CONFLICT (file_id, stream_index) DO UPDATE SET
+			failures = CASE WHEN size = excluded.size AND mtime = excluded.mtime AND model = excluded.model THEN failures + 1 ELSE 1 END,
+			size = excluded.size, mtime = excluded.mtime, language = NULL, confidence = 0, model = excluded.model,
+			checked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+			t.fileID, t.index, t.size, t.mtime, h.Speech)
 		return err
 	}
 	const batch = 4
@@ -201,21 +217,26 @@ func (s *Service) spokenPass(ctx context.Context, h Health) (string, error) {
 			if err != nil {
 				return "", fmt.Errorf("spoken language after %d of %d tracks: %w", i, len(list), err)
 			}
-			batchFailed, sidecarErr := 0, ""
-			for j, r := range results {
-				if j >= len(sent) {
-					break
-				}
-				t := sent[j]
+			// Answers are matched to tracks by the id sent, not by their place in the list; a
+			// track with no answer counts as one the sidecar failed.
+			byID := map[string]SpokenResult{}
+			for _, r := range results {
+				byID[r.ID] = r
+			}
+			var failedTracks []todo
+			sidecarErr := ""
+			for j, t := range sent {
+				r, ok := byID[items[j].ID]
 				switch {
+				case !ok:
+					r.Error = "no answer for the track"
+					fallthrough
 				case r.Error != "":
-					failed++
-					batchFailed++
+					failedTracks = append(failedTracks, t)
 					sidecarErr = r.Error
 					if firstErr == "" {
 						firstErr = "Soundprint: " + r.Error
 					}
-					continue // not kept: tried again next run
 				case r.Language != "" && r.Agree >= 2 && r.Confidence >= SpokenConfidence:
 					lang := SpokenCode(r.Language)
 					if err := record(t, lang, r.Confidence, model); err != nil {
@@ -233,8 +254,21 @@ func (s *Service) spokenPass(ctx context.Context, h Health) (string, error) {
 					}
 				}
 			}
-			// The sidecar failed every track it was sent: stop rather than run through the rest.
-			if batchFailed == len(sent) {
+			failed += len(failedTracks)
+			// The sidecar failed every one of several tracks: the fault is its own, so the tries
+			// aren't counted against the tracks, and the run stops rather than go through the rest.
+			if len(failedTracks) == len(sent) && len(sent) > 1 {
+				slog.Warn("spoken languages stopped", "error", sidecarErr)
+				return "", fmt.Errorf("Soundprint couldn't hear the audio tracks: %s", sidecarErr)
+			}
+			for _, t := range failedTracks {
+				if err := recordFailure(t); err != nil {
+					return "", err
+				}
+			}
+			// A track sent alone that failed can't be told from a failing sidecar: its try is
+			// counted (so it isn't tried for ever), and the run still stops.
+			if len(failedTracks) == len(sent) {
 				slog.Warn("spoken languages stopped", "error", sidecarErr)
 				return "", fmt.Errorf("Soundprint couldn't hear the audio tracks: %s", sidecarErr)
 			}

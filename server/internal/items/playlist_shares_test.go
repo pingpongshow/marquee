@@ -188,3 +188,54 @@ func TestPlaylistSharing(t *testing.T) {
 		t.Fatal("a deleted playlist should go from everyone's")
 	}
 }
+
+// Sharing follows the profile picker (USER-13): the household isn't offered friends, a friend is
+// offered nobody, and an id sent anyway isn't shared with.
+func TestPlaylistSharingKeepsFriendsApart(t *testing.T) {
+	d := testDB(t)
+	ctx := context.Background()
+	s := NewStore(d)
+	user := func(name, restrictions string) int64 {
+		return mustExec(t, d, `INSERT INTO users(username, display_name, restrictions) VALUES (?, ?, ?)`, name, name, restrictions)
+	}
+	ann, bob, fay := user("ann", `{}`), user("bob", `{"isKid":true}`), user("fay", `{"friend":true}`)
+	targets := func(uid int64) []int64 {
+		t.Helper()
+		list, err := s.PlaylistShareTargets(ctx, uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids := []int64{}
+		for _, p := range list {
+			ids = append(ids, p.UserID)
+		}
+		return ids
+	}
+	if got := targets(ann); len(got) != 1 || got[0] != bob {
+		t.Fatalf("the household is offered %v, want only bob", got)
+	}
+	if got := targets(fay); len(got) != 0 {
+		t.Fatalf("a friend is offered %v", got)
+	}
+	shared := func(owner int64, with ...int64) int {
+		t.Helper()
+		pl, err := s.CreatePlaylist(ctx, Access{UserID: owner}, "Mix", "audio", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.SetPlaylistShares(ctx, owner, pl.ID, with, false); err != nil {
+			t.Fatal(err)
+		}
+		_, shares, err := s.PlaylistShares(ctx, owner, pl.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(shares)
+	}
+	if n := shared(ann, bob, fay); n != 1 {
+		t.Fatalf("ann's playlist is shared with %d, want only bob", n)
+	}
+	if n := shared(fay, ann, bob); n != 0 {
+		t.Fatalf("a friend's playlist is shared with %d of the household", n)
+	}
+}

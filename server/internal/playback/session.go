@@ -301,11 +301,13 @@ func (m *Manager) List() []*Session {
 	return out
 }
 
-func (m *Manager) remoteUsage(excluding string) (kbps, count int) {
+// remoteUsage sums the remote streams, leaving out the sessions in except (ones about to be
+// replaced).
+func (m *Manager) remoteUsage(except map[string]bool) (kbps, count int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for id, s := range m.sessions {
-		if s.Remote && id != excluding {
+		if s.Remote && !except[id] {
 			if !s.isSuspended() { // a paused, suspended session sends nothing
 				kbps += s.BitrateKbps()
 			}
@@ -315,12 +317,15 @@ func (m *Manager) remoteUsage(excluding string) (kbps, count int) {
 	return
 }
 
-func (m *Manager) transcodeCount() int {
+func (m *Manager) transcodeCount() int { return m.transcodeCountExcept(nil) }
+
+// transcodeCountExcept counts the running transcodes, leaving out the sessions in except.
+func (m *Manager) transcodeCountExcept(except map[string]bool) int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	n := 0
-	for _, s := range m.sessions {
-		if s.transcoder != nil && !s.isSuspended() {
+	for id, s := range m.sessions {
+		if s.transcoder != nil && !s.isSuspended() && !except[id] {
 			n++
 		}
 	}
@@ -340,17 +345,24 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 		return nil, err
 	}
 
-	// Stop this device's previous session (switching tracks or quality starts a new one).
-	// A preloaded session waits until it starts playing.
+	// This device's previous session is replaced (switching tracks or quality starts a new
+	// one), but only once this one is known to start: until then it's just left out of what's
+	// counted, so a start refused as busy doesn't end what was playing. A preloaded session
+	// replaces nothing until it starts playing.
+	replaced := map[string]bool{}
 	if r.Preload {
 		s.preload = true
 	} else {
-		m.stopOthers(ctx, s)
+		for _, old := range m.List() {
+			if old.DeviceID == s.DeviceID && old.UserID == s.UserID {
+				replaced[old.ID] = true
+			}
+		}
 	}
 
 	q := r.Quality
 	q.Remote = r.Remote
-	q.OtherRemoteKbps, q.OtherRemoteCount = m.remoteUsage("")
+	q.OtherRemoteKbps, q.OtherRemoteCount = m.remoteUsage(replaced)
 	s.LimitKbps, s.LimitReason = MaxKbps(q, cfg.RemoteAccess)
 	m.offsets(ctx, s, r)
 	limits := Limits{MaxKbps: s.LimitKbps, Remote: r.Remote, PreferHEVC: r.Remote && cfg.Transcoder.PreferHEVCRemote,
@@ -378,7 +390,7 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 
 	// Music that needs converting streams progressively from /audio, without HLS.
 	if s.Decision.Method != DirectPlay && s.Media.Video != nil {
-		if m.transcodeCount() >= cfg.Transcoder.MaxConcurrentTranscodes {
+		if m.transcodeCountExcept(replaced) >= cfg.Transcoder.MaxConcurrentTranscodes {
 			return nil, ErrBusy
 		}
 		job := Job{Input: s.Path, Decision: s.Decision, VideoIndex: -1, AudioIndex: -1, SubIndex: -1, SubRelIndex: -1,
@@ -404,6 +416,10 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 		if s.Remote && s.Decision.Method == Transcode && s.Media.Video != nil {
 			s.rungs = ladderFor(s.Decision, s.Media.Video.Height, cfg.Transcoder.RemoteLadder)
 		}
+	}
+
+	if !r.Preload {
+		m.stopOthers(ctx, s)
 	}
 
 	res, err := m.DB.ExecContext(ctx, `INSERT INTO play_history(user_id, item_id, device_id, item_title, started_at, position_ms,
