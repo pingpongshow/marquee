@@ -19,6 +19,7 @@ import app.marquee.api.models.PlaylistKind
 import app.marquee.api.models.RadioRequest
 import app.marquee.api.models.Station
 import app.marquee.core.Marquee
+import app.marquee.core.allPlaylistEntries
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.Dispatchers
@@ -122,7 +123,8 @@ class MusicLibrary(private val marquee: Marquee, private val ownPackage: String,
     private fun tracksOf(listId: String, shuffle: Boolean = false): List<ItemSummary> {
         val (kind, id) = listId.split(":").let { it[0] to it[1].toLong() }
         return when (kind) {
-            "playlist" -> marquee.playlists.listPlaylistItems(id).items.map { it.item }
+            // Every entry: asked for without a limit, a long playlist would stop at its first 500.
+            "playlist" -> marquee.allPlaylistEntries(id).map { it.item }
             else -> marquee.items.itemLeaves(id, shuffle = shuffle)
         }
     }

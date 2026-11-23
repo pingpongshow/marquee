@@ -193,7 +193,7 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     /** Keeps a playlist on the device: downloads what's new and drops what left it (tracks downloaded on their own stay). */
     suspend fun syncPlaylist(id: Long) {
         if (marquee.baseUrl == null) return
-        val items = kotlinx.coroutines.withContext(Dispatchers.IO) { marquee.playlists.listPlaylistItems(id, limit = 2000).items.map { it.item } }
+        val items = kotlinx.coroutines.withContext(Dispatchers.IO) { marquee.allPlaylistEntries(id).map { it.item } }
             .filter { it.type in listOf(ItemType.TRACK, ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO) }
         val info = kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { marquee.playlists.getPlaylist(id) }.getOrNull() }
         val now = items.map { it.id }.toSet()

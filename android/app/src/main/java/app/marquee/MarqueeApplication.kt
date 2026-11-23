@@ -16,6 +16,7 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         marquee = Marquee(this)
+        app.marquee.core.AndroidProfile.init(this)
         app.marquee.music.TrackGains.init(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             private var started = 0

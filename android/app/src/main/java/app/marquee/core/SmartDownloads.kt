@@ -197,19 +197,21 @@ class SmartDownloads(context: Context, private val marquee: Marquee, private val
         }
         // Enough to fill the budget, with some room for tracks too big for what's left.
         fun full() = total >= budget + budget / 4
-        suspend fun <T> io(block: () -> T): T? = withContext(Dispatchers.IO) { runCatching(block).getOrNull() }
+        // A listing that fails ends the run (and shows as its error): taken as empty, what it
+        // would have listed would no longer be wanted, and be removed only to be fetched again.
+        suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.IO) { block() }
         val sort = ItemsApi.SortListLibraryItems._FAVORITED
         // Hearted songs, then hearted albums' and artists' tracks.
-        for (lib in libs) { if (full()) break; add(io { marquee.items.listLibraryItems(lib.id, ItemType.TRACK, sort, limit = 500, favorites = true).items } ?: emptyList()) }
+        for (lib in libs) { if (full()) break; add(io { marquee.items.listLibraryItems(lib.id, ItemType.TRACK, sort, limit = 500, favorites = true).items }) }
         for (type in listOf(ItemType.ALBUM, ItemType.ARTIST)) for (lib in libs) {
             if (full()) break
-            val containers = io { marquee.items.listLibraryItems(lib.id, type, sort, limit = 100, favorites = true).items } ?: continue
-            for (c in containers) { if (full()) break; add(io { marquee.items.itemLeaves(c.id) } ?: emptyList()) }
+            val containers = io { marquee.items.listLibraryItems(lib.id, type, sort, limit = 100, favorites = true).items }
+            for (c in containers) { if (full()) break; add(io { marquee.items.itemLeaves(c.id) }) }
         }
         // Then what's played: the recently played, most played first.
         for (lib in libs) {
             if (full()) break
-            val played = io { marquee.items.listLibraryItems(lib.id, ItemType.TRACK, ItemsApi.SortListLibraryItems._VIEWED, limit = 300).items } ?: continue
+            val played = io { marquee.items.listLibraryItems(lib.id, ItemType.TRACK, ItemsApi.SortListLibraryItems._VIEWED, limit = 300).items }
             add(played.filter { it.lastViewedAt != null || (it.viewCount ?: 0) > 0 }.sortedByDescending { it.viewCount ?: 0 })
         }
         bringUpToDate(SmartSelection.tracks(candidates, budget), Downloads.SmartKind.Music, items, s)

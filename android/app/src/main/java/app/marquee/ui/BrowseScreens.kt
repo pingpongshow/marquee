@@ -101,6 +101,7 @@ import app.marquee.api.models.ItemType
 import app.marquee.api.models.Library
 import app.marquee.api.models.PlaylistKind
 import app.marquee.api.models.SearchResults
+import app.marquee.core.allPlaylistEntries
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -693,7 +694,7 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
     // Kept while on the back stack, so coming back keeps the list's place.
     // Bumped after a rename or a removal, to load the playlist again.
     var version by remember { mutableIntStateOf(0) }
-    val loadedEntries by cachedLoad("playlist-$playlistId-items", version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistItems(playlistId).items }.getOrNull() } }
+    val loadedEntries by cachedLoad("playlist-$playlistId-items", version) { withContext(Dispatchers.IO) { runCatching { marquee.allPlaylistEntries(playlistId) }.getOrNull() } }
     // Removed here: gone at once, before the playlist comes back from the server.
     val removed = remember { mutableStateListOf<Long>() }
     val entries = (loadedEntries ?: emptyList()).filter { it.entryId !in removed }

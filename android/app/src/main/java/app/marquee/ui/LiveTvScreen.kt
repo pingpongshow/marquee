@@ -164,8 +164,7 @@ fun LiveTvScreen(nav: NavHostController) {
         val hidden = if (filter == "hidden") true else null
         withContext(Dispatchers.IO) {
             channels = runCatching { marquee.livetv.listLiveChannels(group, fav, recent, hidden) }.getOrDefault(emptyList())
-            guide = if (hidden == true) emptyMap()
-            else runCatching { marquee.livetv.liveGuide(start, start.plusHours(4), group, fav, recent).associate { it.channelId to it.programmes } }.getOrDefault(emptyMap())
+            guide = runCatching { marquee.livetv.liveGuide(start, start.plusHours(4), group, fav, recent, hidden).associate { it.channelId to it.programmes } }.getOrDefault(emptyMap())
         }
     }
     // TV: the channel last watched has the focus on coming back (not the Guide tab).

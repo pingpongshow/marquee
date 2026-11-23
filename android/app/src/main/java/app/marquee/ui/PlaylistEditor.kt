@@ -63,6 +63,7 @@ import app.marquee.api.models.PlaylistEntry
 import app.marquee.api.models.PlaylistKind
 import app.marquee.api.models.PlaylistMerge
 import app.marquee.api.models.SetPlaylistItemsRequest
+import app.marquee.core.allPlaylistEntries
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -114,15 +115,8 @@ internal object PlaylistEdits {
 }
 
 /** Every entry of a playlist, a page at a time (the server sends up to 2,000 at once). */
-private suspend fun allEntries(marquee: app.marquee.core.Marquee, id: Long): List<PlaylistEntry> = withContext(Dispatchers.IO) {
-    val out = ArrayList<PlaylistEntry>()
-    while (true) {
-        val page = marquee.playlists.listPlaylistItems(id, out.size, 2000)
-        out += page.items
-        if (page.items.isEmpty() || out.size >= page.total) break
-    }
-    out
-}
+private suspend fun allEntries(marquee: app.marquee.core.Marquee, id: Long): List<PlaylistEntry> =
+    withContext(Dispatchers.IO) { marquee.allPlaylistEntries(id) }
 
 /**
  * Edit a playlist (MUSIC-29): pick entries to remove or move to the top or bottom, move one up or

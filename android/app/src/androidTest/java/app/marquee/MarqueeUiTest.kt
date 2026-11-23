@@ -2749,6 +2749,12 @@ class MarqueeUiTest {
                     rule.onAllNodes(hasContentDescription("Up next countdown")).fetchSemanticsNodes().isEmpty()
             }
             shot("vp3-next")
+            // Back leaves the players for the playlist's page, not the video played before this one.
+            back()
+            rule.waitUntil(15_000) {
+                rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isEmpty() &&
+                    rule.onAllNodes(hasText("Play") and hasClickAction()).fetchSemanticsNodes().isNotEmpty()
+            }
         } finally {
             adminApi("DELETE", "/playlists/${created.getLong("id")}", asToken = appToken)
         }

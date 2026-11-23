@@ -61,6 +61,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -121,7 +122,7 @@ import kotlinx.coroutines.withContext
  * remembers them for this file.
  */
 private data class Choice(val fileId: Long? = null, val audio: Long? = null, val subtitle: Long? = null, val maxKbps: Int? = null,
-    val subOffset: Int? = null, val audioOffset: Int? = null, val nightMode: Boolean? = null)
+    val subOffset: Int? = null, val audioOffset: Int? = null, val nightMode: Boolean? = null) : java.io.Serializable // saved with the screen
 
 /** What night mode (dialogue boost) does, under its switches. */
 const val NIGHT_MODE_HELP = "Quieter loud scenes, clearer dialogue"
@@ -143,6 +144,9 @@ internal val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
 internal fun speedLabel(s: Float) = (if (s == s.toInt().toFloat()) s.toInt().toString() else s.toString()) + "×"
 
+/** ExoPlayer's errors for a decoder that can't be set up for a video, or fails on it. */
+private val DECODER_ERRORS = androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED..androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
+
 /** Subtitle and audio timing limits and step (PLAY-17), ms. */
 private const val maxOffset = 30_000
 private const val offsetStep = 100
@@ -163,7 +167,14 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     var session by remember { mutableStateOf<PlaybackSession?>(null) }
     var detail by remember { mutableStateOf<ItemDetail?>(null) }
     var thumbs by remember { mutableStateOf<TrickplayThumbs?>(null) }
-    var choice by remember { mutableStateOf(Choice()) }
+    // The viewer's choices and the place reached outlive the screen being rebuilt (the system
+    // ending the app in the background, a change of configuration): it carries on where it was,
+    // not from where the player was first opened (the start, after Up Next).
+    var choice by rememberSaveable { mutableStateOf(Choice()) }
+    var reached by rememberSaveable { mutableStateOf<Long?>(null) }
+    val startAt = remember { reached } ?: startMs
+    // Set once a video played as it is wouldn't decode: it's asked for again as 8-bit SDR.
+    var cautious by rememberSaveable { mutableStateOf(false) }
     // The session whose tracks the player was last set to (see applyServerTracks).
     var tracksApplied by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -206,6 +217,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     var countdownHeld by remember { mutableStateOf(false) }
     // Set once the end was dealt with, so closing the player doesn't ask again.
     val endHandled = remember { booleanArrayOf(false) }
+    // Set when this player gives way to the next video, which keeps the playlist's order going.
+    val movingOn = remember { booleanArrayOf(false) }
     LaunchedEffect(groupId) { if (groupId != null) { delay(1500); together.join(groupId) } }
     // Playing in order from a video playlist (USER-7) while this video is one of it; anything else ends that.
     val queue = remember(itemId) { marquee.videoQueue.takeIf { itemId in it } ?: emptyList<Long>().also { marquee.videoQueue = it } }
@@ -257,8 +270,9 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
      */
     suspend fun start(at: Long?, c: Choice, playId: Long = itemId) = withContext(Dispatchers.Main) {
         val old = session
-        val req = if (playId != itemId) PlaybackRequest(playId, AndroidProfile.profile, startMs = at)
-        else PlaybackRequest(itemId, AndroidProfile.profile, fileId = c.fileId, audioStreamId = c.audio, subtitleStreamId = c.subtitle,
+        val profile = if (cautious) AndroidProfile.cautious else AndroidProfile.profile
+        val req = if (playId != itemId) PlaybackRequest(playId, profile, startMs = at)
+        else PlaybackRequest(itemId, profile, fileId = c.fileId, audioStreamId = c.audio, subtitleStreamId = c.subtitle,
             startMs = at, maxBitrateKbps = c.maxKbps, subtitleOffsetMs = c.subOffset, audioOffsetMs = c.audioOffset,
             // Only an explicit choice is sent; otherwise the server uses the person's preference.
             nightMode = c.nightMode)
@@ -318,21 +332,21 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         else if (local != null) withContext(Dispatchers.Main) {
             player.setMediaItem(MediaItem.fromUri(Uri.fromFile(local)))
             player.prepare()
-            val begin = startMs ?: downloads.resumePosition(itemId)
+            val begin = startAt ?: downloads.resumePosition(itemId)
             if (begin > 0) player.seekTo(begin)
             player.playWhenReady = true
         } else {
             // Cinema trailers (PLAY-18): a movie started from the beginning (not resumed) gets
             // the server's trailers and pre-roll first; the list is empty when they're off.
             val d = detailReady.await()
-            val fromStart = startMs == 0L || (startMs == null && (d?.viewOffsetMs ?: 0) <= 0)
+            val fromStart = startAt == 0L || (startAt == null && (d?.viewOffsetMs ?: 0) <= 0)
             val pre = if (d?.type == ItemType.MOVIE && fromStart && groupId == null)
                 withContext(Dispatchers.IO) { runCatching { marquee.playback.listPrerolls(itemId) }.getOrDefault(emptyList()) } else emptyList()
             if (pre.isNotEmpty() && !casting) {
                 rolls = pre
                 roll = 0
                 start(0, choice, pre[0].id)
-            } else start(startMs, choice)
+            } else start(startAt, choice)
         }
     }
     // A download playing while the server can be reached: a limited profile's time is checked each minute.
@@ -348,7 +362,12 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     // Watching together keeps everyone at 1×.
     LaunchedEffect(group != null) { if (group != null && speed != 1f) { speed = 1f; player.setPlaybackSpeed(1f) } }
     fun playNext(next: Long) {
-        if (stillShowing()) nav.navigate("player/$next?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
+        if (!stillShowing()) return
+        movingOn[0] = true
+        // This player's own entry gives way to the next one's (found by its destination, whatever
+        // arguments the route has), so Back leaves the players instead of going back through each
+        // video watched, starting it again.
+        nav.navigate("player/$next?start=0") { popUpTo(ownEntry!!.destination.id) { inclusive = true } }
     }
     // Up Next counts down unless the person is using the rating card; then the next video plays.
     LaunchedEffect(endNext, countdownHeld) {
@@ -369,7 +388,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         rolls = emptyList()
         speed = 1f
         player.setPlaybackSpeed(1f)
-        scope.launch { start(startMs, choice) }
+        scope.launch { start(startAt, choice) }
     }
 
     fun nextRoll() {
@@ -385,6 +404,9 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             while (true) {
                 position = player.currentPosition
                 duration = player.duration.coerceAtLeast(0)
+                // The place to carry on from if the screen is rebuilt: the video's own, once it's loading or playing here.
+                if (roll < 0 && !casting && (session != null || local != null) &&
+                    (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_BUFFERING)) reached = position
                 if (player.isPlaying && ++ticks % 10 == 0) report(PlaybackProgress.State.PLAYING)
                 delay(500)
             }
@@ -460,6 +482,14 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             override fun onPlayerError(e: androidx.media3.common.PlaybackException) {
                 // A trailer that won't play is skipped rather than holding up the movie.
                 if (roll >= 0) { nextRoll(); return }
+                // The decoder wouldn't take a video sent as it is (a 10-bit or HDR kind it doesn't
+                // play after all, like H.264 High 10): once more, asking for what every device plays.
+                if (!cautious && local == null && e.errorCode in DECODER_ERRORS && AndroidProfile.profile != AndroidProfile.cautious) {
+                    cautious = true
+                    val at = player.currentPosition
+                    scope.launch { start(at, choice) }
+                    return
+                }
                 if (onDemandRoute != null) { playOnDemand(nav, context, onDemandRoute); return }
                 error = "This video can't be played on this device (${e.errorCodeName})."
             }
@@ -476,6 +506,10 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 marquee.requestRating(ratingRequestFor(marquee, d))
             }
             recordLocal()
+            // Left for good (not on to the next video, nor rebuilt with the screen): a playlist's
+            // order ends here, so the same video played later from its own page goes on to the
+            // next episode, not the playlist's next.
+            if (!movingOn[0] && (context as? Activity)?.isChangingConfigurations != true) marquee.videoQueue = emptyList()
             // Smart downloads catch up (the next episode, removing a watched one) soon after.
             downloads.smart.runSoon()
             together.leave()
@@ -505,7 +539,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             // The title, artwork and resume point come from the details, so wait for them.
             val d = detailReady.await()
             // Opened while already casting nothing played here: start where asked, or resume.
-            val at = if (here == null) startMs ?: d?.viewOffsetMs ?: 0 else player.currentPosition
+            val at = if (here == null) startAt ?: d?.viewOffsetMs ?: 0 else player.currentPosition
             val title = d?.let { if (it.type == ItemType.EPISODE) "${it.grandparentTitle ?: ""} · ${it.title}" else it.title } ?: ""
             marquee.cast.onFinished = onCastFinished
             castError = marquee.cast.load(itemId, at, title, d?.year?.toString(), marquee.imageUrl(d?.images?.backdrop ?: d?.images?.poster, 640), music = false,

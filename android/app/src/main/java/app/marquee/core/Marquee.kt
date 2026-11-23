@@ -248,13 +248,16 @@ class Marquee(context: Context) {
     /** Screens that follow [connection] reload (after offline changes were sent). */
     fun refresh() { _connection.value++ }
 
+    /** The app's own version (versionName), as the server's device and session lists show it. */
+    private val appVersion: String = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "unknown"
+
     val device: DeviceInfo
         get() = DeviceInfo(
             clientId = store.clientId,
             name = Build.MODEL ?: "Android",
             platform = if (isTv) DeviceInfo.Platform.ANDROIDTV else DeviceInfo.Platform.ANDROID,
             product = "Marquee for Android",
-            version = "0.19",
+            version = appVersion,
         )
 
     init {

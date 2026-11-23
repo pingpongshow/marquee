@@ -2360,6 +2360,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param group  (optional)
      * @param favorites  (optional)
      * @param recent  (optional)
+     * @param hidden Only the channels the caller hid (otherwise they&#39;re left out). (optional)
      * @return kotlin.collections.List<LiveGuide200ResponseInner>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -2369,8 +2370,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun liveGuide(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String? = null, favorites: kotlin.Boolean? = null, recent: kotlin.Boolean? = null) : kotlin.collections.List<LiveGuide200ResponseInner> {
-        val localVarResponse = liveGuideWithHttpInfo(start = start, end = end, group = group, favorites = favorites, recent = recent)
+    fun liveGuide(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String? = null, favorites: kotlin.Boolean? = null, recent: kotlin.Boolean? = null, hidden: kotlin.Boolean? = null) : kotlin.collections.List<LiveGuide200ResponseInner> {
+        val localVarResponse = liveGuideWithHttpInfo(start = start, end = end, group = group, favorites = favorites, recent = recent, hidden = hidden)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<LiveGuide200ResponseInner>
@@ -2396,14 +2397,15 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param group  (optional)
      * @param favorites  (optional)
      * @param recent  (optional)
+     * @param hidden Only the channels the caller hid (otherwise they&#39;re left out). (optional)
      * @return ApiResponse<kotlin.collections.List<LiveGuide200ResponseInner>?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun liveGuideWithHttpInfo(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String?, favorites: kotlin.Boolean?, recent: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<LiveGuide200ResponseInner>?> {
-        val localVariableConfig = liveGuideRequestConfig(start = start, end = end, group = group, favorites = favorites, recent = recent)
+    fun liveGuideWithHttpInfo(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String?, favorites: kotlin.Boolean?, recent: kotlin.Boolean?, hidden: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<LiveGuide200ResponseInner>?> {
+        val localVariableConfig = liveGuideRequestConfig(start = start, end = end, group = group, favorites = favorites, recent = recent, hidden = hidden)
 
         return request<Unit, kotlin.collections.List<LiveGuide200ResponseInner>>(
             localVariableConfig
@@ -2418,9 +2420,10 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param group  (optional)
      * @param favorites  (optional)
      * @param recent  (optional)
+     * @param hidden Only the channels the caller hid (otherwise they&#39;re left out). (optional)
      * @return RequestConfig
      */
-    fun liveGuideRequestConfig(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String?, favorites: kotlin.Boolean?, recent: kotlin.Boolean?) : RequestConfig<Unit> {
+    fun liveGuideRequestConfig(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String?, favorites: kotlin.Boolean?, recent: kotlin.Boolean?, hidden: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -2434,6 +2437,9 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
                 }
                 if (recent != null) {
                     put("recent", listOf(recent.toString()))
+                }
+                if (hidden != null) {
+                    put("hidden", listOf(hidden.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
