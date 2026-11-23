@@ -15,8 +15,8 @@ android {
         applicationId = "app.marquee"
         minSdk = 26
         targetSdk = 35
-        versionCode = 76
-        versionName = "1.11.7"
+        versionCode = 78
+        versionName = "1.11.12"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
