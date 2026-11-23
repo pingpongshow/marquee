@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { Alert, Button, Dialog, Spinner } from "@/components/ui";
+import { useLater } from "@/lib/useLater";
 import { availabilityLabel, type DiscoverItem, requestsStatusQuery, useRequestAction } from "./api";
 import { DownloadFromVod } from "./DownloadFromVod";
 import { WatchOnVod } from "./WatchOnVod";
@@ -30,6 +31,7 @@ export function RequestDialog({
     (s) => s.availability === "none",
   );
   const [picked, setPicked] = useState<Set<number> | null>(null);
+  const later = useLater();
   const chosen = picked ?? new Set(open.map((s) => s.number));
   const create = useRequestAction(() =>
     unwrap(
@@ -61,7 +63,7 @@ export function RequestDialog({
             }
             onClick={() =>
               create.mutate(undefined, {
-                onSuccess: () => setTimeout(onClose, 1200),
+                onSuccess: () => later(onClose, 1200),
               })
             }
           >
@@ -102,6 +104,18 @@ export function RequestDialog({
       {item.mediaType === "tv" &&
         (show.isPending ? (
           <Spinner />
+        ) : show.isError ? (
+          // Without its seasons there's nothing to choose, and no reason shown for it.
+          <div className="mt-4">
+            <Alert tone="error">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>Couldn't load the seasons. {show.error.message}</span>
+                <Button size="sm" onClick={() => void show.refetch()}>
+                  Try again
+                </Button>
+              </div>
+            </Alert>
+          </div>
         ) : (
           <fieldset className="mt-4 grid gap-2 sm:grid-cols-2">
             <legend className="mb-2 text-sm font-medium">Seasons</legend>

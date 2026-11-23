@@ -38,7 +38,8 @@ export function SettingsLayout() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               const first = settingsGroups.flatMap((g) => g.sections).find((s) => matches(s, query));
-              if (e.key === "Enter" && first) {
+              // Nothing typed matches every section: Enter then isn't a search.
+              if (e.key === "Enter" && query.trim() && first) {
                 navigate({ to: "/settings/$section", params: { section: first.id } });
                 setQuery("");
               }

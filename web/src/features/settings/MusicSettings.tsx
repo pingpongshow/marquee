@@ -42,8 +42,8 @@ export function MusicSettings() {
       unwrap(api.POST("/music/sound-model", { body: { action } })),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["music", "status"] });
+      // No reset of the form: it took unsaved changes to other Music settings with it.
       qc.invalidateQueries({ queryKey: settingsQuery.queryKey });
-      s.reset();
     },
   });
   if (!s.draft) return <Spinner />;

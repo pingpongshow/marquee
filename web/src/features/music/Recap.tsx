@@ -381,6 +381,9 @@ export function RecapPage() {
     const onKey = (e: KeyboardEvent) => {
       // Focused controls, dialogs and Now Playing (opened from here) keep their keys.
       if (ignoreShortcut(e) || document.querySelector('[role="dialog"][aria-label="Now Playing"]')) return;
+      // Space on a focused button or link is that control's (Play, Close, the page arrows): it
+      // mustn't turn the page as well.
+      if (e.key === " " && e.target instanceof Element && e.target.closest("button, a")) return;
       if (e.key === "ArrowRight" || e.key === " ") {
         e.preventDefault();
         go(1);

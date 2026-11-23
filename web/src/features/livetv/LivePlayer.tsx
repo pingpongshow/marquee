@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, unwrap } from "@/api/client";
+import { api, ApiError, unwrap } from "@/api/client";
 import { deviceProfile } from "@/features/player/deviceProfile";
 import { checkTimeUp } from "@/features/player/TimeUp";
 
@@ -34,6 +34,9 @@ export function LivePlayer({
   // Bumped to tune again after the server ended the stream (callers key the player by
   // channel, so it starts at 0 for each one).
   const [attempt, setAttempt] = useState(0);
+  // When it last tuned again: three times within two minutes is a stream that won't hold, but
+  // one the server ends now and then over a long evening (a recording starting) just carries on.
+  const retunes = useRef<number[]>([]);
   // React doesn't keep the muted property in step with the attribute; autoplay needs it.
   useEffect(() => {
     if (video.current) video.current.muted = !!muted;
@@ -42,6 +45,9 @@ export function LivePlayer({
     let hls: { destroy: () => void } | null = null;
     let session: string | null = null;
     let cancelled = false;
+    // Ends a tune nobody is waiting for any more: left to finish, it held a connection of its
+    // source meanwhile, and the channel switched to was refused.
+    const abort = new AbortController();
     const v = video.current;
     const stop = (id: string) =>
       void api
@@ -54,12 +60,22 @@ export function LivePlayer({
       // The player code loads while tuning; if it fails to load, the session is ended.
       const hlsModule = import("hls.js");
       hlsModule.catch(() => {});
-      const s = await unwrap(
-        api.POST("/livetv/channels/{channelId}/play", {
-          params: { path: { channelId } },
-          body: { profile: deviceProfile() },
-        }),
-      );
+      const tune = () =>
+        unwrap(
+          api.POST("/livetv/channels/{channelId}/play", {
+            params: { path: { channelId } },
+            body: { profile: deviceProfile() },
+            signal: abort.signal,
+          }),
+        );
+      // The channel just left may still hold the source's last connection for a moment (its
+      // stream is being ended as this one is asked for): "all in use" gets one more try.
+      const s = await tune().catch(async (e: unknown) => {
+        if (cancelled || !(e instanceof ApiError) || e.status !== 409) throw e;
+        await new Promise((r) => setTimeout(r, 1500));
+        if (cancelled) throw e;
+        return tune();
+      });
       let Hls: typeof import("hls.js").default;
       try {
         Hls = (await hlsModule).default;
@@ -88,7 +104,10 @@ export function LivePlayer({
               if (cancelled) return;
               if (reason !== null) {
                 session = null; // already gone
-                if (!reason.startsWith("Stopped:") && attempt < 3) {
+                const now = Date.now();
+                retunes.current = retunes.current.filter((t) => now - t < 120_000);
+                if (!reason.startsWith("Stopped:") && retunes.current.length < 3) {
+                  retunes.current.push(now);
                   setLoading(true);
                   setAttempt((a) => a + 1);
                 }
@@ -117,6 +136,7 @@ export function LivePlayer({
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
+      abort.abort();
       hls?.destroy();
       if (v?.getAttribute("src")) {
         v.removeAttribute("src");

@@ -14,7 +14,7 @@ import { RowRating } from "../music/Rating";
 import { favoriteTypes, RowFavorite } from "../browse/Favorite";
 import { useMusicState } from "../player/MusicPlayer";
 import { PlaylistMosaic } from "./PlaylistMosaic";
-import { newShuffleSeed, seededShuffle } from "./order";
+import { newShuffleSeed, rememberPlayOrder, seededShuffle } from "./order";
 import { PinToHomeButton } from "../home/EditHome";
 import { RulesEditor, rulesValid } from "./RulesEditor";
 import { MoveToFolderDialog } from "./Folders";
@@ -109,8 +109,12 @@ export function PlaylistPage() {
     // carries a shuffle to it). Unavailable items are skipped.
     const playable = items.filter((it) => it.available);
     const sh = shuffle ? newShuffleSeed() : undefined;
-    const first = sh ? seededShuffle(playable, sh)[0] : items.slice(start).find((it) => it.available);
-    if (first) navigate({ to: "/play/$itemId", params: { itemId: String(first.id) }, search: { t: 0, pl: id, sh } });
+    const order = sh ? seededShuffle(playable, sh) : playable;
+    // Its place in the order goes along too: an item that's in the playlist twice is two places.
+    const first = sh ? order[0] : items.slice(start).find((it) => it.available);
+    if (!first) return;
+    rememberPlayOrder(id, sh, order);
+    navigate({ to: "/play/$itemId", params: { itemId: String(first.id) }, search: { t: 0, pl: id, sh, pi: order.indexOf(first) } });
   };
   // Dropping on a row moves the dragged entry into that row's position.
   const drop = (target: number) => {

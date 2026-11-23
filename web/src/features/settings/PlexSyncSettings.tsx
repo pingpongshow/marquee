@@ -112,12 +112,23 @@ function ReportView({ r }: { r: Report }) {
 function SignInWithPlex({ onDone }: { onDone: () => void }) {
   const [code, setCode] = useState<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  // The Plex tab is opened by the click itself, empty, and sent to plex.tv once the code is in:
+  // a tab opened after the wait isn't the click's any more, and Safari blocks it.
+  const tab = useRef<Window | null>(null);
   useEffect(() => () => window.clearInterval(timer.current), []);
   const start = useMutation({
     mutationFn: () => unwrap(api.POST("/plex-sync/pin")),
+    onError: () => {
+      tab.current?.close();
+      tab.current = null;
+    },
     onSuccess: (pin) => {
       setCode(pin.code);
-      window.open(pin.authUrl, "_blank", "noopener");
+      if (tab.current && !tab.current.closed) {
+        tab.current.opener = null;
+        tab.current.location.href = pin.authUrl;
+      } else window.open(pin.authUrl, "_blank", "noopener");
+      tab.current = null;
       const until = Date.now() + 5 * 60_000;
       window.clearInterval(timer.current);
       timer.current = window.setInterval(async () => {
@@ -142,7 +153,15 @@ function SignInWithPlex({ onDone }: { onDone: () => void }) {
   });
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Button size="sm" variant="ghost" onClick={() => start.mutate()} loading={start.isPending}>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => {
+          tab.current = window.open("", "_blank");
+          start.mutate();
+        }}
+        loading={start.isPending}
+      >
         <LogIn className="size-4" /> Sign in with Plex
       </Button>
       {code && (
@@ -184,7 +203,13 @@ function ConnectionAndOptions({ st }: { st: Status }) {
           placeholder="Paste a Plex token"
           isSet={c.tokenSet}
           value={draft.token}
-          onChange={(t) => set({ token: t })}
+          onChange={(t) => {
+            // Emptied again: nothing to save for it (not a change to "no token").
+            if (t !== undefined) return set({ token: t });
+            const rest = { ...draft };
+            delete rest.token;
+            setDraft(rest);
+          }}
         />
       </div>
       <SignInWithPlex onDone={() => qc.invalidateQueries({ queryKey: syncQuery.queryKey })} />

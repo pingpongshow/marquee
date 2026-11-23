@@ -267,6 +267,17 @@ export function move(q: Queue, key: number, to: number): Queue {
   return { ...q, entries, index: cur ? entries.indexOf(cur) : q.index };
 }
 
+/**
+ * Moves an entry to just before the one now at `index` (where a dragged row's drop line shows).
+ * Taking the entry out first shifts the ones after it up a place, so one dragged down goes to
+ * `index - 1`: straight to `index` landed it a row below the line.
+ */
+export function moveBefore(q: Queue, key: number, index: number): Queue {
+  const from = q.entries.findIndex((e) => e.key === key);
+  if (from < 0) return q;
+  return move(q, key, from < index ? index - 1 : index);
+}
+
 export function jump(q: Queue, key: number): Queue {
   const i = q.entries.findIndex((e) => e.key === key);
   return i < 0 ? q : { ...q, index: i };

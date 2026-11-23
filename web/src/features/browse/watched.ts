@@ -93,6 +93,14 @@ export const hubsKey = ["items", "hubs"] as const;
  * into the suggestion rows (mixedEntries): older apps don't ask for them, this one does. */
 export const fetchHubs = () => unwrap(api.GET("/hubs/home", { params: { query: { vod: true, mixed: true } } }));
 
+/** One cached list or page changed ahead of the server's answer. */
+export type CacheChange = { key: readonly unknown[]; before: unknown; after: unknown };
+
+/** Takes optimistic changes back, last first, leaving alone whatever has loaded anew since. */
+export function undoChanges(changes: readonly CacheChange[], get: (key: readonly unknown[]) => unknown, set: (key: readonly unknown[], data: unknown) => void) {
+  for (const c of [...changes].reverse()) if (get(c.key) === c.after) set(c.key, c.before);
+}
+
 /** Refreshes everything that shows watch state: item pages, Home rows, library grids, playlists, search. */
 export function refreshWatchState(qc: QueryClient) {
   for (const key of [["items"], ["libraries"], ["playlists"], ["search"], ["continue-watching"]]) void qc.invalidateQueries({ queryKey: key });
@@ -111,19 +119,26 @@ export function useMarkWatched() {
         : unwrap(api.DELETE("/items/{itemId}/watched", { params: { path: { itemId: item.id } } })),
     onMutate: async ({ item, watched }) => {
       const cache = qc.getQueryCache();
-      const snapshot = cache.getAll().map((q) => [q.queryKey, q.state.data] as const);
+      // Only what this changes is remembered, to put back if the server refuses: putting the
+      // whole cache back also undid everything else that had loaded meanwhile.
+      const changes: CacheChange[] = [];
       for (const q of cache.getAll()) {
         if (q.state.data === undefined) continue;
         const next = applyWatched(q.state.data, item.id, watched);
-        if (next !== q.state.data) qc.setQueryData(q.queryKey, next);
+        if (next === q.state.data) continue;
+        changes.push({ key: q.queryKey, before: q.state.data, after: next });
+        qc.setQueryData(q.queryKey, next);
       }
       // Watched, or unwatched (its resume point forgotten): either way it leaves Continue Watching.
-      qc.setQueryData<Hub[]>(hubsKey, (old) => withoutContinueWatching(old, item.id));
-      return { snapshot };
+      const hubs = qc.getQueryData<Hub[]>(hubsKey);
+      const without = withoutContinueWatching(hubs, item.id);
+      if (without !== hubs) {
+        changes.push({ key: hubsKey, before: hubs, after: without });
+        qc.setQueryData<Hub[]>(hubsKey, without);
+      }
+      return { changes };
     },
-    onError: (_e, _v, ctx) => {
-      for (const [key, data] of ctx?.snapshot ?? []) qc.setQueryData(key, data);
-    },
+    onError: (_e, _v, ctx) => undoChanges(ctx?.changes ?? [], (key) => qc.getQueryData(key), (key, data) => qc.setQueryData(key, data)),
     onSettled: () => refreshWatchState(qc),
   });
 }

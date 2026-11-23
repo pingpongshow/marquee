@@ -14084,6 +14084,8 @@ export interface operations {
                 group?: string;
                 favorites?: boolean;
                 recent?: boolean;
+                /** @description Only the channels the caller hid (otherwise they're left out). */
+                hidden?: boolean;
             };
             header?: never;
             path?: never;

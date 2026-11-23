@@ -23,9 +23,32 @@ export function seededShuffle<T>(list: readonly T[], seed: number): T[] {
 /** A fresh shuffle seed. */
 export const newShuffleSeed = () => Math.floor(Math.random() * 2 ** 31) + 1;
 
+/**
+ * What follows the playing item in a play order, with its place in it. `at` is where the playing
+ * item is (carried in the URL): the same film can be in a playlist twice, and going by its id
+ * alone finds the first copy every time, so the playlist went round in a loop. Without a place
+ * that fits, the first copy it is. Null at the end, or when the item isn't in the order.
+ */
+export function nextInOrder<T extends { id: number }>(order: readonly T[], currentId: number, at?: number): { item: T; at: number } | null {
+  const i = at !== undefined && order[at]?.id === currentId ? at : order.findIndex((it) => it.id === currentId);
+  const item = i >= 0 ? order[i + 1] : undefined;
+  return item ? { item, at: i + 1 } : null;
+}
+
 /** The item after `currentId` in a playlist's play order (shuffled when there's a seed); null at the end. */
-export function nextInPlaylist<T extends { id: number }>(items: readonly T[], currentId: number, seed?: number): T | null {
-  const order = seed ? seededShuffle(items, seed) : items;
-  const i = order.findIndex((it) => it.id === currentId);
-  return i >= 0 ? (order[i + 1] ?? null) : null;
+export function nextInPlaylist<T extends { id: number }>(items: readonly T[], currentId: number, seed?: number, at?: number): T | null {
+  return nextInOrder(seed ? seededShuffle(items, seed) : items, currentId, at)?.item ?? null;
+}
+
+// The play order the playlist page started the player with (the latest one). A smart playlist
+// sorted at random comes back in a new order each time it's asked for, so the player goes by
+// this one rather than asking again. Kept in memory: after a reload the player asks the server.
+let started: { playlistId: number; seed: number | undefined; order: readonly unknown[] } | null = null;
+
+export function rememberPlayOrder<T>(playlistId: number, seed: number | undefined, order: readonly T[]) {
+  started = { playlistId, seed, order };
+}
+
+export function recallPlayOrder<T>(playlistId: number, seed: number | undefined): readonly T[] | null {
+  return started && started.playlistId === playlistId && started.seed === seed ? (started.order as readonly T[]) : null;
 }

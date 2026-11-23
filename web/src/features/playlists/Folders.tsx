@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import { playlistFoldersQuery } from "@/api/queries";
 import type { Playlist, PlaylistFolder } from "@/api/types";
@@ -29,10 +29,16 @@ export function MoveToFolderDialog({ playlist, onClose }: { playlist: Playlist; 
   const folders = useQuery(playlistFoldersQuery());
   const [choice, setChoice] = useState(playlist.folderId ?? 0);
   const [name, setName] = useState("");
+  // The folder this dialog has made already: if moving the playlist into it then failed, trying
+  // again uses it rather than making another of the same name.
+  const made = useRef<{ name: string; id: number } | null>(null);
   const save = useMutation({
     mutationFn: async () => {
       let folderId = choice;
-      if (choice === NEW) folderId = (await unwrap(api.POST("/playlist-folders", { body: { name: name.trim() } }))).id;
+      if (choice === NEW) {
+        if (made.current?.name !== name.trim()) made.current = { name: name.trim(), id: (await unwrap(api.POST("/playlist-folders", { body: { name: name.trim() } }))).id };
+        folderId = made.current.id;
+      }
       if (folderId !== (playlist.folderId ?? 0)) await moveToFolder(playlist, folderId);
     },
     onSuccess: () => {

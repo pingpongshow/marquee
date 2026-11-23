@@ -954,7 +954,10 @@ export function UsersSettings() {
           size="sm"
           variant="ghost"
           aria-label={`Delete ${u.displayName}`}
-          onClick={() => setDeleting(u)}
+          onClick={() => {
+            del.reset(); // not the last person's error
+            setDeleting(u);
+          }}
         >
           <Trash2 className="size-4" />
         </Button>

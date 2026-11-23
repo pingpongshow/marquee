@@ -5,6 +5,7 @@ import { api, unwrap } from "@/api/client";
 import { playlistsQuery } from "@/api/queries";
 import type { ItemSummary, PlaylistKind } from "@/api/types";
 import { Alert, Button, Dialog, Input, Spinner } from "@/components/ui";
+import { useLater } from "@/lib/useLater";
 import { PlaylistMosaic } from "./PlaylistMosaic";
 
 const musicTypes = new Set(["track", "album", "artist"]);
@@ -19,6 +20,7 @@ export function AddToPlaylistDialog({ item, onClose }: { item: Pick<ItemSummary,
   const own = lists.data?.filter((p) => !p.readOnly);
   const [title, setTitle] = useState("");
   const [done, setDone] = useState<string | null>(null);
+  const later = useLater();
   const add = useMutation({
     mutationFn: async ({ id, name }: { id?: number; name?: string }) => {
       if (id) return unwrap(api.POST("/playlists/{playlistId}/items", { params: { path: { playlistId: id } }, body: { itemIds: [item.id] } }));
@@ -27,7 +29,7 @@ export function AddToPlaylistDialog({ item, onClose }: { item: Pick<ItemSummary,
     onSuccess: (p) => {
       qc.invalidateQueries({ queryKey: ["playlists"] });
       setDone(p.title);
-      window.setTimeout(onClose, 900);
+      later(onClose, 900);
     },
   });
   const create = (e: FormEvent) => {

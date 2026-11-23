@@ -60,7 +60,7 @@ export const liveGuideQuery = (f: LiveFilter, start: Date, end: Date) =>
         api.GET("/livetv/guide", {
           params: {
             query: {
-              ...(f === "hidden" ? {} : filterParams(f)),
+              ...filterParams(f),
               start: start.toISOString(),
               end: end.toISOString(),
             },

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { usersQuery } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
+import { chartSpan } from "./statsSpan";
 import { Alert, Card, Select, Spinner } from "@/components/ui";
 
 type Stats = components["schemas"]["Stats"];
@@ -104,7 +105,7 @@ function Tile({ label, value }: { label: string; value: string }) {
 /** Stacked daily bars: video and music plays. Days with nothing played are filled in. */
 function DailyChart({ days, period }: { days: Stats["days"]; period: number }) {
   const byDate = new Map(days.map((d) => [d.date, d]));
-  const span = period || Math.min(365, Math.max(30, days.length));
+  const span = chartSpan(period, days.map((d) => d.date));
   const list: { date: string; video: number; music: number }[] = [];
   const end = new Date();
   for (let i = span - 1; i >= 0; i--) {

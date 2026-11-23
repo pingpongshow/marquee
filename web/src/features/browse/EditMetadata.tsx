@@ -132,7 +132,9 @@ export function EditMetadataDialog({ item, onClose }: { item: ItemDetail; onClos
     const body: Edit = { unlock: unlock.length ? unlock : undefined };
     const b = body as Record<string, unknown>;
     for (const [k, v] of Object.entries(values)) {
+      // A number or date can't be sent empty (the server refuses the whole save): leave it out.
       if (k === "index") b[k] = v === "" ? undefined : Number(v);
+      else if (k === "originallyAvailableAt" && v === "") continue;
       else b[k] = v;
     }
     for (const [k, v] of Object.entries(tagValues)) b[k] = v;

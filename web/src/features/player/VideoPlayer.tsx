@@ -39,7 +39,7 @@ import { Thumbs } from "../music/Rating";
 import { cueCss, placeCues, resolveSubtitleStyle } from "@/lib/subtitleStyle";
 import { deviceProfile, prefersNativeHLS } from "./deviceProfile";
 import { SubtitleSearchDialog } from "./SubtitleSearch";
-import { nextInPlaylist } from "../playlists/order";
+import { nextInOrder, recallPlayOrder, seededShuffle } from "../playlists/order";
 import { RatingPromptCard, showRatingPrompt } from "./RatingPrompt";
 import { UpNextScreen } from "./UpNextScreen";
 import { finishedWatching, wantsRatingPrompt } from "./ratingRules";
@@ -122,7 +122,8 @@ function trackLabel(s: MediaStream) {
 type Selection = {
   audio?: number;
   subtitle?: number;
-  quality: number;
+  /** Chosen in this player; unset uses what's stored for the network (home or away). */
+  quality?: number;
   file?: number;
   /** Timing offsets (PLAY-17); unset lets the server use what this user last chose for the file. */
   subOffset?: number;
@@ -177,6 +178,7 @@ export function VideoPlayer({
   startMs,
   playlistId,
   shuffleSeed,
+  playlistIndex,
   fileId,
   groupId,
   preroll,
@@ -187,6 +189,8 @@ export function VideoPlayer({
   playlistId?: number;
   /** A shuffled playlist plays in this seed's order. */
   shuffleSeed?: number;
+  /** This item's place in the playlist's play order (it may be in the playlist twice). */
+  playlistIndex?: number;
   fileId?: number;
   groupId?: string;
   preroll?: Preroll;
@@ -219,10 +223,9 @@ export function VideoPlayer({
   const together = useWatchTogether(videoRef, itemId, me.data?.id, groupId);
   const [sess, setSess] = useState<PlaybackSession | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sel, setSel] = useState<Selection>(() => ({
-    quality: storedQuality(false),
-    file: fileId,
-  }));
+  // No quality here: which stored one applies (home or away) is known once the server says
+  // where this browser is. Starting from the home one made it win away from home too.
+  const [sel, setSel] = useState<Selection>(() => ({ file: fileId }));
   const [restartAt, setRestartAt] = useState<number | undefined>(startMs);
   const [speed, setSpeed] = useState(1);
   // A subtitle offset being tried on the current session (re-fetched, not restarted), and an
@@ -246,6 +249,8 @@ export function VideoPlayer({
   >(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [next, setNext] = useState<ItemSummary | null>(null);
+  // Where `next` is in the playlist's play order.
+  const nextAt = useRef<number | undefined>(undefined);
   // The rating request (USER-19): asked once per playback. Touching it on Up Next holds
   // the countdown until it's answered or closed.
   const [ratingDone, setRatingDone] = useState(false);
@@ -272,6 +277,16 @@ export function VideoPlayer({
     const t = trackRef.current;
     if (t?.isConnected) placeCues(t.track, subPosition);
   }, [subPosition]);
+  // A swapped-in track isn't always shown on its own, so it's shown once, when it's attached.
+  // A stable function: an inline one runs again on every render (several a second), which
+  // turned subtitles back on straight after the browser's own player had turned them off.
+  const attachTrack = useCallback((t: HTMLTrackElement | null) => {
+    if (!t) return;
+    t.track.mode = "showing";
+    trackRef.current = t;
+    placeCues(t.track, cuePosition.current);
+    t.onload = () => placeCues(t.track, cuePosition.current);
+  }, []);
   // Show the controls, then hide them after 3 s of no mouse/keyboard activity while playing.
   const poke = useCallback(() => {
     setChrome(true);
@@ -298,6 +313,8 @@ export function VideoPlayer({
   const audioTracks = file?.streams.filter((s) => s.kind === "audio") ?? [];
   const subTracks = file?.streams.filter((s) => s.kind === "subtitle") ?? [];
   const duration = (sess?.durationMs ?? item.data?.durationMs ?? 0) / 1000;
+  // The quality in force: this player's choice, else the one stored for this network.
+  const quality = sel.quality ?? storedQuality(remote);
 
   const report = useCallback(
     (
@@ -375,7 +392,7 @@ export function VideoPlayer({
       setError(null);
       setBuffering(true);
       try {
-        const quality = sel.quality || storedQuality(remote);
+        const quality = sel.quality ?? storedQuality(remote);
         const measuredKbps =
           remote && !quality
             ? await measureKbps().catch(() => undefined)
@@ -598,18 +615,29 @@ export function VideoPlayer({
   // Up Next: the following playlist entry when playing a playlist, else the next episode.
   useEffect(() => {
     if (!playlistId) return;
-    unwrap(
-      api.GET("/playlists/{playlistId}/items", {
-        params: { path: { playlistId }, query: { limit: 2000 } },
-      }),
-    )
-      .then((p) => {
-        // The same order the playlist page started (a shuffle comes from its seed); unavailable items are skipped.
-        const items = p.items.map((e) => e.item).filter((it) => it.available || it.id === itemId);
-        setNext(nextInPlaylist(items, itemId, shuffleSeed));
+    // The order the playlist page started with, when it's known and has this item: a smart
+    // playlist sorted at random would come back from the server in another order (and maybe
+    // without this item). Otherwise (a reload, a link) the playlist as it is now.
+    const started = recallPlayOrder<ItemSummary>(playlistId, shuffleSeed);
+    const order: Promise<readonly ItemSummary[]> = started?.some((it) => it.id === itemId)
+      ? Promise.resolve(started)
+      : unwrap(
+          api.GET("/playlists/{playlistId}/items", {
+            params: { path: { playlistId }, query: { limit: 2000 } },
+          }),
+        ).then((p) => {
+          // The same order the playlist page started (a shuffle comes from its seed); unavailable items are skipped.
+          const items = p.items.map((e) => e.item).filter((it) => it.available || it.id === itemId);
+          return shuffleSeed ? seededShuffle(items, shuffleSeed) : items;
+        });
+    order
+      .then((list) => {
+        const n = nextInOrder(list, itemId, playlistIndex);
+        nextAt.current = n?.at;
+        setNext(n?.item ?? null);
       })
       .catch(() => setNext(null));
-  }, [playlistId, itemId, shuffleSeed]);
+  }, [playlistId, itemId, shuffleSeed, playlistIndex]);
   useEffect(() => {
     if (playlistId || item.data?.type !== "episode") return;
     unwrap(api.GET("/items/{itemId}/next", { params: { path: { itemId } } }))
@@ -669,7 +697,7 @@ export function VideoPlayer({
     navigate({
         to: "/play/$itemId",
         params: { itemId: String(next.id) },
-      search: { t: 0, pl: playlistId, sh: shuffleSeed },
+      search: { t: 0, pl: playlistId, sh: shuffleSeed, pi: playlistId ? nextAt.current : undefined },
       replace: true,
     });
   }, [next, navigate, playlistId, shuffleSeed]);
@@ -825,14 +853,7 @@ export function VideoPlayer({
             kind="subtitles"
             src={subUrl}
             default
-            // A swapped-in track isn't always shown on its own.
-            ref={(t) => {
-              if (!t) return;
-              t.track.mode = "showing";
-              trackRef.current = t;
-              placeCues(t.track, cuePosition.current);
-              t.onload = () => placeCues(t.track, cuePosition.current);
-            }}
+            ref={attachTrack}
           />
         )}
       </video>
@@ -1262,7 +1283,7 @@ export function VideoPlayer({
               </MenuHeading>
               {remote && (
                 <MenuItem
-                  active={sel.quality === 0}
+                  active={quality === 0}
                   onClick={() => (
                     storeQuality(true, 0),
                     restart({ quality: 0 })
@@ -1276,7 +1297,7 @@ export function VideoPlayer({
                 .map((q) => (
                   <MenuItem
                     key={q.kbps}
-                    active={sel.quality === q.kbps}
+                    active={quality === q.kbps}
                     onClick={() => (
                       storeQuality(remote, q.kbps),
                       restart({ quality: q.kbps })

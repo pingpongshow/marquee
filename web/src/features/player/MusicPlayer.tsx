@@ -80,6 +80,7 @@ type Actions = {
   playNext: (tracks: ItemSummary[]) => void;
   addToQueue: (tracks: ItemSummary[]) => void;
   remove: (key: number) => void;
+  /** Moves an entry to just before the one now at `to`. */
   move: (key: number, to: number) => void;
   jump: (key: number) => void;
   next: () => void;
@@ -1001,7 +1002,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       },
       move: (key, to) => {
         unload(1 - active.current);
-        setQueue((q) => Q.move(q, key, to));
+        setQueue((q) => Q.moveBefore(q, key, to));
       },
       jump: (key) => setQueue((q) => Q.jump(q, key)),
       next,

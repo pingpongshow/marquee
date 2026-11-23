@@ -32,7 +32,11 @@ export function CombinePlaylistsDialog({ initial = [], into, onClose }: { initia
   const kind = chosen[0]?.kind ?? (typeof dest === "number" ? byId.get(dest)?.kind : undefined);
   const destinations = all.filter((p) => !p.readOnly && !p.rules && (!kind || p.kind === kind) && !picked.includes(p.id));
   const ownSources = chosen.filter((p) => !p.readOnly).length;
-  const toggle = (p: Playlist) => setPicked((now) => (now.includes(p.id) ? now.filter((id) => id !== p.id) : [...now, p.id]));
+  const toggle = (p: Playlist) => {
+    // A playlist picked to go in can't also be where they go: back to a new one.
+    if (dest === p.id) setDest("new");
+    setPicked((now) => (now.includes(p.id) ? now.filter((id) => id !== p.id) : [...now, p.id]));
+  };
 
   const merge = useMutation({
     mutationFn: () =>

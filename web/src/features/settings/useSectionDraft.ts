@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { settingsQuery, useUpdateSettings } from "@/api/queries";
 import type { ServerSettings, ServerSettingsUpdate } from "@/api/types";
+import { rebaseDraft } from "./rebaseDraft";
 
 type SectionKey = keyof ServerSettings & keyof ServerSettingsUpdate;
 
@@ -16,11 +17,15 @@ export function useSectionDraft<K extends SectionKey>(key: K, toUpdate?: (d: Ser
   const [draft, setDraft] = useState<ServerSettings[K] | undefined>(server);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  // Adopt fresh server data whenever it changes (initial load, after save).
+  // Take in fresh server data whenever it changes (initial load, after a save here or one
+  // elsewhere), keeping what's being edited: see rebaseDraft. `saved` is the draft this form's
+  // own save sent, which is what the server's answer is compared with.
   const [seen, setSeen] = useState(server);
-  if (server !== seen) {
+  const [saved, setSaved] = useState<ServerSettings[K] | null>(null);
+  if (server !== seen || saved) {
     setSeen(server);
-    setDraft(server);
+    setSaved(null);
+    setDraft(draft === undefined ? server : rebaseDraft(draft, saved ?? seen, server));
   }
 
   const dirty = draft !== undefined && JSON.stringify(draft) !== JSON.stringify(server);
@@ -34,7 +39,13 @@ export function useSectionDraft<K extends SectionKey>(key: K, toUpdate?: (d: Ser
     save: () => {
       if (!draft) return;
       const body = { [key]: toUpdate ? toUpdate(draft) : draft } as ServerSettingsUpdate;
-      mutation.mutate(body, { onSuccess: () => setSavedAt(Date.now()) });
+      const sent = draft;
+      mutation.mutate(body, {
+        onSuccess: () => {
+          setSavedAt(Date.now());
+          setSaved(sent);
+        },
+      });
     },
     saving: mutation.isPending,
     error: mutation.error,

@@ -6,6 +6,7 @@ import { settingsQuery, useUpdateSettings } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
 import { Alert, Button, Card, Field, Input, Spinner, Toggle } from "@/components/ui";
 import { SaveBar } from "./SaveBar";
+import { rowKey, sameRow } from "./rowKeys";
 
 type Webhook = components["schemas"]["Webhook"];
 type Kind = Webhook["events"][number];
@@ -36,7 +37,7 @@ export function WebhooksSettings() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const list = draft ?? server;
   const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(server);
-  const edit = (i: number, patch: Partial<Webhook>) => setDraft(list.map((w, j) => (j === i ? { ...w, ...patch } : w)));
+  const edit = (i: number, patch: Partial<Webhook>) => setDraft(list.map((w, j) => (j === i ? sameRow(w, { ...w, ...patch }) : w)));
 
   if (query.isPending) return <Spinner />;
   return (
@@ -45,7 +46,7 @@ export function WebhooksSettings() {
         Each event is sent as a JSON POST. With a secret, the body is signed: <code className="text-xs">X-Marquee-Signature: sha256=…</code> (HMAC-SHA256). Failed deliveries are retried twice.
       </p>
       {list.map((w, i) => (
-        <WebhookCard key={w.id ?? `new-${i}`} hook={w} onChange={(p) => edit(i, p)} onRemove={() => setDraft(list.filter((_, j) => j !== i))} />
+        <WebhookCard key={rowKey(w)} hook={w} onChange={(p) => edit(i, p)} onRemove={() => setDraft(list.filter((_, j) => j !== i))} />
       ))}
       <Button onClick={() => setDraft([...list, { name: "", url: "", events: ["playback.started", "playback.stopped"], enabled: true, secret: newSecret() }])}>
         <Plus className="size-4" /> Add webhook

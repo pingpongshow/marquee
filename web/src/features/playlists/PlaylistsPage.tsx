@@ -34,9 +34,15 @@ function NewPlaylistDialog({ folderId, onClose }: { folderId?: number; onClose: 
       navigate({ to: "/playlist/$playlistId", params: { playlistId: String(p.id) } });
     },
   });
+  // Enter in the form and the Create button go the same way: a named playlist, a smart one's
+  // rules filled in, and one at a time.
+  const ready = !!title.trim() && (!smart || rulesValid(rules));
+  const go = () => {
+    if (ready && !create.isPending) create.mutate();
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (title.trim()) create.mutate();
+    go();
   };
   return (
     <Dialog
@@ -49,7 +55,7 @@ function NewPlaylistDialog({ folderId, onClose }: { folderId?: number; onClose: 
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={!title.trim() || (smart && !rulesValid(rules))} loading={create.isPending} onClick={() => create.mutate()}>
+          <Button variant="primary" disabled={!ready} loading={create.isPending} onClick={go}>
             Create
           </Button>
         </>

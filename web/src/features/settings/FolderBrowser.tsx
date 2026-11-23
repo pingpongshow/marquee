@@ -16,7 +16,8 @@ export function FolderBrowser({ onPick, initialPath = null }: { onPick: (path: s
           size="sm"
           variant="ghost"
           aria-label="Up one folder"
-          disabled={path === null}
+          // Not while the folder is loading: its parent isn't known yet, and Up went to the roots.
+          disabled={path === null || listing.isPending}
           onClick={() => setPath(listing.data?.parent ?? null)}
         >
           <ChevronLeft className="size-4" />

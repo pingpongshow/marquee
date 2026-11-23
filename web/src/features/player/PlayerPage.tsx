@@ -20,7 +20,7 @@ const loading = (
 
 export function PlayerPage() {
   const { itemId } = useParams({ from: "/play/$itemId" });
-  const { t, pl, sh, f, g, vm, vs, ve } = useSearch({ from: "/play/$itemId" });
+  const { t, pl, sh, pi, f, g, vm, vs, ve } = useSearch({ from: "/play/$itemId" });
   const navigate = useNavigate();
   // Started from a film or episode on demand that the library has: if the library's copy
   // can't be played (gone, or it fails), the stream on demand plays instead.
@@ -41,6 +41,7 @@ export function PlayerPage() {
         startMs={t}
         playlistId={pl}
         shuffleSeed={sh}
+        playlistIndex={pi}
         fileId={f}
         groupId={g}
         onUnplayable={onDemand}
@@ -69,6 +70,7 @@ function PlayerFlow({
   startMs,
   playlistId,
   shuffleSeed,
+  playlistIndex,
   fileId,
   groupId,
   onUnplayable,
@@ -77,6 +79,7 @@ function PlayerFlow({
   startMs?: number;
   playlistId?: number;
   shuffleSeed?: number;
+  playlistIndex?: number;
   fileId?: number;
   groupId?: string;
   onUnplayable?: () => void;
@@ -127,6 +130,7 @@ function PlayerFlow({
       startMs={startMs}
       playlistId={playlistId}
       shuffleSeed={shuffleSeed}
+      playlistIndex={playlistIndex}
       fileId={fileId}
       groupId={groupId}
       onUnplayable={onUnplayable}

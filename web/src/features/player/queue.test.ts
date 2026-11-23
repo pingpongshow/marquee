@@ -10,6 +10,7 @@ import {
   jump,
   load,
   move,
+  moveBefore,
   playContext,
   playNext,
   remove,
@@ -64,6 +65,18 @@ describe("queue", () => {
     expect(ids(q)[1]).toBe(9);
     q = toggleShuffle(q);
     expect(ids(q)).toEqual([1, 9, 2, 3]);
+  });
+
+  it("drops a dragged entry just before the row it was dropped on, up or down", () => {
+    const q = load(emptyQueue, [1, 2, 3, 4, 5].map(track), 0);
+    // Down: 2 dropped on 4 goes between 3 and 4 (not after 4).
+    expect(ids(moveBefore(q, q.entries[1]!.key, 3))).toEqual([1, 3, 2, 4, 5]);
+    // Up: 5 dropped on 2 goes between 1 and 2.
+    expect(ids(moveBefore(q, q.entries[4]!.key, 1))).toEqual([1, 5, 2, 3, 4]);
+    // On itself, or an unknown entry: nothing moves.
+    expect(ids(moveBefore(q, q.entries[2]!.key, 2))).toEqual([1, 2, 3, 4, 5]);
+    expect(moveBefore(q, -1, 2)).toBe(q);
+    expect(current(moveBefore(q, q.entries[4]!.key, 1))?.item.id).toBe(1);
   });
 
   it("removes and moves while keeping the current track", () => {

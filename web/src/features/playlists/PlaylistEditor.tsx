@@ -102,6 +102,9 @@ export function PlaylistEditorPage() {
         setKnown(new Set([...known, ...fresh.map((e) => e.entryId)]));
         setSaved([...saved, ...fresh]);
         setDraft([...draft, ...fresh]);
+        // Earlier drafts get them too: they're in the playlist already, and saving a draft
+        // without them (after Undo) would take them out again.
+        setHistory(history.map((h) => [...h, ...fresh]));
       }
     }
   }
@@ -247,16 +250,22 @@ export function PlaylistEditorPage() {
         if (dirty && !save.isPending) save.mutate(draft);
         return;
       }
+      // ⌘/Ctrl+A and Z are this page's too, except in a text field or under a dialog (theirs).
+      if (ignoreShortcut(e, true)) return;
+      if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        selectAll();
+        return;
+      }
+      if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undo();
+        return;
+      }
       if (ignoreShortcut(e)) return;
       if ((e.key === "Delete" || e.key === "Backspace") && selected.size) {
         e.preventDefault();
         removeSelected();
-      } else if (mod && e.key.toLowerCase() === "a") {
-        e.preventDefault();
-        selectAll();
-      } else if (mod && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        undo();
       } else if (e.key === "Escape" && selected.size) {
         setSelected(new Set());
       }

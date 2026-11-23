@@ -26,7 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(
     (token: string) => {
       session.set(token);
-      qc.clear();
+      // Not clear(): that drops the queries without telling the pages showing them, so after a
+      // profile switch the open page kept the previous profile's rows. This empties and reloads
+      // them. The server's own info isn't anyone's, and resetting it would blank the whole app.
+      void qc.resetQueries({ predicate: (q) => q.queryKey[0] !== "system" });
+      qc.getMutationCache().clear();
       setAuthed(true);
     },
     [qc],

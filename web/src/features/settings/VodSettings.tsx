@@ -10,6 +10,7 @@ import { vodStatusQuery } from "../livetv/vodApi";
 import { SaveBar } from "./SaveBar";
 import { VodSaveSettings } from "./VodSaveSettings";
 import { VodDownloadsPanel } from "@/features/livetv/VodSaves";
+import { rowKey, sameRow } from "./rowKeys";
 
 type Source = components["schemas"]["VodSource"];
 type Draft = { enabled: boolean; sources: Source[]; autoRefresh: boolean; refreshHours: number };
@@ -71,7 +72,7 @@ export function VodSettings() {
   const d = draft ?? server;
   const dirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(server);
   const edit = (i: number, patch: Partial<Source>) =>
-    setDraft({ ...d, sources: d.sources.map((s, j) => (j === i ? { ...s, ...patch } : s)) });
+    setDraft({ ...d, sources: d.sources.map((s, j) => (j === i ? sameRow(s, { ...s, ...patch }) : s)) });
   const state = (id?: string) => status.data?.sources.find((s) => s.id === id);
   const st = status.data;
 
@@ -129,7 +130,7 @@ export function VodSettings() {
         const ss = state(s.id);
         return (
           <Card
-            key={s.id ?? `new-${i}`}
+            key={rowKey(s)}
             title={s.name || "New source"}
             description={
               ss ? (

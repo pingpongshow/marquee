@@ -182,10 +182,11 @@ const playRoute = createRoute({
   path: "/play/$itemId",
   validateSearch: (
     s: Record<string, unknown>,
-  ): { t?: number; pl?: number; sh?: number; f?: number; g?: string; vm?: number; vs?: number; ve?: number } => ({
+  ): { t?: number; pl?: number; sh?: number; pi?: number; f?: number; g?: string; vm?: number; vs?: number; ve?: number } => ({
     t: typeof s.t === "number" ? s.t : undefined,
     pl: typeof s.pl === "number" ? s.pl : undefined,
     sh: typeof s.sh === "number" ? s.sh : undefined, // a shuffled playlist's seed
+    pi: typeof s.pi === "number" ? s.pi : undefined, // this item's place in the playlist's play order
     f: typeof s.f === "number" ? s.f : undefined, // a specific version's file (LIB-7)
     g: typeof s.g === "string" ? s.g : undefined, // a watch-together group to join
     // The same film (vm) or episode (vs, ve) on demand: played instead if the library's copy can't be.

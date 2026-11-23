@@ -54,14 +54,20 @@ function TextSearch({ q, tabs }: { q: string; tabs: ReactNode }) {
   // A search started elsewhere (the header, Back or Forward) changes q: show it in the box, or
   // the debounce below would put the old text back.
   const [seenQ, setSeenQ] = useState(q);
+  // What this box last sent to the URL. It arrives as q a moment later, and by then more may
+  // have been typed: that isn't a search from elsewhere, and mustn't take the new letters away.
+  const [sent, setSent] = useState<string | null>(null);
   if (q !== seenQ) {
     setSeenQ(q);
-    if (q !== text.trim()) setText(q);
+    if (q !== text.trim() && q !== sent) setText(q);
   }
   // Update the URL (and results) shortly after typing stops.
   useEffect(() => {
     if (text.trim() === q) return;
-    const t = window.setTimeout(() => navigate({ search: { q: text.trim() }, replace: true }), 250);
+    const t = window.setTimeout(() => {
+      setSent(text.trim());
+      void navigate({ search: { q: text.trim() }, replace: true });
+    }, 250);
     return () => window.clearTimeout(t);
   }, [text, q, navigate]);
   const results = useQuery({ ...searchQuery(q, 50), enabled: q.length > 0 });

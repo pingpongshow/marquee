@@ -387,6 +387,8 @@ function QuotaInput({ id, value, onSave }: { id: string; value: number; onSave: 
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
     if (draft === null) return;
+    // Emptied (on the way to typing another amount): not 0, which means no limit.
+    if (draft.trim() === "") return setDraft(null);
     const n = Math.max(0, Math.floor(Number(draft)));
     if (Number.isFinite(n) && n !== value) onSave(n);
     setDraft(null);

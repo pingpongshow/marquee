@@ -33,10 +33,12 @@ export function Poster({
   /** An image URL for artwork that isn't in the library (movies on demand, LIVE-6). */
   src?: string;
 }) {
-  const [failed, setFailed] = useState(false);
+  // The image that failed, not just that one did: a grid reuses this for another item.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const Icon = icons[item.type] ?? Film;
   const artId = shape === "wide" ? (item.images?.thumb ?? item.images?.backdrop) : item.images?.poster;
   const url = src ?? (artId ? imageUrl(artId, width) : undefined);
+  const failed = !!url && failedUrl === url;
   const h = hue(item.title);
   return (
     <div
@@ -52,7 +54,7 @@ export function Poster({
     >
       {!compact && <WatchBadges item={item} />}
       {url && !failed ? (
-        <img src={url} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="absolute inset-0 size-full object-cover" />
+        <img src={url} alt="" loading="lazy" decoding="async" onError={() => setFailedUrl(url)} className="absolute inset-0 size-full object-cover" />
       ) : compact ? null : (
         <>
           <Icon className="absolute top-3 left-3 size-5 text-white/30" aria-hidden />

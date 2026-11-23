@@ -98,6 +98,16 @@ const credentialCodes = new Set([
   "invalid_totp",
 ]);
 
+/**
+ * Whether a 401 means this browser's session is over. Not when it's about credentials just
+ * entered, and not when the request went out with an earlier token: switching profile ends the
+ * previous profile's session, and its late answers mustn't sign the new profile out.
+ */
+export function endsSession(sentAuthorization: string | null, current: string | null, code: string | undefined): boolean {
+  if (code && credentialCodes.has(code)) return false;
+  return sentAuthorization === `Bearer ${current}`;
+}
+
 const authMiddleware: Middleware = {
   onRequest({ request }) {
     if (token) request.headers.set("Authorization", `Bearer ${token}`);
@@ -119,7 +129,7 @@ const authMiddleware: Middleware = {
         .json()
         .then((b: { code?: string }) => b?.code)
         .catch(() => undefined);
-      if (code && credentialCodes.has(code)) return response;
+      if (!endsSession(request.headers.get("Authorization"), token, code)) return response;
       session.set(null);
       unauthorizedListeners.forEach((fn) => fn());
     }

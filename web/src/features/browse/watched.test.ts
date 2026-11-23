@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyWatched, hasWatchState, isWatched, withoutContinueWatching } from "./watched";
+import { applyWatched, hasWatchState, isWatched, undoChanges, withoutContinueWatching } from "./watched";
 
 const movie = { id: 5, type: "movie", title: "M", available: true, viewCount: 0, viewOffsetMs: 60000 };
 const season = { id: 20, type: "season", parentId: 10, title: "S1", available: true, leafCount: 3, watchedLeafCount: 1 };
@@ -53,5 +53,37 @@ describe("hasWatchState", () => {
     expect(hasWatchState({ id: 1, type: "episode", viewOffsetMs: 60_000 })).toBe(true); // Continue Watching
     expect(hasWatchState({ id: 1, type: "show", leafCount: 10, watchedLeafCount: 0 })).toBe(false);
     expect(hasWatchState({ id: 1, type: "season", leafCount: 10, watchedLeafCount: 3 })).toBe(true);
+  });
+});
+
+describe("undoChanges", () => {
+  it("puts back what was changed, and leaves what has loaded anew since", () => {
+    const cache = new Map<string, unknown>([
+      ["a", "a-optimistic"],
+      ["b", "b-refetched"], // loaded again after the optimistic change
+      ["c", "c-untouched"],
+    ]);
+    undoChanges(
+      [
+        { key: ["a"], before: "a-before", after: "a-optimistic" },
+        { key: ["b"], before: "b-before", after: "b-optimistic" },
+      ],
+      (key) => cache.get(String(key[0])),
+      (key, data) => cache.set(String(key[0]), data),
+    );
+    expect([...cache.values()]).toEqual(["a-before", "b-refetched", "c-untouched"]);
+  });
+
+  it("undoes two changes to the same list in turn", () => {
+    const cache = new Map<string, unknown>([["a", 3]]);
+    undoChanges(
+      [
+        { key: ["a"], before: 1, after: 2 },
+        { key: ["a"], before: 2, after: 3 },
+      ],
+      (key) => cache.get(String(key[0])),
+      (key, data) => cache.set(String(key[0]), data),
+    );
+    expect(cache.get("a")).toBe(1);
   });
 });

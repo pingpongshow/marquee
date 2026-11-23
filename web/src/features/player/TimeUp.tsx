@@ -7,6 +7,7 @@ import { toast } from "@/components/Toast";
 import { Button } from "@/components/ui";
 import { formatMinutes } from "@/features/users/timeLimits";
 import { exitFullscreen } from "@/lib/fullscreen";
+import { isPlayerPath } from "./playerPaths";
 
 /** The signed-in person's time limit today (kids' profiles). */
 export const timeLimitQuery = queryOptions({
@@ -89,8 +90,8 @@ export function TimeUpHost() {
     shown = null;
     closedAt = Date.now();
     emit();
-    if (location.pathname.startsWith("/play/") || location.pathname.endsWith("/play"))
-      void navigate({ to: "/" });
+    // Every player, the episode on demand and Live TV ones included.
+    if (isPlayerPath(location.pathname)) void navigate({ to: "/" });
   };
   return (
     <div

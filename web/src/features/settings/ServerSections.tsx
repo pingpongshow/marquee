@@ -167,7 +167,20 @@ export function SecretField({ label, help, isSet, value, onChange, placeholder =
       {(id) =>
         editing || !isSet ? (
           // An emptied field leaves the saved secret alone (Remove is for removing it).
-          <Input id={id} type="password" autoComplete="off" placeholder={placeholder} value={value ?? ""} onChange={(e) => onChange(e.target.value || undefined)} />
+          // Emptying it while typing isn't a save: it stays a field (until it's left empty).
+          <Input
+            id={id}
+            type="password"
+            autoComplete="off"
+            placeholder={placeholder}
+            value={value ?? ""}
+            onChange={(e) => {
+              const next = e.target.value || undefined;
+              if (next === undefined) setSeen({ isSet, value: undefined });
+              onChange(next);
+            }}
+            onBlur={() => value === undefined && setEditing(false)}
+          />
         ) : (
           <div className="flex items-center gap-3">
             {value === "" ? (

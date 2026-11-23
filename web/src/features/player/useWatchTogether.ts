@@ -19,6 +19,14 @@ const DRIFT = 1500;
  * is long-polled; local play, pause, seek and buffering are sent as commands. Events caused
  * by applying the group's state aren't echoed back.
  */
+/** Server clock minus ours, from a group state that has just arrived. */
+export const clockOffset = (g: Pick<WatchGroup, "serverTime">, now: number) => new Date(g.serverTime).getTime() - now;
+
+/** Where the group is now (ms): its position when it last changed, plus the time played since. */
+export function groupPosition(g: Pick<WatchGroup, "playing" | "positionMs" | "at">, offset: number, now: number) {
+  return g.playing ? g.positionMs + (now + offset - new Date(g.at).getTime()) : g.positionMs;
+}
+
 export function useWatchTogether(
   videoRef: RefObject<HTMLVideoElement | null>,
   itemId: number,
@@ -30,21 +38,25 @@ export function useWatchTogether(
   const groupRef = useRef<WatchGroup | null>(null);
   const applying = useRef(0); // until this time, video events are ours
   const offset = useRef(0); // server clock minus ours
+  // Until this time the next "seeked" is ours (a seek we applied, which can take seconds to
+  // finish on a transcode: longer than the window above, so it was sent back to the group).
+  const ownSeek = useRef(0);
 
+  // `fresh`: the state has just come from the server, so its serverTime is now. A stored state
+  // applied again later (once the video has loaded) keeps the offset measured when it arrived:
+  // measuring it again then put the viewer behind by however long the loading took.
   const apply = useCallback(
-    (g: WatchGroup) => {
+    (g: WatchGroup, fresh = true) => {
       groupRef.current = g;
       setGroup(g);
-      offset.current = new Date(g.serverTime).getTime() - Date.now();
+      if (fresh) offset.current = clockOffset(g, Date.now());
       const v = videoRef.current;
       if (!v || v.readyState < 1) return;
-      const serverNow = Date.now() + offset.current;
-      const target = g.playing
-        ? g.positionMs + (serverNow - new Date(g.at).getTime())
-        : g.positionMs;
+      const target = groupPosition(g, offset.current, Date.now());
       const quiet = () => (applying.current = Date.now() + 800);
       if (Math.abs(v.currentTime * 1000 - target) > DRIFT) {
         quiet();
+        ownSeek.current = Date.now() + 15_000;
         v.currentTime = target / 1000;
       }
       if (g.playing && v.paused) {
@@ -70,6 +82,7 @@ export function useWatchTogether(
         }),
       );
       groupRef.current = next;
+      offset.current = clockOffset(next, Date.now());
       setGroup(next);
     } catch (e) {
       setError((e as Error).message);
@@ -140,7 +153,7 @@ export function useWatchTogether(
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const onMeta = () => groupRef.current && apply(groupRef.current);
+    const onMeta = () => groupRef.current && apply(groupRef.current, false);
     v.addEventListener("loadedmetadata", onMeta);
     return () => v.removeEventListener("loadedmetadata", onMeta);
   }, [videoRef, apply]);
@@ -152,7 +165,14 @@ export function useWatchTogether(
     const mine = () => Date.now() > applying.current;
     const onPlay = () => mine() && void send("play");
     const onPause = () => mine() && !v.ended && void send("pause");
-    const onSeeked = () => mine() && void send("seek");
+    const onSeeked = () => {
+      // The end of a seek applied from the group, however long it took: not the viewer's.
+      if (Date.now() < ownSeek.current) {
+        ownSeek.current = 0;
+        return;
+      }
+      if (mine()) void send("seek");
+    };
     const onWaiting = () => void send("buffering");
     const onPlaying = () => {
       // Only my own loading holds the group up.
