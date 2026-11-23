@@ -53,7 +53,8 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - Metadata and artwork from TMDB (with OMDb ratings from IMDb, Rotten Tomatoes and Metacritic), AniList for anime, and MusicBrainz, Deezer, Wikipedia and ListenBrainz for music.
 - Collections (automatic film series, manual, and **smart collections** built from filters), extras, multiple versions and editions, and cast and crew pages.
 - **Trailers** for any film or show: a local trailer file if you have one, otherwise the official trailer, played in the app.
-- Fix Match, metadata editing with locked fields, and custom artwork.
+- Fix Match and a **full editor** on the web for films, shows, seasons, episodes and music: every detail, the tags (genres, styles, moods, countries) and the artwork, picked from the item's own, TMDB's alternatives, an image link or an upload. What you edit is locked, so refreshes and scans leave it alone.
+- **Track languages worked out for you:** audio tracks with no language are identified by listening to a few short sections (Soundprint), and unlabelled subtitle tracks by reading them.
 - **Library Health:** duplicates (compare every copy's details and move the one you don't want to a recoverable trash), unmatched items, unplayable files, upgrade candidates, playback errors, missing artwork and missing subtitles.
 - **Large files optimizer:** re-encode oversized films and episodes to HEVC (on an NVIDIA GPU end to end), keeping every audio and subtitle track, with an optional size cap per hour of running time.
 - **Themes for the web app:** an admin picks one of 28 looks, from styles to seasons and holidays, with optional automatic holidays, and can upload a tiled or full-page background for everyone. The native apps keep their own look.
@@ -61,10 +62,11 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - Import watch history, ratings, playlists, markers and accounts from an existing Plex server.
 
 ### Playback
-- Direct play, direct stream (remux) or transcode, chosen per device and network, with HDR-to-SDR tone mapping.
+- Direct play, direct stream (remux) or transcode, chosen per device and network, with HDR-to-SDR tone mapping. HDR and 10-bit video play as they are on Apple and Android devices that support them.
+- **Your audio and subtitle choice is remembered per show:** pick a language or subtitles on one episode and the rest of the series starts the same way.
 - Automatic quality for remote viewers, adaptive bitrate, and a fair share of your upload bandwidth.
 - Subtitles: text, styled ASS with embedded fonts, and burned-in image subtitles. Each person picks size, colour, background and position, and can adjust subtitle and audio timing (remembered per file). Search OpenSubtitles or use **Bazarr**.
-- Skip Intro and Skip Credits (detected automatically), chapters, seek-bar thumbnails, playback speed, an Up Next countdown between episodes and cinema trailers before films.
+- Skip Intro and Skip Credits (detected automatically), chapters, seek-bar thumbnails, playback speed, an Up Next countdown that plays the next episode by itself, and cinema trailers before films.
 - Continue Watching and On Deck, with any title removable from the row.
 - **Watch together:** shared play, pause and seek across devices.
 - Chromecast from iPhone, iPad and Android; AirPlay on Apple devices.
@@ -75,10 +77,11 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - **In Town:** concerts by artists you like, near you and on tour, on the web and in the Mac app, with a banner on artist pages. An admin turns it on with their own free Ticketmaster key, and your server does all the looking up; each person sets a city or postcode. It sends artist names and locations to Ticketmaster, and past shows are deleted. Kids' profiles don't get it.
 - **Sonos:** play to a room from the Mac app; the server sends the music straight to the speakers. The server needs to be on the same network as the speakers (`network_mode: host` in Docker, as in the compose files). To limit it to certain players, set `MARQUEE_SONOS_HOSTS` to their addresses, comma-separated.
 - **Artist Radio and Track Radio:** endless stations from an artist or any song, with similar artists and tracks.
-- **Thumbs down:** a song you flag stays out of your radios and generated playlists.
+- **Thumbs up and down** on Now Playing and in the video player: a thumbs down keeps a song out of your radios and generated playlists, and a film or show out of your suggestions, without hiding it from the library.
+- **Playlist editor:** reorder, remove, select several, undo and add from the library on the web, with a simpler editor in the apps, and **combine** playlists into a new or existing one. Add what's playing to a playlist with + on Now Playing.
 - Artist pages lead with your top songs: favourites, songs you rated 3.5 stars or more, and what's popular.
-- **Shared playlists:** playlists are private until you share them with chosen people (an admin can share with everyone). They accept, can play but not change them, and can remove them from their list.
-- Daily mixes from your listening, artist bios, smart playlists, favourites, synced lyrics, gapless playback, crossfade, an equaliser, and **Your Year in Music**.
+- **Shared playlists:** playlists are private until you share them with chosen people in the household (an admin can share with everyone). They accept, can play but not change them, and can remove them from their list.
+- Daily mixes from your listening, artist bios, smart playlists, favourites, synced lyrics, gapless playback, crossfade, an equaliser, a queue the Apple apps remember after they're closed, and **Your Year in Music**.
 - Loudness levelling on every track (ReplayGain tags, or measured on the server).
 - Scrobbling to ListenBrainz and Last.fm.
 
@@ -86,18 +89,18 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - **Muse for movies:** "90s sci-fi with time travel" or "acclaimed war films I haven't seen" finds matches in your library.
 - "Recommended for You", "Because you watched…", New Releases, Top Rated, Trending Now, Critically Acclaimed, Binge-Worthy Shows, Under 95 Minutes, Best of a decade, Timeless Classics, Family Movie Night, International Picks, Watch It Again and rows from the genres you watch, with films and shows on demand mixed in (marked VOD) and See all on every row, plus a holiday row in the 30 days before Halloween, Thanksgiving and Christmas, and "More like this".
 - A Home screen each person can reorder, hide and pin rows on.
-- Personal ratings, a household community rating with comments, a watchlist and statistics.
+- Personal ratings, a household community rating with comments, statistics, and a watchlist that a film leaves once you've watched it and a show once you've watched every episode.
 - Favourites (the heart) on films, shows, episodes and music, which also steer recommendations.
 - Requests through [Seerr](https://github.com/seerr-team/seerr), approved by an admin.
 
 ### Live TV and on demand
-- A channel guide from any M3U/XMLTV source or Dispatcharr, What's On and favourite channels.
+- A channel guide from any M3U/XMLTV source or Dispatcharr, What's On, favourite channels and channels you can hide.
 - DVR: one-off and series recordings, commercials cut out with Comskip, quotas per person and a shared or personal view of recordings.
 - **VOD Movies and VOD Shows** from Dispatcharr or any Xtream Codes source, matched to TMDB, with filters, Continue Watching and suggestions picked from each person's taste.
 - **Save to library** (admins): films and whole series from VOD downloaded, checked and named for your library, using the provider connections nobody is watching on.
 
 ### People and administration
-- Local accounts with profiles and optional PINs, managed profiles for children (rating and library limits), two-factor sign-in, and Quick Connect for TVs.
+- Local accounts with profiles and optional PINs, managed profiles for children (rating and library limits), two-factor sign-in, and Quick Connect for TVs. An admin can let a profile sign in at home with no PIN or password at all.
 - Share with friends through one-time invite links.
 - Dashboard, activity, logs, scheduled tasks (each can be switched off), backups and restore, an internet speed test, webhooks and Prometheus metrics.
 - Email: admin alerts (failed tasks, downloads and conversions, low disk space and more) and password or PIN resets by email.
@@ -106,7 +109,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 
 | Platform | Highlights |
 |---|---|
-| **Web** | Everything, including settings and administration. Built into the server: open `http://<server>:32500`. |
+| **Web** | Everything, including settings, administration, the metadata editor and the full playlist editor. Full-screen video on iPhone. Built into the server: open `http://<server>:32500`. |
 | **Mac** | A sidebar like Apple Music, a slim floating mini player and floating video, a menu bar icon, media keys and downloads. Play to any Mac output for Marquee alone, AirPlay or Sonos. |
 | **iPhone and iPad** | Downloads, AirPlay and Chromecast, lock-screen controls. |
 | **Apple TV** | Top Shelf, Quick Connect sign-in, remote-controllable. |
