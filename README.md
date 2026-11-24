@@ -52,6 +52,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - Movies, TV shows, anime, music and home videos, scanned from your folders and kept current as files change.
 - Metadata and artwork from TMDB (with OMDb ratings from IMDb, Rotten Tomatoes and Metacritic), AniList for anime, and MusicBrainz, Deezer, Wikipedia and ListenBrainz for music.
 - Collections (automatic film series, manual, and **smart collections** built from filters), extras, multiple versions and editions, and cast and crew pages.
+- **Collections of your own:** in each video library, group its films or shows into your own collections, shown as a poster grid that opens each title's page. Rename, reorder, share them with chosen people and pin them to Home. An admin chooses which video libraries allow them.
 - **Trailers** for any film or show: a local trailer file if you have one, otherwise the official trailer, played in the app.
 - Fix Match and a **full editor** on the web for films, shows, seasons, episodes and music: every detail, the tags (genres, styles, moods, countries) and the artwork, picked from the item's own, TMDB's alternatives, an image link or an upload. What you edit is locked, so refreshes and scans leave it alone.
 - **Track languages worked out for you:** audio tracks with no language are identified by listening to a few short sections (Soundprint), and unlabelled subtitle tracks by reading them.
@@ -80,6 +81,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - **Thumbs up and down** on Now Playing and in the video player: a thumbs down keeps a song out of your radios and generated playlists, and a film or show out of your suggestions, without hiding it from the library.
 - **Playlist editor:** reorder, remove, select several, undo and add from the library on the web, with a simpler editor in the apps, and **combine** playlists into a new or existing one. Add what's playing to a playlist with + on Now Playing.
 - Artist pages lead with your top songs: favourites, songs you rated 3.5 stars or more, and what's popular.
+- **Playlists live in Music** and are for music; give one a picture of its own by uploading an image or pasting an image link (collections too).
 - **Shared playlists:** playlists are private until you share them with chosen people in the household (an admin can share with everyone). They accept, can play but not change them, and can remove them from their list.
 - Daily mixes from your listening, artist bios, smart playlists, favourites, synced lyrics, gapless playback, crossfade, an equaliser, a queue the Apple apps remember after they're closed, and **Your Year in Music**.
 - Loudness levelling on every track (ReplayGain tags, or measured on the server).
