@@ -320,10 +320,13 @@ fun app.marquee.api.models.ItemDetail.summary() = ItemSummary(
     userRating = userRating, watchlisted = watchlisted, communityRating = communityRating, favorite = favorite, disliked = disliked,
 )
 
-/** A playlist's poster mosaic: up to four of its items' posters, or its one poster. */
+/** A playlist's or collection's artwork: the picture its owner gave it (MUSIC-30), else a mosaic of up to four of its items' posters, or its one poster. */
 @Composable
-fun PlaylistMosaic(imageIds: List<Long>, title: String, modifier: Modifier = Modifier) {
+fun PlaylistMosaic(p: app.marquee.api.models.Playlist, modifier: Modifier = Modifier) {
     val marquee = LocalMarquee.current
+    val title = p.title
+    marquee.playlistImageUrl(p, 300)?.let { Artwork(it, title, Shape.Square, modifier); return }
+    val imageIds = p.imageIds
     if (imageIds.size < 4) { Artwork(marquee.imageUrl(imageIds.firstOrNull(), 200), title, Shape.Square, modifier); return }
     Column(modifier.aspectRatio(1f).clip(RoundedCornerShape(8.dp)).background(Color(0xFF15151B))) {
         imageIds.take(4).chunked(2).forEach { row ->

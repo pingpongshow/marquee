@@ -94,7 +94,8 @@ fun PlaylistShareDialog(p: Playlist, onDone: (Boolean) -> Unit) {
                 when {
                     s == null && error == null -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     s != null -> {
-                        Text("They'll see it once they accept, and can play it but not change it.", style = MaterialTheme.typography.bodySmall,
+                        Text(if (p.kind == app.marquee.api.models.PlaylistKind.VIDEO) "They'll see it once they accept, and can browse it but not change it."
+                            else "They'll see it once they accept, and can play it but not change it.", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Column(Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState())) {
                             // Only admins may share with everyone (the server refuses anyone else).

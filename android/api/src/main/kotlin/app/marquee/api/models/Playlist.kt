@@ -46,6 +46,8 @@ import kotlinx.serialization.Contextual
  * @param sharedWithAll Your playlist is shared with everyone on the server.
  * @param shareCount How many people your playlist is offered to or shared with by name.
  * @param folderId The folder of yours it's in (MUSIC-28). Left out at the top level.
+ * @param libraryId Collections (kind video, USER-23): the video library it belongs to; it takes titles from that library only.
+ * @param imageVersion Set when its owner gave it a picture of its own (MUSIC-30): show /playlists/{id}/image?v=<this> in place of the mosaic of imageIds. It changes when the picture does.
  */
 @Serializable
 
@@ -94,7 +96,15 @@ data class Playlist (
 
     /* The folder of yours it's in (MUSIC-28). Left out at the top level. */
     @SerialName(value = "folderId")
-    val folderId: kotlin.Long? = null
+    val folderId: kotlin.Long? = null,
+
+    /* Collections (kind video, USER-23): the video library it belongs to; it takes titles from that library only. */
+    @SerialName(value = "libraryId")
+    val libraryId: kotlin.Long? = null,
+
+    /* Set when its owner gave it a picture of its own (MUSIC-30): show /playlists/{id}/image?v=<this> in place of the mosaic of imageIds. It changes when the picture does. */
+    @SerialName(value = "imageVersion")
+    val imageVersion: kotlin.String? = null
 
 ) {
 

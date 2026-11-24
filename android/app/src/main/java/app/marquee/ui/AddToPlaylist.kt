@@ -46,27 +46,48 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** "Add to playlist" (USER-7) for any track, album, artist, movie, show or episode. */
+/** "Add to playlist" (USER-7) for a track, album or artist. */
 @Composable
-fun AddToPlaylistButton(itemId: Long, music: Boolean) {
+fun AddToPlaylistButton(itemId: Long) {
     var open by remember { mutableStateOf(false) }
     OutlinedButton(modifier = Modifier.focusRing(), onClick = { open = true }) {
         Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null)
         Text("Add to playlist")
     }
-    if (open) AddToPlaylistDialog(itemId, music) { open = false }
+    if (open) AddToPlaylistDialog(itemId) { open = false }
 }
 
-/** Picks one of the person's playlists of the right kind, or makes a new one with the item in it. */
+/**
+ * "Add to my collection…" (USER-23) for a film, show, season, episode or video: into one of the
+ * person's collections of the item's library. Nothing while that library doesn't allow them.
+ */
 @Composable
-fun AddToPlaylistDialog(itemId: Long, music: Boolean, onDone: () -> Unit) {
+fun AddToCollectionButton(itemId: Long, libraryId: Long) {
+    if (personalCollectionsOn(libraryId) != true) return
+    var open by remember { mutableStateOf(false) }
+    OutlinedButton(modifier = Modifier.focusRing(), onClick = { open = true }) {
+        Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null)
+        Text("Add to my collection…")
+    }
+    if (open) AddToPlaylistDialog(itemId, collectionsOf = libraryId) { open = false }
+}
+
+/**
+ * Picks one of the person's music playlists, or makes a new one with the item in it. With
+ * [collectionsOf] (a video library) it's their collections of that library instead (USER-23):
+ * the item goes in as it is, a show staying a show.
+ */
+@Composable
+fun AddToPlaylistDialog(itemId: Long, collectionsOf: Long? = null, onDone: () -> Unit) {
     val marquee = LocalMarquee.current
     val scope = rememberCoroutineScope()
-    val kind = if (music) PlaylistKind.AUDIO else PlaylistKind.VIDEO
+    val kind = if (collectionsOf != null) PlaylistKind.VIDEO else PlaylistKind.AUDIO
     // Read here, not just inside the dialog: an answer arriving during the dialog's first composition could otherwise never show.
     val playlists = produceState<List<Playlist>?>(null) {
         // Smart playlists fill themselves, so they aren't offered; nor are ones shared by someone else, which only they can change (MUSIC-24).
-        value = withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists(kind).filter { it.rules == null && it.readOnly != true } }.getOrDefault(emptyList()) }
+        value = withContext(Dispatchers.IO) {
+            runCatching { marquee.playlists.listPlaylists(kind, collectionsOf).filter { it.rules == null && it.readOnly != true } }.getOrDefault(emptyList())
+        }
     }.value
     var newTitle by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -83,7 +104,7 @@ fun AddToPlaylistDialog(itemId: Long, music: Boolean, onDone: () -> Unit) {
     }
     AlertDialog(
         onDismissRequest = onDone,
-        title = { Text("Add to playlist") },
+        title = { Text(if (collectionsOf != null) "Add to my collection" else "Add to playlist") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 when {
@@ -97,14 +118,14 @@ fun AddToPlaylistDialog(itemId: Long, music: Boolean, onDone: () -> Unit) {
                                 }.focusRing().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
                                         Text(p.title)
-                                        Text("${p.itemCount} items", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(if (collectionsOf != null) titlesCount(p.itemCount) else "${p.itemCount} items", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(newTitle, { newTitle = it }, Modifier.weight(1f), singleLine = true, label = { Text("New playlist") })
-                            TextButton({ act(newTitle.trim()) { marquee.playlists.createPlaylist(PlaylistCreate(newTitle.trim(), kind, listOf(itemId))) } },
+                            OutlinedTextField(newTitle, { newTitle = it }, Modifier.weight(1f), singleLine = true, label = { Text(if (collectionsOf != null) "New collection" else "New playlist") })
+                            TextButton({ act(newTitle.trim()) { marquee.playlists.createPlaylist(PlaylistCreate(newTitle.trim(), kind, listOf(itemId), libraryId = collectionsOf)) } },
                                 Modifier.focusRing(), enabled = newTitle.isNotBlank() && !busy) { Text("Create") }
                         }
                     }
@@ -149,6 +170,6 @@ fun TrackMenu(track: ItemSummary, onMoved: (() -> Unit)? = null) {
         move = false
         if (moved != null) { toast(context, "Moved “${moved.title}”"); onMoved?.invoke() }
     }
-    if (playlist) AddToPlaylistDialog(track.id, music = true) { playlist = false }
+    if (playlist) AddToPlaylistDialog(track.id) { playlist = false }
     if (journey) app.marquee.music.SoundJourneyDialog(track.id, track.title) { journey = false }
 }

@@ -121,7 +121,7 @@ fun MiniPlayer(onOpen: () -> Unit) {
             }
         }
     }
-    if (adding) app.marquee.ui.AddToPlaylistDialog(n.id, music = true) { adding = false }
+    if (adding) app.marquee.ui.AddToPlaylistDialog(n.id) { adding = false }
 }
 
 /** Full-screen Now Playing: artwork or lyrics or the queue, rating, radio, sleep timer and DJ. */
@@ -240,7 +240,7 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
         }
         androidx.compose.material3.SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp))
     }
-    if (adding && n != null) app.marquee.ui.AddToPlaylistDialog(n.id, music = true) { adding = false }
+    if (adding && n != null) app.marquee.ui.AddToPlaylistDialog(n.id) { adding = false }
     if (saving) SaveAsPlaylistDialog(defaultPlaylistTitle(source), music.queue.value.map { it.id }) { pl ->
         saving = false
         if (pl != null) scope.launch {

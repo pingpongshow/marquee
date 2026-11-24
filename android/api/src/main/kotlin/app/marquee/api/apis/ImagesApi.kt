@@ -217,6 +217,93 @@ open class ImagesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         )
     }
 
+    /**
+     * GET /playlists/{playlistId}/image
+     * A playlist&#39;s or collection&#39;s own picture (MUSIC-30), resized to a cached width. For anyone who can open it.
+     * Usable directly in &lt;img&gt; tags with the image key (?key&#x3D;). Add ?v&#x3D;&lt;the playlist&#39;s imageVersion&gt; so a changed picture is fetched again: responses are immutable.
+     * @param playlistId 
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
+     * @param v The playlist&#39;s imageVersion: it only makes the address change with the picture. (optional)
+     * @return java.io.File
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getPlaylistImage(playlistId: kotlin.Long, w: kotlin.Int? = null, v: kotlin.String? = null) : java.io.File {
+        val localVarResponse = getPlaylistImageWithHttpInfo(playlistId = playlistId, w = w, v = v)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as java.io.File
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /playlists/{playlistId}/image
+     * A playlist&#39;s or collection&#39;s own picture (MUSIC-30), resized to a cached width. For anyone who can open it.
+     * Usable directly in &lt;img&gt; tags with the image key (?key&#x3D;). Add ?v&#x3D;&lt;the playlist&#39;s imageVersion&gt; so a changed picture is fetched again: responses are immutable.
+     * @param playlistId 
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
+     * @param v The playlist&#39;s imageVersion: it only makes the address change with the picture. (optional)
+     * @return ApiResponse<java.io.File?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getPlaylistImageWithHttpInfo(playlistId: kotlin.Long, w: kotlin.Int?, v: kotlin.String?) : ApiResponse<java.io.File?> {
+        val localVariableConfig = getPlaylistImageRequestConfig(playlistId = playlistId, w = w, v = v)
+
+        return request<Unit, java.io.File>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getPlaylistImage
+     *
+     * @param playlistId 
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
+     * @param v The playlist&#39;s imageVersion: it only makes the address change with the picture. (optional)
+     * @return RequestConfig
+     */
+    fun getPlaylistImageRequestConfig(playlistId: kotlin.Long, w: kotlin.Int?, v: kotlin.String?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (w != null) {
+                    put("w", listOf(w.toString()))
+                }
+                if (v != null) {
+                    put("v", listOf(v.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/playlists/{playlistId}/image".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
 
     private fun encodeURIComponent(uriComponent: kotlin.String): kotlin.String =
         HttpUrl.Builder().scheme("http").host("localhost").addPathSegment(uriComponent).build().encodedPathSegments[0]

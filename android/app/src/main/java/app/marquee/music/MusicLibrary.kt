@@ -53,10 +53,11 @@ class MusicLibrary(private val marquee: Marquee, private val ownPackage: String,
 
     private fun <T> io(block: suspend () -> T): ListenableFuture<T> = marquee.scope.future(Dispatchers.IO) { block() }
 
-    private fun folder(id: String, title: String, playable: Boolean = false, art: Long? = null, type: Int = MediaMetadata.MEDIA_TYPE_FOLDER_MIXED) =
+    private fun folder(id: String, title: String, playable: Boolean = false, art: Long? = null, type: Int = MediaMetadata.MEDIA_TYPE_FOLDER_MIXED,
+        artUrl: String? = null) =
         MediaItem.Builder().setMediaId(id).setMediaMetadata(
             MediaMetadata.Builder().setTitle(title).setIsBrowsable(true).setIsPlayable(playable).setMediaType(type)
-                .setArtworkUri(marquee.imageUrl(art, 300)?.let(Uri::parse)).build(),
+                .setArtworkUri((artUrl ?: marquee.imageUrl(art, 300))?.let(Uri::parse)).build(),
         ).build()
 
     private fun playable(id: String, title: String, subtitle: String? = null, art: Long? = null, type: Int = MediaMetadata.MEDIA_TYPE_RADIO_STATION) =
@@ -101,7 +102,8 @@ class MusicLibrary(private val marquee: Marquee, private val ownPackage: String,
                     musicMoods.map { playable("radio:mood:${it.lowercase()}", "$it Radio") }
             }
             PLAYLISTS -> marquee.playlists.listPlaylists(PlaylistKind.AUDIO).map {
-                folder("playlist:${it.id}", it.title, playable = true, art = it.imageIds.firstOrNull(), type = MediaMetadata.MEDIA_TYPE_PLAYLIST)
+                folder("playlist:${it.id}", it.title, playable = true, art = it.imageIds.firstOrNull(), type = MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                    artUrl = marquee.playlistImageUrl(it, 300))
             }
             ARTISTS -> musicLibraries().flatMap { lib -> marquee.items.listLibraryItems(lib.id, ItemType.ARTIST, ItemsApi.SortListLibraryItems.TITLE, limit = 500).items }
                 .map { folder("artist:${it.id}", it.title, playable = true, art = it.images?.poster, type = MediaMetadata.MEDIA_TYPE_ARTIST) }

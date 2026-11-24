@@ -9,6 +9,7 @@ import app.marquee.api.models.CreateDownloadRequest
 import app.marquee.api.models.Download
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.ItemType
+import app.marquee.api.models.PlaylistKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -190,16 +191,19 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
 
     // Playlists
 
-    /** Keeps a playlist on the device: downloads what's new and drops what left it (tracks downloaded on their own stay). */
+    /** Keeps a music playlist on the device: downloads what's new and drops what left it (tracks downloaded on their own stay). */
     suspend fun syncPlaylist(id: Long) {
         if (marquee.baseUrl == null) return
+        // Fails with the listing below rather than guessing the kind: a collection's videos must not be taken for tracks that left.
+        val info = kotlinx.coroutines.withContext(Dispatchers.IO) { marquee.playlists.getPlaylist(id) }
+        // A video playlist kept before they became collections (USER-23): no longer followed, its videos stay as downloads of their own.
+        if (info.kind == PlaylistKind.VIDEO) { releasePlaylist(id); return }
         val items = kotlinx.coroutines.withContext(Dispatchers.IO) { marquee.allPlaylistEntries(id).map { it.item } }
-            .filter { it.type in listOf(ItemType.TRACK, ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO) }
-        val info = kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { marquee.playlists.getPlaylist(id) }.getOrNull() }
+            .filter { it.type == ItemType.TRACK }
         val now = items.map { it.id }.toSet()
         val before = _playlists.value[id].orEmpty()
         _playlists.update { it + (id to now) }
-        _playlistInfo.update { m -> m + (id to PlaylistInfo(info?.title ?: m[id]?.title.orEmpty(), items.map { it.id }, info?.ownerName ?: m[id]?.ownerName)) }
+        _playlistInfo.update { m -> m + (id to PlaylistInfo(info.title, items.map { it.id }, info.ownerName ?: m[id]?.ownerName)) }
         savePlaylists()
         for (it in items) if (_entries.value[it.id] == null) {
             runCatching { download(it) }
@@ -217,6 +221,16 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         _playlistInfo.update { it - id }
         savePlaylists()
         dropOrphans(ids)
+    }
+
+    /** Stops following a playlist without removing what it downloaded. */
+    private fun releasePlaylist(id: Long) {
+        val ids = _playlists.value[id] ?: return
+        _playlists.update { it - id }
+        _playlistInfo.update { it - id }
+        savePlaylists()
+        val kept = _playlists.value.values.flatten().toSet()
+        ids.filter { it !in kept && _entries.value[it]?.viaPlaylist == true }.forEach { set(it) { e -> e.copy(viaPlaylist = false) } }
     }
 
     private fun dropOrphans(ids: Set<Long>) {

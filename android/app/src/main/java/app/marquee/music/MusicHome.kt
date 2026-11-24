@@ -228,6 +228,8 @@ fun MusicHome(nav: NavHostController, library: Library) {
                         music.play(tracks, 0, source = "Shuffle All")
                     }
                 })
+                // Playlists are music only and open from here (USER-23), so they're up with the first things to reach.
+                add(Triple("Playlists", Icons.AutoMirrored.Filled.QueueMusic) { nav.navigate("playlists") })
                 if (enabled && museOn) add(Triple("Muse", Icons.Filled.AutoAwesome) { nav.navigate("musicmuse/$lib") })
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = sidePadding).semantics { contentDescription = "Quick actions" },
@@ -354,7 +356,7 @@ private fun <T> CardRow(items: List<T>, pad: PaddingValues, modifier: Modifier =
 private fun PlaylistCard(p: Playlist, width: Dp, onClick: () -> Unit) {
     val marquee = LocalMarquee.current
     Column(Modifier.width(width)) {
-        Artwork(marquee.imageUrl(p.imageIds.firstOrNull(), 300), p.title, Shape.Square, Modifier.fillMaxWidth().focusCard(onClick).semantics { contentDescription = p.title })
+        Artwork(marquee.playlistImageUrl(p, 300) ?: marquee.imageUrl(p.imageIds.firstOrNull(), 300), p.title, Shape.Square, Modifier.fillMaxWidth().focusCard(onClick).semantics { contentDescription = p.title })
         Text(p.title, Modifier.padding(top = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
         Text("${p.itemCount} tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }

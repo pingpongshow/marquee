@@ -39,7 +39,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -72,11 +71,11 @@ import app.marquee.music.NowPlayingScreen
 
 private data class Dest(val route: String, val label: String, val icon: ImageVector)
 
-// Live TV isn't a tab: it's listed under Libraries when it's set up.
+// Live TV isn't a tab: it's listed under Libraries when it's set up. Nor are Playlists: they're
+// music only and open from the music library (USER-23).
 private val tabs = listOf(
     Dest("home", "Home", Icons.Filled.Home),
     Dest("libraries", "Libraries", Icons.Filled.VideoLibrary),
-    Dest("playlists", "Playlists", Icons.Filled.LibraryMusic),
     Dest("search", "Search", Icons.Filled.Search),
     Dest("settings", "Settings", Icons.Filled.Settings),
 )
@@ -211,6 +210,7 @@ private fun Routes(nav: NavHostController) {
         // All of Continue Watching (Home's row's View more).
         composable(CONTINUE_ROUTE) { ContinueWatchingScreen(nav) }
         composable("libraries") { LibrariesScreen(nav) }
+        // Music playlists, opened from the music library; not a tab.
         composable("playlists") { PlaylistsScreen(nav) }
         composable("playlists/folder/{id}", listOf(navArgument("id") { type = NavType.LongType })) { PlaylistsScreen(nav, it.arguments!!.getLong("id")) }
         composable("search") { SearchScreen(nav) }

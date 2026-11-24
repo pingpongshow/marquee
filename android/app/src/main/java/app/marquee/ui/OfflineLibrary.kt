@@ -65,7 +65,7 @@ private fun rememberOfflineContent(): Pair<OfflineContent, List<ItemSummary>> {
 @Composable
 private fun posterUrl(id: Long): String? = LocalDownloads.current.posterFile(id)?.let { android.net.Uri.fromFile(it).toString() }
 
-/** Plays [list] in order from [start]: each video going on to the next, as a playlist does (USER-7). */
+/** Plays [list] in order from [start]: each video going on to the next. */
 private fun playVideos(marquee: Marquee, nav: NavHostController, list: List<ItemSummary>, start: Int = 0) {
     marquee.videoQueue = list.drop(start).map { it.id }
     list.getOrNull(start)?.let { nav.navigate("player/${it.id}") }

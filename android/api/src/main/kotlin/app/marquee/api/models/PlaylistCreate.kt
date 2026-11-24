@@ -37,6 +37,7 @@ import kotlinx.serialization.Contextual
  * @param kind 
  * @param itemIds 
  * @param rules 
+ * @param libraryId Required for kind video (USER-23): the video library the collection belongs to. A collection can't have rules.
  */
 @Serializable
 
@@ -52,7 +53,11 @@ data class PlaylistCreate (
     val itemIds: kotlin.collections.List<kotlin.Long>? = null,
 
     @SerialName(value = "rules")
-    val rules: SmartRules? = null
+    val rules: SmartRules? = null,
+
+    /* Required for kind video (USER-23): the video library the collection belongs to. A collection can't have rules. */
+    @SerialName(value = "libraryId")
+    val libraryId: kotlin.Long? = null
 
 ) {
 

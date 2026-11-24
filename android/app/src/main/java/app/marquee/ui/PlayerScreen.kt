@@ -217,12 +217,12 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     var countdownHeld by remember { mutableStateOf(false) }
     // Set once the end was dealt with, so closing the player doesn't ask again.
     val endHandled = remember { booleanArrayOf(false) }
-    // Set when this player gives way to the next video, which keeps the playlist's order going.
+    // Set when this player gives way to the next video, which keeps the Offline Library's order going.
     val movingOn = remember { booleanArrayOf(false) }
     LaunchedEffect(groupId) { if (groupId != null) { delay(1500); together.join(groupId) } }
-    // Playing in order from a video playlist (USER-7) while this video is one of it; anything else ends that.
+    // Playing in order from the Offline Library while this video is one of those; anything else ends that.
     val queue = remember(itemId) { marquee.videoQueue.takeIf { itemId in it } ?: emptyList<Long>().also { marquee.videoQueue = it } }
-    /** What comes next: the playlist's next video, or the next episode. */
+    /** What comes next: the next video of the Offline Library's order, or the next episode. */
     suspend fun upNext(): Long? = if (queue.isNotEmpty()) queue.getOrNull(queue.indexOf(itemId) + 1)
         else withContext(Dispatchers.IO) { runCatching { marquee.items.nextItem(itemId) }.getOrNull() }?.id
     // Downloaded: play the file on the device, even when the server is reachable (D64).
@@ -446,7 +446,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 d?.let { marquee.askedRating(it.id) }
                 if (local != null) {
                     recordLocal(ended = true)
-                    // In order from a playlist or the Offline Library: on to the next one if it's downloaded too.
+                    // In order from the Offline Library: on to the next one if it's downloaded too.
                     val next = queue.getOrNull(queue.indexOf(itemId) + 1)?.takeIf { downloads.localFile(it) != null }
                     if (next != null) playNext(next)
                     else if (stillShowing()) { d?.let { marquee.requestRating(ratingRequestFor(marquee, it)) }; nav.popBackStack() }
@@ -506,9 +506,9 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 marquee.requestRating(ratingRequestFor(marquee, d))
             }
             recordLocal()
-            // Left for good (not on to the next video, nor rebuilt with the screen): a playlist's
-            // order ends here, so the same video played later from its own page goes on to the
-            // next episode, not the playlist's next.
+            // Left for good (not on to the next video, nor rebuilt with the screen): the Offline
+            // Library's order ends here, so the same video played later from its own page goes on
+            // to the next episode, not that order's next.
             if (!movingOn[0] && (context as? Activity)?.isChangingConfigurations != true) marquee.videoQueue = emptyList()
             // Smart downloads catch up (the next episode, removing a watched one) soon after.
             downloads.smart.runSoon()

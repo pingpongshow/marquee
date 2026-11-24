@@ -183,8 +183,9 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             val id = d.id
             marquee.scope.launch { if (!marquee.sync.setWatched(id, false)) toast(context, "Couldn't update “${d.title}”") }
         }) { Icon(Icons.Filled.RemoveDone, null); Text("Mark unwatched") }
-        if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.SEASON, ItemType.EPISODE, ItemType.VIDEO, ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
-            AddToPlaylistButton(d.id, music = d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
+        // Music goes into playlists; videos into the person's collections of their library (USER-23).
+        if (d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK)) AddToPlaylistButton(d.id)
+        else if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.SEASON, ItemType.EPISODE, ItemType.VIDEO)) AddToCollectionButton(d.id, d.libraryId)
     }
     @Composable fun Download() {
         if (!marquee.isTv && d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO, ItemType.TRACK, ItemType.ALBUM, ItemType.ARTIST, ItemType.SEASON, ItemType.SHOW))

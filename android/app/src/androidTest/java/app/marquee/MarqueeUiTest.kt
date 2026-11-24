@@ -147,6 +147,13 @@ class MarqueeUiTest {
         tap(name)
     }
 
+    /** Playlists are music only and open from the music library (USER-23): its Playlists quick action. */
+    private fun openPlaylists() {
+        openLibrary("Music")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Quick actions"), 20_000)
+        tap("Playlists")
+    }
+
     /** From the music home: the Artists page, scrolled to an artist. */
     private fun openArtist(name: String) {
         rule.waitUntilAtLeastOneExists(hasContentDescription("Music home"), 20_000)
@@ -751,7 +758,7 @@ class MarqueeUiTest {
     @Test fun playlistDownload() {
         assumeTrue("phones and tablets only", !isTv)
         connectAndSignIn()
-        tap("Playlists")
+        openPlaylists()
         rule.waitText("Road Trip")
         tap("Road Trip")
         rule.waitText("Shuffle")
@@ -1015,17 +1022,17 @@ class MarqueeUiTest {
         rule.waitUntilAtLeastOneExists(playing, 10_000) // still playing here
     }
 
-    /** Add to playlist (USER-7): from a movie's page into a new playlist, then an album track's menu. */
-    @Test fun addToPlaylist() {
+    /** Add to my collection (USER-23): from a movie's page into a new collection of its library. */
+    @Test fun addToCollection() {
         connectAndSignIn()
         openLibrary("Movies")
         rule.waitText("00 Preview Test")
         tap("00 Preview Test")
-        rule.waitText("Add to playlist", 10_000)
-        tap("Add to playlist")
-        rule.waitUntilAtLeastOneExists(hasText("New playlist"), 10_000)
+        rule.waitText("Add to my collection…", 10_000)
+        tap("Add to my collection…")
+        rule.waitUntilAtLeastOneExists(hasText("New collection"), 10_000)
         val name = "UI list ${(1000..9999).random()}"
-        rule.onNode(hasSetTextAction() and hasText("New playlist")).performTextInput(name)
+        rule.onNode(hasSetTextAction() and hasText("New collection")).performTextInput(name)
         tap("Create")
         rule.waitText("Added to $name.", 10_000)
         shot("pl1-added")
@@ -2063,7 +2070,7 @@ class MarqueeUiTest {
                 assertTrue("$where: $label is one line (${b.height / density} dp tall)", b.height / density <= 60f && b.width > b.height)
             }
         }
-        tap("Playlists")
+        openPlaylists()
         rule.waitText("Road Trip")
         tap("Road Trip")
         rule.waitText("Shuffle")
@@ -2726,40 +2733,6 @@ class MarqueeUiTest {
         }
     }
 
-    /** Video playlists (USER-7): listed with music ones, Play plays the first video and goes on to the next. */
-    @Test fun videoPlaylistPlays() {
-        connectAndSignIn()
-        val name = "Video PL ${System.currentTimeMillis() % 100000}"
-        val created = org.json.JSONObject(adminApi("POST", "/playlists", """{"title":"$name","kind":"video","itemIds":[4,5]}""", asToken = appToken))
-        try {
-            tap("Playlists")
-            rule.waitText("Video playlists")
-            rule.waitUntil(10_000) { scrollTo(hasText(name)) }
-            shot("vp1-list")
-            tap(name)
-            rule.waitText("20 Valley")
-            rule.waitUntilAtLeastOneExists(hasText("Play") and hasClickAction(), 10_000)
-            shot("vp2-playlist")
-            rule.onNode(hasText("Play") and hasClickAction()).performClick()
-            rule.waitUntilAtLeastOneExists(hasContentDescription("Video player"), 15_000)
-            rule.waitUntil(15_000) { rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isNotEmpty() && rule.onAllNodesWithText("20 Valley").fetchSemanticsNodes().isNotEmpty() }
-            // Two-second videos: the next one follows on its own, after Up Next's countdown.
-            rule.waitUntil(40_000) {
-                rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isNotEmpty() && rule.onAllNodesWithText("15 Thunder").fetchSemanticsNodes().isNotEmpty() &&
-                    rule.onAllNodes(hasContentDescription("Up next countdown")).fetchSemanticsNodes().isEmpty()
-            }
-            shot("vp3-next")
-            // Back leaves the players for the playlist's page, not the video played before this one.
-            back()
-            rule.waitUntil(15_000) {
-                rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isEmpty() &&
-                    rule.onAllNodes(hasText("Play") and hasClickAction()).fetchSemanticsNodes().isNotEmpty()
-            }
-        } finally {
-            adminApi("DELETE", "/playlists/${created.getLong("id")}", asToken = appToken)
-        }
-    }
-
     /** Going back to a list keeps its place (the item opened is still on screen), not the top. */
     @Test fun listKeepsPlaceAfterBack() {
         connectAndSignIn()
@@ -3363,7 +3336,7 @@ class MarqueeUiTest {
         val lists = org.json.JSONArray(adminApi("GET", "/playlists", asToken = appToken))
         val id = (0 until lists.length()).map { lists.getJSONObject(it) }.first { it.getString("title") == "Road Trip" }.getLong("id")
         try {
-            tap("Playlists")
+            openPlaylists()
             rule.waitText("Road Trip")
             tap("Road Trip")
             rule.waitUntilAtLeastOneExists(hasContentDescription("Playlist actions"), 10_000)
@@ -3466,7 +3439,7 @@ class MarqueeUiTest {
         tap("Movies")
         rule.waitText("00 Preview Test")
         tap("00 Preview Test")
-        rule.waitText("Add to playlist", 15_000)
+        rule.waitText("Add to my collection…", 15_000)
         assertTrue(rule.onAllNodesWithText("Download", substring = true).fetchSemanticsNodes().isEmpty())
         shot("tvn1-movie")
         tap("Settings")
@@ -3663,7 +3636,7 @@ class MarqueeUiTest {
         val a = create("Share A $tag")
         val b = create("Share B $tag")
         try {
-            tap("Playlists")
+            openPlaylists()
             rule.waitText("Share A $tag", 15_000)
             rule.waitText("Share B $tag")
             rule.waitText("Accept")
@@ -3718,7 +3691,7 @@ class MarqueeUiTest {
         adminApi("PUT", "/playlists/$sharedId/shares", """{"userIds":[2]}""")
         adminApi("PUT", "/me/playlist-shares/$sharedId", asToken = appToken)
         try {
-            tap("Playlists")
+            openPlaylists()
             rule.waitText("Road Trip")
             tap("Road Trip")
             rule.waitUntilAtLeastOneExists(hasContentDescription("Playlist actions"), 10_000)
@@ -3745,9 +3718,9 @@ class MarqueeUiTest {
             openLibrary("Movies")
             rule.waitText("00 Preview Test")
             tap("00 Preview Test")
-            rule.waitText("Add to playlist", 10_000)
-            tap("Add to playlist")
-            rule.waitUntilAtLeastOneExists(hasText("New playlist"), 10_000)
+            rule.waitText("Add to my collection…", 10_000)
+            tap("Add to my collection…")
+            rule.waitUntilAtLeastOneExists(hasText("New collection"), 10_000)
             assertTrue(rule.onAllNodesWithText("Not Yours").fetchSemanticsNodes().isEmpty())
             tap("Cancel")
         } finally {

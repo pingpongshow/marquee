@@ -68,7 +68,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// ---------- Editing and combining playlists (MUSIC-29) ----------
+// ---------- Editing playlists and collections, and combining playlists (MUSIC-29, USER-23) ----------
 
 /** Ways the editor sorts a playlist. */
 internal enum class PlaylistSort(val label: String) {
@@ -94,7 +94,7 @@ internal object PlaylistEdits {
 
     private fun artist(e: PlaylistEntry) = e.item.artistCredit ?: e.item.grandparentTitle ?: ""
 
-    /** Each song or video once, where it first appears. */
+    /** Each song once, where it first appears. */
     fun withoutDuplicates(entries: List<PlaylistEntry>): List<PlaylistEntry> = entries.distinctBy { it.item.id }
 
     /** How many entries [withoutDuplicates] would take out. */
@@ -122,6 +122,8 @@ private suspend fun allEntries(marquee: app.marquee.core.Marquee, id: Long): Lis
  * Edit a playlist (MUSIC-29): pick entries to remove or move to the top or bottom, move one up or
  * down, sort the whole playlist, or take out duplicates. Nothing changes on the server until Save,
  * which sends the new order (and what's gone) in one go. Leaving with changes asks first.
+ * A collection (USER-23) is edited the same way, less what only suits songs: sorting by artist
+ * or album, and duplicates (it holds each title once).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -137,10 +139,11 @@ fun PlaylistEditScreen(nav: NavHostController, playlistId: Long) {
     var saving by remember { mutableStateOf(false) }
     var sorting by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
+    val music = playlist?.kind != PlaylistKind.VIDEO
     LaunchedEffect(playlistId) {
         runCatching { allEntries(marquee, playlistId) }
             .onSuccess { entries.clear(); entries.addAll(it); original = it.map { e -> e.entryId } }
-            .onFailure { error = "Couldn't load the playlist: ${serverMessage(it)}" }
+            .onFailure { error = "Couldn't load it: ${serverMessage(it)}" }
     }
     val changed = original != null && original != entries.map { it.entryId }
     fun set(list: List<PlaylistEntry>) { entries.clear(); entries.addAll(list) }
@@ -149,12 +152,11 @@ fun PlaylistEditScreen(nav: NavHostController, playlistId: Long) {
         scope.launch {
             withContext(Dispatchers.IO) { runCatching { marquee.playlists.setPlaylistItems(playlistId, SetPlaylistItemsRequest(entries.map { it.entryId })) } }
                 .onSuccess { nav.popBackStack() }
-                .onFailure { toast(context, "Couldn't save the playlist: ${serverMessage(it)}") }
+                .onFailure { toast(context, "Couldn't save the ${if (music) "playlist" else "collection"}: ${serverMessage(it)}") }
             saving = false
         }
     }
     BackHandler(enabled = changed) { leaving = true }
-    val music = playlist?.kind != PlaylistKind.VIDEO
     val dupes = PlaylistEdits.duplicates(entries)
 
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp), modifier = Modifier.testTag("playlistEditor")) {
@@ -162,14 +164,14 @@ fun PlaylistEditScreen(nav: NavHostController, playlistId: Long) {
             Column(Modifier.padding(horizontal = sidePadding), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text("Edit playlist", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (music) "Edit playlist" else "Edit collection", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(playlist?.title ?: "", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2)
                     }
                     TextButton({ if (changed) leaving = true else nav.popBackStack() }, Modifier.focusRing()) { Text("Cancel") }
                     Button(::save, Modifier.focusRing().initialFocus(marquee.isTv), enabled = changed && !saving) { Text(if (saving) "Saving…" else "Save") }
                 }
                 Text(buildString {
-                    append(if (entries.size == 1) "1 ${if (music) "song" else "video"}" else "${entries.size} ${if (music) "songs" else "videos"}")
+                    append(if (!music) titlesCount(entries.size) else if (entries.size == 1) "1 song" else "${entries.size} songs")
                     if (selected.isNotEmpty()) append(" · ${selected.size} selected")
                     if (changed) append(" · not saved yet")
                 }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -197,7 +199,7 @@ fun PlaylistEditScreen(nav: NavHostController, playlistId: Long) {
                             }
                         }
                     }
-                    OutlinedButton({ set(PlaylistEdits.withoutDuplicates(entries)); selected.retainAll(entries.map { it.entryId }.toSet()) },
+                    if (music) OutlinedButton({ set(PlaylistEdits.withoutDuplicates(entries)); selected.retainAll(entries.map { it.entryId }.toSet()) },
                         Modifier.focusRing(), enabled = dupes > 0) {
                         Icon(Icons.Filled.ContentCopy, null)
                         Text(if (dupes > 0) "Remove $dupes duplicate${if (dupes == 1) "" else "s"}" else "No duplicates", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
@@ -229,13 +231,13 @@ fun PlaylistEditScreen(nav: NavHostController, playlistId: Long) {
     }
     if (leaving) AlertDialog(onDismissRequest = { leaving = false },
         title = { Text("Discard your changes?") },
-        text = { Text("The playlist stays as it was.") },
+        text = { Text(if (music) "The playlist stays as it was." else "The collection stays as it was.") },
         confirmButton = { TextButton({ leaving = false; nav.popBackStack() }, Modifier.focusRing()) { Text("Discard", color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton({ leaving = false }, Modifier.focusRing().initialFocus(marquee.isTv)) { Text("Keep editing") } })
 }
 
 /**
- * Combine playlists (MUSIC-29): pick two or more of one kind (yours, shared with you or smart),
+ * Combine music playlists (MUSIC-29): pick two or more (yours, shared with you or smart),
  * then put them into a new playlist or onto the end of one of yours, leaving out duplicates if
  * you like, and deleting your originals afterwards if you like. [onDone] has the playlist they
  * went into, or null when cancelled.
@@ -252,11 +254,9 @@ fun CombinePlaylistsDialog(playlists: List<Playlist>, onDone: (Playlist?) -> Uni
     var deleteSources by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    // One kind at a time: the first picked decides.
-    val kind = playlists.firstOrNull { it.id in picked }?.kind
     val sources = playlists.filter { it.id in picked }
-    // Where they can go: your own (not smart) playlists of the same kind, not already a source.
-    val targets = playlists.filter { it.readOnly != true && it.rules == null && (kind == null || it.kind == kind) && it.id !in picked }
+    // Where they can go: your own (not smart) playlists, not already a source.
+    val targets = playlists.filter { it.readOnly != true && it.rules == null && it.id !in picked }
     val ready = picked.size >= (if (intoNew) 2 else 1) && (intoNew || into != null)
     fun combine() {
         busy = true
@@ -281,14 +281,12 @@ fun CombinePlaylistsDialog(playlists: List<Playlist>, onDone: (Playlist?) -> Uni
                 Column(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
                     playlists.forEach { p ->
                         val on = p.id in picked
-                        val usable = kind == null || p.kind == kind
-                        Row(Modifier.fillMaxWidth().focusCard({ if (on) picked.remove(p.id) else if (usable) { picked.add(p.id); if (into == p.id) into = null } })
+                        Row(Modifier.fillMaxWidth().focusCard({ if (on) picked.remove(p.id) else { picked.add(p.id); if (into == p.id) into = null } })
                             .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(on, null, enabled = usable)
+                            Checkbox(on, null)
                             Column(Modifier.weight(1f)) {
-                                Text(p.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    color = if (usable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(listOfNotNull("${p.itemCount} ${if (p.kind == PlaylistKind.AUDIO) "songs" else "videos"}", playlistSharing(p),
+                                Text(p.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(listOfNotNull("${p.itemCount} songs", playlistSharing(p),
                                     if (p.rules != null) "Smart" else null).joinToString(" · "),
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -416,8 +417,35 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long, initialSort: String? 
     var loading by remember { mutableStateOf(false) }
     var library by rememberCached("library-$libraryId") { mutableStateOf<Library?>(null) }
     var opened by rememberLastOpened("library-$libraryId")
-    // Movie libraries also browse by collection (META-7).
+    // Movie libraries also browse by collection (META-7); so does any video library that lets people keep their own (USER-23).
     var collections by rememberSaveable { mutableStateOf(false) }
+    val personal = library?.let { it.type != LibraryType.MUSIC && it.type != LibraryType.PHOTOS && it.options.personalCollections == true } == true
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Bumped after a collection is made or an invitation answered, to load the person's collections again.
+    var mineVersion by remember { mutableIntStateOf(0) }
+    // The person's own collections of this library and those shared with them; loaded again on coming back from one.
+    val loadedMine by cachedLoad("library-$libraryId-mine", mineVersion, personal) {
+        if (!personal) null else withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists(PlaylistKind.VIDEO, libraryId) }.getOrNull() }
+    }
+    val mine = if (personal) loadedMine ?: emptyList() else emptyList()
+    // Collections of this library that people have shared with this person, to accept or decline.
+    val loadedInvites by cachedLoad("library-$libraryId-invites", mineVersion, personal) {
+        if (!personal) null else withContext(Dispatchers.IO) {
+            runCatching { marquee.playlists.listPlaylistInvites().filter { it.kind == PlaylistKind.VIDEO && it.libraryId == libraryId } }.getOrNull()
+        }
+    }
+    // Answered here: gone at once, before the lists come back from the server.
+    val answered = remember { mutableStateListOf<Long>() }
+    val invites = if (personal) (loadedInvites ?: emptyList()).filter { it.id !in answered } else emptyList()
+    fun answer(p: app.marquee.api.models.Playlist, accept: Boolean) {
+        answered.add(p.id)
+        marquee.scope.launch {
+            withContext(Dispatchers.IO) { runCatching { if (accept) marquee.playlists.acceptPlaylistShare(p.id) else marquee.playlists.removePlaylistShare(p.id) } }
+                .onSuccess { mineVersion++ }
+                .onFailure { answered.remove(p.id); toast(context, "Couldn't answer “${p.title}”: ${serverMessage(it)}") }
+        }
+    }
+    var naming by remember { mutableStateOf(false) }
     // Sort by title, the person's own rating or when they favourited it; only what they rated
     // 4★ or more; only their favourites (the heart, USER-12).
     // Home's Recently Added and Recently Played rows open their library in that order (USER-12).
@@ -458,7 +486,7 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long, initialSort: String? 
             if (museOn && library?.type in listOf(LibraryType.MOVIES, LibraryType.SHOWS, LibraryType.ANIME)) IconButton({ nav.navigate("muse?lib=$libraryId") }, Modifier.focusRing()) {
                 Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold)
             }
-            if (library?.type == LibraryType.MOVIES) listOf(false to "All", true to "Collections").forEach { (c, label) ->
+            if (library?.type == LibraryType.MOVIES || personal) listOf(false to "All", true to "Collections").forEach { (c, label) ->
                 androidx.compose.material3.FilterChip(collections == c, {
                     if (collections != c) { collections = c; reload() }
                 }, { Text(label) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)))
@@ -481,8 +509,9 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long, initialSort: String? 
                     leadingIcon = { Icon(Icons.Filled.Star, null, Modifier.size(18.dp), tint = Gold) })
             }
         }
-        if (total == 0) Text(when {
-                collections -> "Nothing here yet."
+        // The library's own collections follow the person's: "Nothing here" only when there are neither.
+        if (total == 0 && !(collections && personal && (loadedMine == null || mine.isNotEmpty()))) Text(when {
+                collections -> if (personal) "No collections yet. Choose New collection to start one." else "Nothing here yet."
                 listOf(hearts, fav, unwatched).count { it } > 1 -> "Nothing matches these filters."
                 unwatched -> "You've watched everything here."
                 hearts -> "No favourites here yet. Tap the heart on a title to add it."
@@ -492,20 +521,42 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long, initialSort: String? 
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         LazyVerticalGrid(GridCells.Adaptive(min), Modifier.semantics { contentDescription = "Library items" }, contentPadding = PaddingValues(sidePadding),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            items(invites.size, key = { "invite${invites[it].id}" }, span = { GridItemSpan(maxLineSpan) }) { i ->
+                val p = invites[i]
+                PlaylistInvite(p, focusFirst = false, onAccept = { answer(p, accept = true) }, onDecline = { answer(p, accept = false) }, inset = false)
+            }
+            // The person's own collections first (USER-23), then the library's; the two headings only when there are both.
+            val both = mine.isNotEmpty() && items.isNotEmpty()
+            if (collections && personal) {
+                item(key = "mine", span = { GridItemSpan(maxLineSpan) }) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (both) Text("My Collections", Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        OutlinedButton({ naming = true }, Modifier.focusRing().initialFocus(marquee.isTv && opened == null && mine.isEmpty() && total == 0).testTag("newCollection")) {
+                            Icon(Icons.Filled.Add, null); Text("New collection", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
+                        }
+                    }
+                }
+                items(mine.size, key = { "mine${mine[it].id}" }) { i ->
+                    val p = mine[i]
+                    // Negative, apart from the library collections' ids.
+                    CollectionCard(p, min, autoFocus = marquee.isTv && (if (opened != null) opened == -p.id else i == 0)) { opened = -p.id; nav.navigate("playlist/${p.id}") }
+                }
+                if (both) item(key = "theirs", span = { GridItemSpan(maxLineSpan) }) {
+                    Text("Library collections", Modifier.padding(top = 8.dp).semantics { heading() }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+            }
             itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
                 PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { opened = it.id; openItem(nav, it) },
-                    autoFocus = marquee.isTv && (if (opened != null) it.id == opened else i == 0),
+                    autoFocus = marquee.isTv && (if (opened != null) it.id == opened else i == 0 && !(collections && mine.isNotEmpty())),
                     showRating = byMyRating || fav, actions = tileActions(it, nav = nav))
             }
         }
     }
+    if (naming) NewCollectionDialog(libraryId) { made -> naming = false; if (made != null) mineVersion++ }
 }
 
-/** Where entry [i] of [items] is among those that [match] (-1 when it doesn't): a duplicate gets its own place, not the first's. */
-internal fun <T> positionAmong(items: List<T>, i: Int, match: (T) -> Boolean): Int =
-    if (i !in items.indices || !match(items[i])) -1 else (0 until i).count { match(items[it]) }
-
+/** The person's music playlists (opened from the music library): folders, invitations and Combine. Collections live in their video library (USER-23). */
 @Composable
 fun PlaylistsScreen(nav: NavHostController, folderId: Long? = null) {
     val marquee = LocalMarquee.current
@@ -514,7 +565,7 @@ fun PlaylistsScreen(nav: NavHostController, folderId: Long? = null) {
     var version by remember { mutableIntStateOf(0) }
     val page = folderId?.let { "playlists-folder-$it" } ?: "playlists"
     // Kept while on the back stack, so coming back keeps the list's place.
-    val loaded by cachedLoad(page, version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists() } } }
+    val loaded by cachedLoad(page, version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists(PlaylistKind.AUDIO) } } }
     val lists = loaded?.getOrNull() ?: emptyList()
     // The person's folders (MUSIC-28): those at the top level, then the playlists in none.
     val loadedFolders by cachedLoad("$page-folders", version) { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistFolders() }.getOrNull() } }
@@ -526,7 +577,8 @@ fun PlaylistsScreen(nav: NavHostController, folderId: Long? = null) {
     val shownFolders = if (folderId == null) folders else emptyList()
     // Playlists people have shared with this person (MUSIC-24), to accept or decline.
     val loadedInvites by cachedLoad("playlist-invites", version) {
-        if (folderId != null) emptyList() else withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistInvites() }.getOrNull() }
+        // A collection's invitation shows in its library.
+        if (folderId != null) emptyList() else withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistInvites().filter { it.kind == PlaylistKind.AUDIO } }.getOrNull() }
     }
     // Answered here: gone at once, before the lists come back from the server.
     val answered = remember { mutableStateListOf<Long>() }
@@ -583,7 +635,7 @@ fun PlaylistsScreen(nav: NavHostController, folderId: Long? = null) {
                 Text("Nothing in this folder yet. Choose Folder on a playlist to put it here.", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             lists.isEmpty() && folders.isEmpty() -> item {
-                Text("No playlists yet. Choose Add to playlist on a movie, episode, album or song to start one.", Modifier.padding(sidePadding),
+                Text("No playlists yet. Choose Add to playlist on an album or song to start one.", Modifier.padding(sidePadding),
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -603,38 +655,30 @@ fun PlaylistsScreen(nav: NavHostController, folderId: Long? = null) {
                     .focusCard({ opened = -f.id; nav.navigate("playlists/folder/${f.id}") }),
             )
         }
-        // Video and music playlists, each under its own heading (USER-7), with their poster mosaics.
-        val (videos, music) = shown.partition { it.kind == PlaylistKind.VIDEO }
-        listOf("Video playlists" to videos, "Music playlists" to music).filter { it.second.isNotEmpty() }.forEach { (heading, group) ->
-            if (videos.isNotEmpty() || shownFolders.isNotEmpty()) item(key = heading) {
-                Text(heading, Modifier.padding(start = sidePadding, end = sidePadding, top = 16.dp, bottom = 4.dp).semantics { this.heading() },
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-            items(group, key = { it.id }) { p ->
-                ListItem(
-                    headlineContent = { Text(p.title) },
-                    supportingContent = { Text(listOfNotNull("${p.itemCount} ${if (p.kind == PlaylistKind.AUDIO) "tracks" else "videos"}", playlistSharing(p)).joinToString(" · ")) },
-                    leadingContent = { PlaylistMosaic(p.imageIds, p.title, Modifier.size(56.dp)) },
-                    trailingContent = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box {
-                                // TV: the D-pad can't reach it; holding OK on the row opens the same menu.
-                                if (!marquee.isTv) IconButton({ filing = p.id }, Modifier.focusRing()) { Icon(Icons.Filled.DriveFileMove, "Folder for ${p.title}") }
-                                PlaylistFolderMenu(p, filing == p.id, { filing = null }) { version++ }
-                            }
-                            Icon(Icons.Filled.ChevronRight, null)
+        items(shown, key = { it.id }) { p ->
+            ListItem(
+                headlineContent = { Text(p.title) },
+                supportingContent = { Text(listOfNotNull("${p.itemCount} tracks", playlistSharing(p)).joinToString(" · ")) },
+                leadingContent = { PlaylistMosaic(p, Modifier.size(56.dp)) },
+                trailingContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box {
+                            // TV: the D-pad can't reach it; holding OK on the row opens the same menu.
+                            if (!marquee.isTv) IconButton({ filing = p.id }, Modifier.focusRing()) { Icon(Icons.Filled.DriveFileMove, "Folder for ${p.title}") }
+                            PlaylistFolderMenu(p, filing == p.id, { filing = null }) { version++ }
                         }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                    modifier = Modifier.initialFocus(marquee.isTv && invites.isEmpty() && (if (opened != null) opened == p.id else p.id == first))
-                        .focusCard({ opened = p.id; nav.navigate("playlist/${p.id}") }, onLongClick = { filing = p.id }),
-                )
-            }
+                        Icon(Icons.Filled.ChevronRight, null)
+                    }
+                },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                modifier = Modifier.initialFocus(marquee.isTv && invites.isEmpty() && (if (opened != null) opened == p.id else p.id == first))
+                    .focusCard({ opened = p.id; nav.navigate("playlist/${p.id}") }, onLongClick = { filing = p.id }),
+            )
         }
     }
     if (combining) CombinePlaylistsDialog(lists) { made ->
         combining = false
-        if (made != null) { version++; toast(context, "“${made.title}” now has ${made.itemCount} ${if (made.kind == PlaylistKind.AUDIO) "songs" else "videos"}") }
+        if (made != null) { version++; toast(context, "“${made.title}” now has ${made.itemCount} songs") }
     }
     if (naming) FolderNameDialog("New folder", "", "Create", { naming = false }) { name ->
         withContext(Dispatchers.IO) { runCatching { marquee.playlists.createPlaylistFolder(app.marquee.api.models.PlaylistFolderUpdate(name)) } }.onSuccess { version++ }
@@ -666,17 +710,20 @@ internal fun playlistSharing(p: app.marquee.api.models.Playlist): String? = when
     else -> null
 }
 
-/** An invitation at the top of Playlists: whose it is, with Accept and Decline. */
+/**
+ * An invitation at the top of Playlists, or of a video library for one of its collections: whose
+ * it is, with Accept and Decline. [inset] off where the list around it already keeps to the sides.
+ */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun PlaylistInvite(p: app.marquee.api.models.Playlist, focusFirst: Boolean, onAccept: () -> Unit, onDecline: () -> Unit) {
-    Row(Modifier.padding(horizontal = sidePadding, vertical = 6.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Gold.copy(alpha = 0.12f))
+private fun PlaylistInvite(p: app.marquee.api.models.Playlist, focusFirst: Boolean, onAccept: () -> Unit, onDecline: () -> Unit, inset: Boolean = true) {
+    Row(Modifier.padding(horizontal = if (inset) sidePadding else 0.dp, vertical = 6.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Gold.copy(alpha = 0.12f))
         .testTag("invite-${p.id}").padding(12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        PlaylistMosaic(p.imageIds, p.title, Modifier.size(56.dp))
+        PlaylistMosaic(p, Modifier.size(56.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(p.title, fontWeight = FontWeight.SemiBold, maxLines = 2)
-            Text("${p.ownerName ?: "Someone"} shared this with you · ${p.itemCount} ${if (p.kind == PlaylistKind.AUDIO) "tracks" else "videos"}",
+            Text("${p.ownerName ?: "Someone"} shared this ${if (p.kind == PlaylistKind.AUDIO) "playlist with you · ${p.itemCount} tracks" else "collection with you · ${titlesCount(p.itemCount)}"}",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Button(onAccept, Modifier.focusRing().initialFocus(focusFirst)) { Text("Accept", maxLines = 1, softWrap = false) }
@@ -718,19 +765,16 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
     }
     val tracks = entries.map { it.item }
     var opened by rememberLastOpened("playlist-$playlistId")
-    // A video playlist plays in the video player, in order, each video going on to the next (USER-7).
-    fun isVideo(x: ItemSummary) = x.type in app.marquee.core.WatchState.videoTypes && x.type != ItemType.SHOW && x.type != ItemType.SEASON
-    val videos = tracks.filter(::isVideo)
-    fun playVideos(list: List<ItemSummary>) {
-        if (list.isEmpty()) return
-        marquee.videoQueue = list.map { it.id }
-        nav.navigate("player/${list.first().id}")
+    // A video playlist is a collection (USER-23): a grid of titles that open their pages, with nothing to play.
+    playlist?.takeIf { it.kind == PlaylistKind.VIDEO }?.let { p ->
+        CollectionPage(nav, p, loadedEntries?.let { entries }, editable, { id -> opened = id }, opened, ::removeEntry) { version++ }
+        return
     }
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp)) {
         item {
             Column(Modifier.padding(horizontal = sidePadding)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    playlist?.let { PlaylistMosaic(it.imageIds, it.title, Modifier.size(if (marquee.isTv) 120.dp else 88.dp)) }
+                    playlist?.let { PlaylistMosaic(it, Modifier.size(if (marquee.isTv) 120.dp else 88.dp)) }
                     Column {
                         Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         playlist?.let(::playlistSharing)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -746,13 +790,6 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
                             Icon(Icons.Filled.Shuffle, null); Text("Shuffle", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
                         }
                         if (!marquee.isTv) PlaylistDownloadButton(playlistId)
-                    } else if (videos.isNotEmpty()) {
-                        Button(onClick = { playVideos(videos) }, modifier = Modifier.focusRing().initialFocus(marquee.isTv && opened == null)) {
-                            Icon(Icons.Filled.PlayArrow, null); Text("Play", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
-                        }
-                        OutlinedButton(onClick = { playVideos(videos.shuffled()) }, modifier = Modifier.focusRing()) {
-                            Icon(Icons.Filled.Shuffle, null); Text("Shuffle", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
-                        }
                     }
                     // Edit (MUSIC-29): select, remove, reorder, sort and take out duplicates, saved at once.
                     if (editable && entries.size > 0) OutlinedButton({ nav.navigate("playlist/$playlistId/edit") }, Modifier.focusRing().testTag("editPlaylist")) {
@@ -767,10 +804,9 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
                 }
             }
         }
-        items(entries.size) { i ->
+        // Not before the playlist is known: a collection's titles would show as rows for a moment.
+        items(if (playlist == null) 0 else entries.size) { i ->
             val it = entries[i].item
-            // Its own place among the videos (a video in the playlist twice plays on from this copy, not the first).
-            val vi = positionAmong(entries, i) { e -> isVideo(e.item) }
             var menu by remember { mutableStateOf(false) }
             // TV: Right from the row reaches its heart (and stars), which sit inside it.
             val hearted = it.type in app.marquee.core.FavoriteState.types
@@ -799,18 +835,17 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
                     }
                 },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                // A video plays from here on through the rest of the playlist.
                 modifier = Modifier.initialFocus(marquee.isTv && opened == it.id).then(if (hearted) Modifier.rowFocus(inRow) else Modifier)
-                    .focusCard({ opened = it.id; if (it.type == ItemType.TRACK) music.play(tracks, i, source = title) else if (vi >= 0) playVideos(videos.drop(vi)) else openItem(nav, it) },
+                    .focusCard({ opened = it.id; if (it.type == ItemType.TRACK) music.play(tracks, i, source = title) else openItem(nav, it) },
                         onLongClick = if (editable) ({ menu = true }) else null),
             )
         }
     }
 }
 
-/** A playlist someone shared with this person: it can only leave their playlists (with a confirmation). */
+/** A playlist or collection someone shared with this person: it can only leave their own (with a confirmation). */
 @Composable
-private fun RemoveSharedPlaylistButton(p: app.marquee.api.models.Playlist, nav: NavHostController) {
+internal fun RemoveSharedPlaylistButton(p: app.marquee.api.models.Playlist, nav: NavHostController) {
     val marquee = LocalMarquee.current
     val downloads = LocalDownloads.current
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -820,7 +855,7 @@ private fun RemoveSharedPlaylistButton(p: app.marquee.api.models.Playlist, nav: 
     }
     if (removing) AlertDialog(onDismissRequest = { removing = false },
         title = { Text("Remove “${p.title}”?") },
-        text = { Text("It leaves your playlists. To get it back, ${p.ownerName ?: "its owner"} would have to share it with you again.") },
+        text = { Text("It leaves your ${if (p.kind == PlaylistKind.VIDEO) "collections" else "playlists"}. To get it back, ${p.ownerName ?: "its owner"} would have to share it with you again.") },
         confirmButton = {
             TextButton({
                 removing = false
@@ -834,29 +869,34 @@ private fun RemoveSharedPlaylistButton(p: app.marquee.api.models.Playlist, nav: 
         dismissButton = { TextButton({ removing = false }, Modifier.focusRing()) { Text("Cancel") } })
 }
 
-/** A playlist's "…": Share (phones and tablets), Rename and Delete (with a confirmation), for its owner's own playlists. */
+/** A playlist's or collection's "…": Share (phones and tablets), Rename, Change picture and Delete (with a confirmation), for its owner's own. */
 @Composable
-private fun PlaylistMenu(p: app.marquee.api.models.Playlist, nav: NavHostController, onChanged: () -> Unit) {
+internal fun PlaylistMenu(p: app.marquee.api.models.Playlist, nav: NavHostController, onChanged: () -> Unit) {
     val marquee = LocalMarquee.current
+    val noun = if (p.kind == PlaylistKind.VIDEO) "collection" else "playlist"
     val context = androidx.compose.ui.platform.LocalContext.current
     var open by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
+    var picture by remember { mutableStateOf(false) }
     Box {
-        IconButton({ open = true }, Modifier.focusRing()) { Icon(Icons.Filled.MoreVert, "Playlist actions") }
+        IconButton({ open = true }, Modifier.focusRing()) { Icon(Icons.Filled.MoreVert, if (p.kind == PlaylistKind.VIDEO) "Collection actions" else "Playlist actions") }
         DropdownMenu(open, { open = false }) {
             if (!marquee.isTv) DropdownMenuItem({ Text("Share…") }, { open = false; sharing = true }, leadingIcon = { Icon(Icons.Filled.Share, null) })
             DropdownMenuItem({ Text("Rename…") }, { open = false; renaming = true }, leadingIcon = { Icon(Icons.Filled.Edit, null) })
-            DropdownMenuItem({ Text("Delete playlist…") }, { open = false; deleting = true }, leadingIcon = { Icon(Icons.Filled.Delete, null) })
+            // A picture of its own (MUSIC-30), in place of the mosaic.
+            DropdownMenuItem({ Text("Change picture…") }, { open = false; picture = true }, leadingIcon = { Icon(Icons.Filled.Photo, null) })
+            DropdownMenuItem({ Text("Delete $noun…") }, { open = false; deleting = true }, leadingIcon = { Icon(Icons.Filled.Delete, null) })
         }
     }
     if (sharing) PlaylistShareDialog(p) { changed -> sharing = false; if (changed) onChanged() }
+    if (picture) PlaylistPictureDialog(p) { changed -> picture = false; if (changed) onChanged() }
     if (renaming) {
         var name by remember { mutableStateOf(p.title) }
         var busy by remember { mutableStateOf(false) }
         AlertDialog(onDismissRequest = { renaming = false },
-            title = { Text("Rename playlist") },
+            title = { Text("Rename $noun") },
             text = { OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true) },
             confirmButton = {
                 TextButton({
@@ -873,7 +913,7 @@ private fun PlaylistMenu(p: app.marquee.api.models.Playlist, nav: NavHostControl
     }
     if (deleting) AlertDialog(onDismissRequest = { deleting = false },
         title = { Text("Delete “${p.title}”?") },
-        text = { Text("The playlist goes for good. What's in it stays in your library.") },
+        text = { Text("The $noun goes for good. What's in it stays in your library.") },
         confirmButton = {
             TextButton({
                 deleting = false
@@ -1057,7 +1097,7 @@ private fun PendingSyncRow() {
     }
 }
 
-/** Keep a playlist on the device, in step with its changes (MUSIC-19). */
+/** Keep a music playlist on the device, in step with its changes (MUSIC-19). */
 @Composable
 private fun PlaylistDownloadButton(id: Long) {
     val downloads = LocalDownloads.current

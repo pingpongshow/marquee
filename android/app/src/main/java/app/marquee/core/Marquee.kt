@@ -56,7 +56,7 @@ class Marquee(context: Context) {
     /** Kids' time limits: why video stopped, and the last status for playing downloads offline. */
     val timeLimits: TimeLimits by lazy { TimeLimits(appContext, this) }
     /**
-     * Videos playing in order (a video playlist, USER-7): the player moves on to the next of
+     * Videos playing in order (from the Offline Library): the player moves on to the next of
      * these when one ends. Cleared when a video outside it is played.
      */
     @Volatile var videoQueue: List<Long> = emptyList()
@@ -519,6 +519,13 @@ class Marquee(context: Context) {
     fun imageUrl(artworkId: Long?, width: Int): String? {
         if (artworkId == null || baseUrl == null) return null
         return "$baseUrl/api/v1/images/$artworkId?w=${width * 2}&$imageAuth"
+    }
+
+    /** A playlist's or collection's own picture (MUSIC-30), when its owner gave it one; the version makes a changed picture load again. */
+    fun playlistImageUrl(p: app.marquee.api.models.Playlist, width: Int): String? {
+        val v = p.imageVersion ?: return null
+        if (baseUrl == null) return null
+        return "$baseUrl/api/v1/playlists/${p.id}/image?w=${width * 2}&v=${java.net.URLEncoder.encode(v, "UTF-8")}&$imageAuth"
     }
 
     /** Resolves a server-relative URL (streams, avatars, person photos). */

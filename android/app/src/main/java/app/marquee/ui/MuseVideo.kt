@@ -72,7 +72,7 @@ fun MuseVideoScreen(nav: NavHostController, libraryId: Long?) {
 
 /**
  * Describe what you want to watch (USER-15): a prompt with example chips; the results grid
- * with how Muse read it, a note while it's still learning the library, and Save as playlist.
+ * with how Muse read it, a note while it's still learning the library, and Save as collection.
  */
 @Composable
 fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolean = false) {
@@ -112,14 +112,18 @@ fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolea
             busy = false
         }
     }
+    // A collection belongs to one library (USER-23): the answer can be saved as one when it's all from the same library, and that library allows them.
+    val saveInto = results?.map { it.libraryId }?.distinct()?.singleOrNull()
+    val canSave = saveInto?.let { personalCollectionsOn(it) } == true
     fun save() {
         val list = results ?: return
+        val into = saveInto ?: return
         if (saving || list.isEmpty()) return
         saving = true
         scope.launch {
             withContext(Dispatchers.IO) {
-                runCatching { marquee.playlists.createPlaylist(PlaylistCreate("Muse: ${asked.take(60)}", PlaylistKind.VIDEO, itemIds = list.map { it.id })) }
-            }.onSuccess { saved = it.id to it.title }.onFailure { error = "Couldn't save the playlist: ${serverMessage(it)}" }
+                runCatching { marquee.playlists.createPlaylist(PlaylistCreate("Muse: ${asked.take(60)}", PlaylistKind.VIDEO, itemIds = list.map { it.id }, libraryId = into)) }
+            }.onSuccess { saved = it.id to it.title }.onFailure { error = "Couldn't save the collection: ${serverMessage(it)}" }
             saving = false
         }
     }
@@ -164,9 +168,11 @@ fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolea
                 if (!list.isNullOrEmpty()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(if (list.size == 1) "1 title" else "${list.size} titles", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     val sv = saved
-                    if (sv == null) OutlinedButton(::save, Modifier.focusRing(), enabled = !saving) {
-                        Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null)
-                        Text("Save as playlist", Modifier.padding(start = 6.dp))
+                    if (sv == null) {
+                        if (canSave) OutlinedButton(::save, Modifier.focusRing(), enabled = !saving) {
+                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null)
+                            Text("Save as collection", Modifier.padding(start = 6.dp))
+                        }
                     } else TextButton({ nav.navigate("playlist/${sv.first}") }, Modifier.focusRing()) { Text("Saved · Open “${sv.second}”") }
                 }
             }

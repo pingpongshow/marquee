@@ -37,6 +37,7 @@ import kotlinx.serialization.Contextual
  * @param includeInHome 
  * @param includeInSearch 
  * @param scanIntervalHours 0 = rely on file watching only.
+ * @param personalCollections Video libraries (USER-23): people can keep their own collections of its titles (playlists of kind video). On unless turned off; off hides them and refuses new ones, and keeps the ones already made.
  */
 @Serializable
 
@@ -60,7 +61,11 @@ data class LibraryOptions (
 
     /* 0 = rely on file watching only. */
     @SerialName(value = "scanIntervalHours")
-    val scanIntervalHours: kotlin.Int? = null
+    val scanIntervalHours: kotlin.Int? = null,
+
+    /* Video libraries (USER-23): people can keep their own collections of its titles (playlists of kind video). On unless turned off; off hides them and refuses new ones, and keeps the ones already made. */
+    @SerialName(value = "personalCollections")
+    val personalCollections: kotlin.Boolean? = null
 
 ) {
 

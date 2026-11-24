@@ -40,6 +40,7 @@ import app.marquee.api.models.PlaylistMerge
 import app.marquee.api.models.PlaylistShareTarget
 import app.marquee.api.models.PlaylistSharing
 import app.marquee.api.models.PlaylistSharingUpdate
+import app.marquee.api.models.SetPlaylistImageLinkRequest
 import app.marquee.api.models.SetPlaylistItemsRequest
 import app.marquee.api.models.UpdatePlaylistRequest
 
@@ -1028,9 +1029,10 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
 
     /**
      * GET /playlists
-     * Your playlists.
-     * 
+     * Your music playlists (kind audio) and your collections (kind video, USER-23).
+     * A video playlist is a personal collection: a list of titles from one video library, kept under that library, that opens each title&#39;s page rather than playing through. It holds films, shows, seasons, episodes and videos as they were added (a show stays a show), and can be renamed, reordered, shared and deleted like a playlist. Collections of a library whose personalCollections option is off aren&#39;t listed.
      * @param kind  (optional)
+     * @param libraryId Only the collections (kind video) of this library. (optional)
      * @return kotlin.collections.List<Playlist>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1040,8 +1042,8 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listPlaylists(kind: PlaylistKind? = null) : kotlin.collections.List<Playlist> {
-        val localVarResponse = listPlaylistsWithHttpInfo(kind = kind)
+    fun listPlaylists(kind: PlaylistKind? = null, libraryId: kotlin.Long? = null) : kotlin.collections.List<Playlist> {
+        val localVarResponse = listPlaylistsWithHttpInfo(kind = kind, libraryId = libraryId)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<Playlist>
@@ -1060,17 +1062,18 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
 
     /**
      * GET /playlists
-     * Your playlists.
-     * 
+     * Your music playlists (kind audio) and your collections (kind video, USER-23).
+     * A video playlist is a personal collection: a list of titles from one video library, kept under that library, that opens each title&#39;s page rather than playing through. It holds films, shows, seasons, episodes and videos as they were added (a show stays a show), and can be renamed, reordered, shared and deleted like a playlist. Collections of a library whose personalCollections option is off aren&#39;t listed.
      * @param kind  (optional)
+     * @param libraryId Only the collections (kind video) of this library. (optional)
      * @return ApiResponse<kotlin.collections.List<Playlist>?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listPlaylistsWithHttpInfo(kind: PlaylistKind?) : ApiResponse<kotlin.collections.List<Playlist>?> {
-        val localVariableConfig = listPlaylistsRequestConfig(kind = kind)
+    fun listPlaylistsWithHttpInfo(kind: PlaylistKind?, libraryId: kotlin.Long?) : ApiResponse<kotlin.collections.List<Playlist>?> {
+        val localVariableConfig = listPlaylistsRequestConfig(kind = kind, libraryId = libraryId)
 
         return request<Unit, kotlin.collections.List<Playlist>>(
             localVariableConfig
@@ -1081,14 +1084,18 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * To obtain the request config of the operation listPlaylists
      *
      * @param kind  (optional)
+     * @param libraryId Only the collections (kind video) of this library. (optional)
      * @return RequestConfig
      */
-    fun listPlaylistsRequestConfig(kind: PlaylistKind?) : RequestConfig<Unit> {
+    fun listPlaylistsRequestConfig(kind: PlaylistKind?, libraryId: kotlin.Long?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
                 if (kind != null) {
                     put("kind", listOf(kind.toString()))
+                }
+                if (libraryId != null) {
+                    put("libraryId", listOf(libraryId.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
@@ -1331,6 +1338,79 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
     }
 
     /**
+     * DELETE /playlists/{playlistId}/image
+     * Back to the mosaic of its items (MUSIC-30).
+     * 
+     * @param playlistId 
+     * @return Playlist
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removePlaylistImage(playlistId: kotlin.Long) : Playlist {
+        val localVarResponse = removePlaylistImageWithHttpInfo(playlistId = playlistId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Playlist
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /playlists/{playlistId}/image
+     * Back to the mosaic of its items (MUSIC-30).
+     * 
+     * @param playlistId 
+     * @return ApiResponse<Playlist?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removePlaylistImageWithHttpInfo(playlistId: kotlin.Long) : ApiResponse<Playlist?> {
+        val localVariableConfig = removePlaylistImageRequestConfig(playlistId = playlistId)
+
+        return request<Unit, Playlist>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removePlaylistImage
+     *
+     * @param playlistId 
+     * @return RequestConfig
+     */
+    fun removePlaylistImageRequestConfig(playlistId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/playlists/{playlistId}/image".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * DELETE /playlists/{playlistId}/items/{entryId}
      * 
      * 
@@ -1545,6 +1625,83 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.PATCH,
             path = "/playlist-folders/{folderId}".replace("{"+"folderId"+"}", encodeURIComponent(folderId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /playlists/{playlistId}/image
+     * Use the image at a link as your playlist&#39;s or collection&#39;s picture (MUSIC-30). The server downloads it once and keeps its own copy; links to this server or the home network are refused.
+     * 
+     * @param playlistId 
+     * @param setPlaylistImageLinkRequest 
+     * @return Playlist
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun setPlaylistImageLink(playlistId: kotlin.Long, setPlaylistImageLinkRequest: SetPlaylistImageLinkRequest) : Playlist {
+        val localVarResponse = setPlaylistImageLinkWithHttpInfo(playlistId = playlistId, setPlaylistImageLinkRequest = setPlaylistImageLinkRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Playlist
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /playlists/{playlistId}/image
+     * Use the image at a link as your playlist&#39;s or collection&#39;s picture (MUSIC-30). The server downloads it once and keeps its own copy; links to this server or the home network are refused.
+     * 
+     * @param playlistId 
+     * @param setPlaylistImageLinkRequest 
+     * @return ApiResponse<Playlist?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun setPlaylistImageLinkWithHttpInfo(playlistId: kotlin.Long, setPlaylistImageLinkRequest: SetPlaylistImageLinkRequest) : ApiResponse<Playlist?> {
+        val localVariableConfig = setPlaylistImageLinkRequestConfig(playlistId = playlistId, setPlaylistImageLinkRequest = setPlaylistImageLinkRequest)
+
+        return request<SetPlaylistImageLinkRequest, Playlist>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setPlaylistImageLink
+     *
+     * @param playlistId 
+     * @param setPlaylistImageLinkRequest 
+     * @return RequestConfig
+     */
+    fun setPlaylistImageLinkRequestConfig(playlistId: kotlin.Long, setPlaylistImageLinkRequest: SetPlaylistImageLinkRequest) : RequestConfig<SetPlaylistImageLinkRequest> {
+        val localVariableBody = setPlaylistImageLinkRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/playlists/{playlistId}/image".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -1776,6 +1933,82 @@ open class PlaylistsApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.PATCH,
             path = "/playlists/{playlistId}".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /playlists/{playlistId}/image
+     * Upload a picture (JPEG, PNG or WebP, up to 20 MB) for your playlist or collection (MUSIC-30). It&#39;s shown in place of the mosaic of its items, to you and to everyone it&#39;s shared with.
+     * 
+     * @param playlistId 
+     * @param body 
+     * @return Playlist
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun uploadPlaylistImage(playlistId: kotlin.Long, body: java.io.File) : Playlist {
+        val localVarResponse = uploadPlaylistImageWithHttpInfo(playlistId = playlistId, body = body)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Playlist
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /playlists/{playlistId}/image
+     * Upload a picture (JPEG, PNG or WebP, up to 20 MB) for your playlist or collection (MUSIC-30). It&#39;s shown in place of the mosaic of its items, to you and to everyone it&#39;s shared with.
+     * 
+     * @param playlistId 
+     * @param body 
+     * @return ApiResponse<Playlist?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun uploadPlaylistImageWithHttpInfo(playlistId: kotlin.Long, body: java.io.File) : ApiResponse<Playlist?> {
+        val localVariableConfig = uploadPlaylistImageRequestConfig(playlistId = playlistId, body = body)
+
+        return request<java.io.File, Playlist>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation uploadPlaylistImage
+     *
+     * @param playlistId 
+     * @param body 
+     * @return RequestConfig
+     */
+    fun uploadPlaylistImageRequestConfig(playlistId: kotlin.Long, body: java.io.File) : RequestConfig<java.io.File> {
+        val localVariableBody = body
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/playlists/{playlistId}/image".replace("{"+"playlistId"+"}", encodeURIComponent(playlistId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
