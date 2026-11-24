@@ -34,10 +34,12 @@ export function LibraryDialog({ open, onClose, library }: { open: boolean; onClo
   const update = useUpdateLibrary();
   const mutation = editing ? update : create;
   const isTV = type === "shows" || type === "anime";
+  const isVideo = type !== "music" && type !== "photos";
 
   const submit = () => {
     const options: LibraryOptions = { ...opts };
     if (!isTV) delete options.episodeOrdering;
+    if (!isVideo) delete options.personalCollections;
     if (editing) update.mutate({ id: library.id, body: { name, paths, options } }, { onSuccess: onClose });
     else
       // The server queues the first scan itself.
@@ -204,6 +206,14 @@ export function LibraryDialog({ open, onClose, library }: { open: boolean; onClo
           )}
           <Toggle label="Show on Home" help="Include this library’s hubs (Recently Added, Continue Watching) on the Home screen." checked={opts.includeInHome ?? true} onChange={(v) => setOpts({ ...opts, includeInHome: v })} />
           <Toggle label="Include in search" checked={opts.includeInSearch ?? true} onChange={(v) => setOpts({ ...opts, includeInSearch: v })} />
+          {isVideo && (
+            <Toggle
+              label="People can make their own collections"
+              help="Everyone can group this library’s titles into collections of their own, on its Collections tab. Turned off, theirs are hidden and kept."
+              checked={opts.personalCollections ?? true}
+              onChange={(v) => setOpts({ ...opts, personalCollections: v })}
+            />
+          )}
           <Field label="Full rescan every (hours)" help="New files are picked up instantly by file watching; this is a safety net. 0 = never.">
             {(id) => <Input id={id} type="number" min={0} value={opts.scanIntervalHours ?? 24} onChange={(e) => setOpts({ ...opts, scanIntervalHours: Number(e.target.value) })} />}
           </Field>

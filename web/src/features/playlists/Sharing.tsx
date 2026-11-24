@@ -8,7 +8,8 @@ import { Alert, Badge, Button, Dialog, Spinner } from "@/components/ui";
 import { toast } from "@/components/Toast";
 import { PlaylistMosaic } from "./PlaylistMosaic";
 
-const countText = (p: Pick<Playlist, "itemCount" | "kind">) => `${p.itemCount} ${p.kind === "audio" ? (p.itemCount === 1 ? "track" : "tracks") : p.itemCount === 1 ? "item" : "items"}`;
+/** "12 tracks" for a playlist, "12 titles" for a collection. */
+export const countText = (p: Pick<Playlist, "itemCount" | "kind">) => `${p.itemCount} ${p.kind === "audio" ? (p.itemCount === 1 ? "track" : "tracks") : p.itemCount === 1 ? "title" : "titles"}`;
 
 /** "Shared by Sam" for a playlist someone shared with you (MUSIC-24). */
 export const sharedByText = (p: Pick<Playlist, "ownerName">) => (p.ownerName ? `Shared by ${p.ownerName}` : "Shared with you");
@@ -33,7 +34,7 @@ export function SharedIcon({ playlist }: { playlist: Pick<Playlist, "readOnly" |
 }
 
 /** Your playlist's Share dialog: choose people (and, for admins, everyone) and see who's answered. */
-export function ShareDialog({ playlist, onClose }: { playlist: Pick<Playlist, "id" | "title">; onClose: () => void }) {
+export function ShareDialog({ playlist, onClose }: { playlist: Pick<Playlist, "id" | "title" | "kind">; onClose: () => void }) {
   const qc = useQueryClient();
   const admin = !!useQuery(meQuery).data?.isAdmin;
   const sharing = useQuery(playlistSharingQuery(playlist.id));
@@ -83,7 +84,7 @@ export function ShareDialog({ playlist, onClose }: { playlist: Pick<Playlist, "i
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-muted">It's private until you share it. People you choose see it once they accept, and can play it but not change it.</p>
+        <p className="text-sm text-muted">It's private until you share it. People you choose see it once they accept, and can {playlist.kind === "audio" ? "play" : "open"} it but not change it.</p>
         {error && <Alert tone="error">{error.message}</Alert>}
         {loading && <Spinner />}
         {!loading && admin && (
@@ -115,9 +116,10 @@ export function ShareDialog({ playlist, onClose }: { playlist: Pick<Playlist, "i
   );
 }
 
-/** Takes a playlist shared with you out of your playlists, once confirmed. */
-export function RemoveSharedDialog({ playlist, onClose, onRemoved }: { playlist: Pick<Playlist, "id" | "title" | "ownerName">; onClose: () => void; onRemoved: () => void }) {
+/** Takes a playlist or collection shared with you out of yours, once confirmed. */
+export function RemoveSharedDialog({ playlist, onClose, onRemoved }: { playlist: Pick<Playlist, "id" | "title" | "ownerName" | "kind">; onClose: () => void; onRemoved: () => void }) {
   const qc = useQueryClient();
+  const yours = playlist.kind === "audio" ? "your playlists" : "your collections";
   const remove = useMutation({
     mutationFn: () => unwrap(api.DELETE("/me/playlist-shares/{playlistId}", { params: { path: { playlistId: playlist.id } } })),
     onSuccess: () => {
@@ -129,7 +131,7 @@ export function RemoveSharedDialog({ playlist, onClose, onRemoved }: { playlist:
     <Dialog
       open
       onClose={onClose}
-      title="Remove from your playlists?"
+      title={`Remove from ${yours}?`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -147,48 +149,56 @@ export function RemoveSharedDialog({ playlist, onClose, onRemoved }: { playlist:
         </div>
       )}
       <p className="text-sm text-muted">
-        “{playlist.title}” will leave your playlists. To get it back you'd need {playlist.ownerName ?? "its owner"} to share it with you again.
+        “{playlist.title}” will leave {yours}. To get it back you'd need {playlist.ownerName ?? "its owner"} to share it with you again.
       </p>
     </Dialog>
   );
 }
 
-/** Playlists waiting for an answer, at the top of the Playlists page. */
-export function PlaylistInvites() {
+/**
+ * Playlists and collections waiting for an answer, at the top of the Playlists page; with a
+ * library, that library's collections only, on its Collections tab.
+ */
+export function PlaylistInvites({ libraryId }: { libraryId?: number }) {
   const qc = useQueryClient();
-  const invites = useQuery(playlistInvitesQuery);
+  const all = useQuery(playlistInvitesQuery);
+  const invites = libraryId ? all.data?.filter((p) => p.kind === "video" && p.libraryId === libraryId) : all.data;
   const answer = useMutation({
-    mutationFn: ({ id, accept }: { id: number; title: string; accept: boolean }) =>
+    mutationFn: ({ id, accept }: { id: number; title: string; collection: boolean; accept: boolean }) =>
       accept
         ? unwrap(api.PUT("/me/playlist-shares/{playlistId}", { params: { path: { playlistId: id } } }))
         : unwrap(api.DELETE("/me/playlist-shares/{playlistId}", { params: { path: { playlistId: id } } })),
-    onSuccess: (_, { id, title, accept }) => {
+    onSuccess: (_, { id, title, collection, accept }) => {
       void qc.invalidateQueries({ queryKey: ["playlists"] });
-      if (accept) toast(`Added “${title}” to your playlists.`, { link: { label: "Open playlist", to: "/playlist/$playlistId", params: { playlistId: String(id) } } });
+      if (accept)
+        toast(`Added “${title}” to your ${collection ? "collections" : "playlists"}.`, {
+          link: { label: collection ? "Open collection" : "Open playlist", to: "/playlist/$playlistId", params: { playlistId: String(id) } },
+        });
     },
     onError: (e: Error) => toast(e.message, { tone: "error" }),
   });
-  if (!invites.data?.length) return null;
+  if (!invites?.length) return null;
   return (
     <section className="mb-8" aria-labelledby="playlist-invites-title" data-testid="playlist-invites">
       <h2 id="playlist-invites-title" className="mb-3 text-lg font-semibold">
         Shared with you
       </h2>
       <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
-        {invites.data.map((p) => (
+        {invites.map((p) => (
           <li key={p.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
             <PlaylistMosaic playlist={p} className="size-11" />
             <div className="min-w-0 flex-1 basis-40">
               <div className="truncate text-sm font-medium">{p.title}</div>
               <div className="truncate text-xs text-muted">
+                {p.kind === "video" && !libraryId ? "Collection · " : ""}
                 {sharedByText(p)} · {countText(p)}
               </div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="primary" disabled={answer.isPending} onClick={() => answer.mutate({ id: p.id, title: p.title, accept: true })}>
+              <Button size="sm" variant="primary" disabled={answer.isPending} onClick={() => answer.mutate({ id: p.id, title: p.title, collection: p.kind === "video", accept: true })}>
                 Accept
               </Button>
-              <Button size="sm" variant="ghost" disabled={answer.isPending} onClick={() => answer.mutate({ id: p.id, title: p.title, accept: false })}>
+              <Button size="sm" variant="ghost" disabled={answer.isPending} onClick={() => answer.mutate({ id: p.id, title: p.title, collection: p.kind === "video", accept: false })}>
                 Decline
               </Button>
             </div>

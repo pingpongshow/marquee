@@ -20,7 +20,7 @@ const loading = (
 
 export function PlayerPage() {
   const { itemId } = useParams({ from: "/play/$itemId" });
-  const { t, pl, sh, pi, f, g, vm, vs, ve } = useSearch({ from: "/play/$itemId" });
+  const { t, f, g, vm, vs, ve } = useSearch({ from: "/play/$itemId" });
   const navigate = useNavigate();
   // Started from a film or episode on demand that the library has: if the library's copy
   // can't be played (gone, or it fails), the stream on demand plays instead.
@@ -39,9 +39,6 @@ export function PlayerPage() {
         key={itemId}
         itemId={Number(itemId)}
         startMs={t}
-        playlistId={pl}
-        shuffleSeed={sh}
-        playlistIndex={pi}
         fileId={f}
         groupId={g}
         onUnplayable={onDemand}
@@ -50,12 +47,9 @@ export function PlayerPage() {
   );
 }
 
-/**
- * A movie started from the beginning, alone, gets the cinema trailers first (PLAY-18). Not in a
- * playlist, which goes straight from one item to the next.
- */
-function wantsPrerolls(d: ItemDetail, startMs?: number, groupId?: string, playlistId?: number) {
-  if (groupId || playlistId || d.type !== "movie") return false;
+/** A movie started from the beginning, alone, gets the cinema trailers first (PLAY-18). */
+function wantsPrerolls(d: ItemDetail, startMs?: number, groupId?: string) {
+  if (groupId || d.type !== "movie") return false;
   return startMs === 0 || (startMs === undefined && !d.viewOffsetMs);
 }
 
@@ -68,18 +62,12 @@ function prerollLabel(p: ItemSummary) {
 function PlayerFlow({
   itemId,
   startMs,
-  playlistId,
-  shuffleSeed,
-  playlistIndex,
   fileId,
   groupId,
   onUnplayable,
 }: {
   itemId: number;
   startMs?: number;
-  playlistId?: number;
-  shuffleSeed?: number;
-  playlistIndex?: number;
   fileId?: number;
   groupId?: string;
   onUnplayable?: () => void;
@@ -88,9 +76,7 @@ function PlayerFlow({
   // Decided once, when the item first loads: later refetches (progress) mustn't change it.
   const [eligible, setEligible] = useState<boolean | null>(null);
   if (eligible === null && (item.data || item.isError))
-    setEligible(
-      item.data ? wantsPrerolls(item.data, startMs, groupId, playlistId) : false,
-    );
+    setEligible(item.data ? wantsPrerolls(item.data, startMs, groupId) : false);
   const prerolls = useQuery({
     queryKey: ["prerolls", itemId],
     queryFn: () =>
@@ -128,9 +114,6 @@ function PlayerFlow({
       key="main"
       itemId={itemId}
       startMs={startMs}
-      playlistId={playlistId}
-      shuffleSeed={shuffleSeed}
-      playlistIndex={playlistIndex}
       fileId={fileId}
       groupId={groupId}
       onUnplayable={onUnplayable}

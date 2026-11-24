@@ -1,20 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { clsx } from "clsx";
-import { Combine, FolderInput, GripVertical, ListChecks, Pencil, Play, Share2, Shuffle, Trash2, X } from "lucide-react";
+import { ChevronLeft, Combine, FolderInput, ImagePlus, GripVertical, ListChecks, Pencil, Play, Share2, Shuffle, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { api, imageUrl, unwrap } from "@/api/client";
 import { playlistItemsQuery, playlistQuery } from "@/api/queries";
-import type { ItemSummary, PlaylistEntry } from "@/api/types";
+import type { Playlist, PlaylistEntry } from "@/api/types";
 import { Alert, Button, Dialog, Input, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "../browse/format";
+import { CollectionPage } from "./CollectionPage";
+import { PictureDialog } from "./Picture";
 import { ItemMenu } from "../browse/ItemMenu";
 import { TrackRadioButton } from "../music/RadioButtons";
 import { RowRating } from "../music/Rating";
-import { favoriteTypes, RowFavorite } from "../browse/Favorite";
+import { RowFavorite } from "../browse/Favorite";
 import { useMusicState } from "../player/MusicPlayer";
 import { PlaylistMosaic } from "./PlaylistMosaic";
-import { newShuffleSeed, rememberPlayOrder, seededShuffle } from "./order";
 import { PinToHomeButton } from "../home/EditHome";
 import { RulesEditor, rulesValid } from "./RulesEditor";
 import { MoveToFolderDialog } from "./Folders";
@@ -23,19 +24,21 @@ import { RemoveSharedDialog, ShareDialog, SharedIcon, sharedByText, sharedText }
 import type { SmartRules } from "@/api/types";
 import { Sparkles } from "lucide-react";
 
-function subtitle(it: ItemSummary) {
-  if (it.type === "track") return [it.artistCredit ?? it.grandparentTitle, it.parentTitle].filter(Boolean).join(" · ");
-  if (it.type === "episode") return `${it.grandparentTitle ?? ""} · S${it.parentTitle?.replace(/\D/g, "") || "?"} E${it.index ?? "?"}`;
-  return it.year ? String(it.year) : "";
-}
-
 export function PlaylistPage() {
   const { playlistId } = useParams({ from: "/playlist/$playlistId" });
   const id = Number(playlistId);
+  const pl = useQuery(playlistQuery(id));
+  if (pl.isPending) return <Spinner />;
+  if (pl.isError) return <div className="p-8"><Alert tone="error">{pl.error.message}</Alert></div>;
+  // A playlist of kind video is a collection (USER-23): a grid of titles, with nothing to play.
+  return pl.data.kind === "video" ? <CollectionPage key={id} collection={pl.data} /> : <MusicPlaylistPage key={id} playlist={pl.data} />;
+}
+
+function MusicPlaylistPage({ playlist: p }: { playlist: Playlist }) {
+  const id = p.id;
   const qc = useQueryClient();
   const navigate = useNavigate();
   const music = useMusicState();
-  const pl = useQuery(playlistQuery(id));
   const entries = useQuery(playlistItemsQuery(id));
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -43,6 +46,7 @@ export function PlaylistPage() {
   const [removing, setRemoving] = useState(false);
   const [filing, setFiling] = useState(false);
   const [combining, setCombining] = useState(false);
+  const [picturing, setPicturing] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
   const [editingRules, setEditingRules] = useState<SmartRules | null>(null);
   const saveRules = useMutation({
@@ -90,32 +94,14 @@ export function PlaylistPage() {
     onSettled: invalidate,
   });
 
-  if (pl.isPending) return <Spinner />;
-  if (pl.isError) return <div className="p-8"><Alert tone="error">{pl.error.message}</Alert></div>;
-  const p = pl.data;
   const list: PlaylistEntry[] = entries.data?.items ?? [];
   const items = list.map((e) => e.item);
   // Someone else's playlist (shared with you) can be played but not changed; a smart one's tracks
   // come from its rules.
   const fixedTracks = !!p.rules || !!p.readOnly;
 
-  const play = (start: number, shuffle = false) => {
-    if (p.kind === "audio") {
-      // A smart playlist is generated: a thumbs down takes a song out of it (MUSIC-25).
-      music.play(items, start, { shuffle, source: p.title, station: !!p.rules });
-      return;
-    }
-    // Video plays in the player, which goes on through the playlist in this order (the seed
-    // carries a shuffle to it). Unavailable items are skipped.
-    const playable = items.filter((it) => it.available);
-    const sh = shuffle ? newShuffleSeed() : undefined;
-    const order = sh ? seededShuffle(playable, sh) : playable;
-    // Its place in the order goes along too: an item that's in the playlist twice is two places.
-    const first = sh ? order[0] : items.slice(start).find((it) => it.available);
-    if (!first) return;
-    rememberPlayOrder(id, sh, order);
-    navigate({ to: "/play/$itemId", params: { itemId: String(first.id) }, search: { t: 0, pl: id, sh, pi: order.indexOf(first) } });
-  };
+  // A smart playlist is generated: a thumbs down takes a song out of it (MUSIC-25).
+  const play = (start: number, shuffle = false) => music.play(items, start, { shuffle, source: p.title, station: !!p.rules });
   // Dropping on a row moves the dragged entry into that row's position.
   const drop = (target: number) => {
     if (drag === null) return;
@@ -127,12 +113,15 @@ export function PlaylistPage() {
 
   return (
     <div className="p-6 lg:p-8">
+      <Link to="/playlists" className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-text">
+        <ChevronLeft className="size-4" aria-hidden /> Playlists
+      </Link>
       <header className="mb-8 flex flex-col gap-6 sm:flex-row sm:items-end">
         <PlaylistMosaic playlist={p} size={400} className="size-48 shadow-xl" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wider text-faint uppercase">
             {p.rules && <Sparkles className="size-3.5 text-accent" aria-hidden />}
-            {p.rules ? "Smart playlist" : p.kind === "audio" ? "Music playlist" : "Video playlist"}
+            {p.rules ? "Smart playlist" : "Playlist"}
           </div>
           {renaming === null ? (
             <h1 className="mt-1 flex items-center gap-2 text-3xl font-bold">
@@ -161,7 +150,7 @@ export function PlaylistPage() {
             </form>
           )}
           <div className="mt-2 text-sm text-muted">
-            {p.itemCount} {p.kind === "audio" ? "tracks" : "items"} · {formatDuration(p.durationMs)}
+            {p.itemCount} tracks · {formatDuration(p.durationMs)}
           </div>
           {(p.readOnly || sharedText(p)) && (
             <div className="mt-1 flex items-center gap-1.5 text-sm text-muted" data-testid="playlist-sharing-note">
@@ -200,6 +189,11 @@ export function PlaylistPage() {
                 <Share2 className="size-4" /> Share
               </Button>
             )}
+            {!p.readOnly && (
+              <Button variant="ghost" onClick={() => setPicturing(true)}>
+                <ImagePlus className="size-4" /> Change picture
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => setFiling(true)}>
               <FolderInput className="size-4" /> Folder
             </Button>
@@ -219,13 +213,13 @@ export function PlaylistPage() {
       {entries.isPending && <Spinner />}
       {list.length === 0 && entries.isSuccess && (
         <p className="text-muted">
-          {p.readOnly ? "This playlist is empty." : p.rules ? "No tracks match these rules yet. Try loosening them with “Edit rules”." : "This playlist is empty. Use “Add to playlist” on tracks, albums, movies or episodes."}
+          {p.readOnly ? "This playlist is empty." : p.rules ? "No tracks match these rules yet. Try loosening them with “Edit rules”." : "This playlist is empty. Use “Add to playlist” on songs, albums or artists."}
         </p>
       )}
       <ol className="empty:hidden divide-y divide-border rounded-lg border border-border bg-surface">
         {list.map((e, i) => {
           const it = e.item;
-          const art = it.type === "episode" ? (it.images?.thumb ?? it.images?.poster) : it.images?.poster;
+          const art = it.images?.poster;
           return (
             <li
               key={e.entryId}
@@ -247,7 +241,7 @@ export function PlaylistPage() {
               }}
               className={clsx(
                 "group flex items-center gap-3 px-3 py-2 hover:bg-surface-2",
-                music.current?.item.id === it.id && p.kind === "audio" && "text-accent",
+                music.current?.item.id === it.id && "text-accent",
                 drag === e.entryId && "opacity-40",
                 over === i && drag !== null && drag !== e.entryId && "border-t-2 border-t-accent",
               )}
@@ -255,21 +249,21 @@ export function PlaylistPage() {
               {!fixedTracks && <GripVertical className="size-4 shrink-0 cursor-grab text-faint max-sm:hidden" aria-hidden />}
               <span className="w-6 shrink-0 text-right text-sm text-faint tabular-nums max-sm:hidden">{i + 1}</span>
               <button onClick={() => play(i)} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={!it.available}>
-                <span className={clsx("shrink-0 overflow-hidden rounded bg-surface-3", it.type === "track" ? "size-10" : "aspect-video w-20")}>
-                  {art && <img src={imageUrl(art, it.type === "track" ? 40 : 80)} alt="" loading="lazy" className="size-full object-cover" />}
+                <span className="size-10 shrink-0 overflow-hidden rounded bg-surface-3">
+                  {art && <img src={imageUrl(art, 40)} alt="" loading="lazy" className="size-full object-cover" />}
                 </span>
                 <span className="min-w-0">
                   <span className={clsx("block truncate text-sm", !it.available && "text-faint line-through")}>{it.title}</span>
-                  <span className="block truncate text-xs text-muted">{subtitle(it)}</span>
+                  <span className="block truncate text-xs text-muted">{[it.artistCredit ?? it.grandparentTitle, it.parentTitle].filter(Boolean).join(" · ")}</span>
                 </span>
               </button>
-              <Link to="/item/$itemId" params={{ itemId: String(it.type === "track" && it.parentId ? it.parentId : it.id) }} className="hidden text-xs text-muted hover:underline md:block">
-                {it.type === "track" ? "Album" : "Details"}
+              <Link to="/item/$itemId" params={{ itemId: String(it.parentId ?? it.id) }} className="hidden text-xs text-muted hover:underline md:block">
+                Album
               </Link>
-              {favoriteTypes.has(it.type) && <RowFavorite item={it} />}
-              {it.type === "track" && <RowRating item={it} className="max-sm:hidden" />}
-              {it.type === "track" && <TrackRadioButton item={it} />}
-              <span className={clsx("w-14 shrink-0 text-right text-sm text-muted tabular-nums", it.type === "track" && "max-sm:hidden")}>{it.type === "track" ? formatTrackTime(it.durationMs) : formatDuration(it.durationMs)}</span>
+              <RowFavorite item={it} />
+              <RowRating item={it} className="max-sm:hidden" />
+              <TrackRadioButton item={it} />
+              <span className="w-14 shrink-0 text-right text-sm text-muted tabular-nums max-sm:hidden">{formatTrackTime(it.durationMs)}</span>
               <ItemMenu item={it} />
               <button hidden={fixedTracks} onClick={() => remove.mutate(e.entryId)} className="rounded p-1 text-muted opacity-0 group-hover:opacity-100 hover:text-text focus:opacity-100" aria-label={`Remove ${it.title}`}>
                 <X className="size-4" />
@@ -314,8 +308,9 @@ export function PlaylistPage() {
       >
         <p className="text-sm text-muted">“{p.title}” will be deleted. The media in it isn’t affected.</p>
       </Dialog>
+      {picturing && <PictureDialog playlist={p} onClose={() => setPicturing(false)} />}
       {filing && <MoveToFolderDialog playlist={p} onClose={() => setFiling(false)} />}
-      {combining && <CombinePlaylistsDialog initial={[id]} onClose={() => setCombining(false)} />}
+      {combining && <CombinePlaylistsDialog scope={{ kind: "audio" }} initial={[id]} onClose={() => setCombining(false)} />}
       {sharing && <ShareDialog playlist={p} onClose={() => setSharing(false)} />}
       {removing && <RemoveSharedDialog playlist={p} onClose={() => setRemoving(false)} onRemoved={() => navigate({ to: "/playlists" })} />}
     </div>

@@ -4081,7 +4081,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Your playlists. */
+        /**
+         * Your music playlists (kind audio) and your collections (kind video, USER-23).
+         * @description A video playlist is a personal collection: a list of titles from one video library, kept under that library, that opens each title's page rather than playing through. It holds films, shows, seasons, episodes and videos as they were added (a show stays a show), and can be renamed, reordered, shared and deleted like a playlist. Collections of a library whose personalCollections option is off aren't listed.
+         */
         get: operations["listPlaylists"];
         put?: never;
         post: operations["createPlaylist"];
@@ -4107,6 +4110,31 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["updatePlaylist"];
+        trace?: never;
+    };
+    "/playlists/{playlistId}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A playlist's or collection's own picture (MUSIC-30), resized to a cached width. For anyone who can open it.
+         * @description Usable directly in <img> tags with the image key (?key=). Add ?v=<the playlist's imageVersion> so a changed picture is fetched again: responses are immutable.
+         */
+        get: operations["getPlaylistImage"];
+        /** Use the image at a link as your playlist's or collection's picture (MUSIC-30). The server downloads it once and keeps its own copy; links to this server or the home network are refused. */
+        put: operations["setPlaylistImageLink"];
+        /** Upload a picture (JPEG, PNG or WebP, up to 20 MB) for your playlist or collection (MUSIC-30). It's shown in place of the mosaic of its items, to you and to everyone it's shared with. */
+        post: operations["uploadPlaylistImage"];
+        /** Back to the mosaic of its items (MUSIC-30). */
+        delete: operations["removePlaylistImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/playlist-folders": {
@@ -6654,6 +6682,8 @@ export interface components {
             includeInSearch?: boolean;
             /** @description 0 = rely on file watching only. */
             scanIntervalHours?: number;
+            /** @description Video libraries (USER-23): people can keep their own collections of its titles (playlists of kind video). On unless turned off; off hides them and refuses new ones, and keeps the ones already made. */
+            personalCollections?: boolean;
         };
         Library: {
             /** Format: int64 */
@@ -7946,6 +7976,13 @@ export interface components {
              * @description The folder of yours it's in (MUSIC-28). Left out at the top level.
              */
             folderId?: number;
+            /**
+             * Format: int64
+             * @description Collections (kind video, USER-23): the video library it belongs to; it takes titles from that library only.
+             */
+            libraryId?: number;
+            /** @description Set when its owner gave it a picture of its own (MUSIC-30): show /playlists/{id}/image?v=<this> in place of the mosaic of imageIds. It changes when the picture does. */
+            imageVersion?: string;
         };
         PlaylistFolder: {
             /** Format: int64 */
@@ -7988,6 +8025,11 @@ export interface components {
             kind: components["schemas"]["PlaylistKind"];
             itemIds?: number[];
             rules?: components["schemas"]["SmartRules"];
+            /**
+             * Format: int64
+             * @description Required for kind video (USER-23): the video library the collection belongs to. A collection can't have rules.
+             */
+            libraryId?: number;
         };
         /** @description Which playlists to combine and where (MUSIC-29). Give intoId to add them to the end of one of your playlists, or a title for a new one. */
         PlaylistMerge: {
@@ -16260,6 +16302,8 @@ export interface operations {
         parameters: {
             query?: {
                 kind?: components["schemas"]["PlaylistKind"];
+                /** @description Only the collections (kind video) of this library. */
+                libraryId?: number;
             };
             header?: never;
             path?: never;
@@ -16379,6 +16423,121 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlaylistImage: {
+        parameters: {
+            query?: {
+                /** @description Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. */
+                w?: components["parameters"]["ImageWidth"];
+                /** @description The playlist's imageVersion: it only makes the address change with the picture. */
+                v?: string;
+            };
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image. */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setPlaylistImageLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The image's own address (https://…): a JPEG, PNG or WebP. */
+                    url: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The playlist as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Playlist"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    uploadPlaylistImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "image/*": string;
+            };
+        };
+        responses: {
+            /** @description The playlist as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Playlist"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removePlaylistImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlistId: components["parameters"]["PlaylistId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The playlist as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Playlist"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

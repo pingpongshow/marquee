@@ -39,7 +39,6 @@ import { Thumbs } from "../music/Rating";
 import { cueCss, placeCues, resolveSubtitleStyle } from "@/lib/subtitleStyle";
 import { deviceProfile, prefersNativeHLS } from "./deviceProfile";
 import { SubtitleSearchDialog } from "./SubtitleSearch";
-import { nextInOrder, recallPlayOrder, seededShuffle } from "../playlists/order";
 import { RatingPromptCard, showRatingPrompt } from "./RatingPrompt";
 import { UpNextScreen } from "./UpNextScreen";
 import { finishedWatching, wantsRatingPrompt } from "./ratingRules";
@@ -176,9 +175,6 @@ function profileFor(level: number) {
 export function VideoPlayer({
   itemId,
   startMs,
-  playlistId,
-  shuffleSeed,
-  playlistIndex,
   fileId,
   groupId,
   preroll,
@@ -186,11 +182,6 @@ export function VideoPlayer({
 }: {
   itemId: number;
   startMs?: number;
-  playlistId?: number;
-  /** A shuffled playlist plays in this seed's order. */
-  shuffleSeed?: number;
-  /** This item's place in the playlist's play order (it may be in the playlist twice). */
-  playlistIndex?: number;
   fileId?: number;
   groupId?: string;
   preroll?: Preroll;
@@ -249,8 +240,6 @@ export function VideoPlayer({
   >(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [next, setNext] = useState<ItemSummary | null>(null);
-  // Where `next` is in the playlist's play order.
-  const nextAt = useRef<number | undefined>(undefined);
   // The rating request (USER-19): asked once per playback. Touching it on Up Next holds
   // the countdown until it's answered or closed.
   const [ratingDone, setRatingDone] = useState(false);
@@ -612,38 +601,13 @@ export function VideoPlayer({
     };
   }, [report, stopSession, qc]);
 
-  // Up Next: the following playlist entry when playing a playlist, else the next episode.
+  // Up Next: an episode's next episode.
   useEffect(() => {
-    if (!playlistId) return;
-    // The order the playlist page started with, when it's known and has this item: a smart
-    // playlist sorted at random would come back from the server in another order (and maybe
-    // without this item). Otherwise (a reload, a link) the playlist as it is now.
-    const started = recallPlayOrder<ItemSummary>(playlistId, shuffleSeed);
-    const order: Promise<readonly ItemSummary[]> = started?.some((it) => it.id === itemId)
-      ? Promise.resolve(started)
-      : unwrap(
-          api.GET("/playlists/{playlistId}/items", {
-            params: { path: { playlistId }, query: { limit: 2000 } },
-          }),
-        ).then((p) => {
-          // The same order the playlist page started (a shuffle comes from its seed); unavailable items are skipped.
-          const items = p.items.map((e) => e.item).filter((it) => it.available || it.id === itemId);
-          return shuffleSeed ? seededShuffle(items, shuffleSeed) : items;
-        });
-    order
-      .then((list) => {
-        const n = nextInOrder(list, itemId, playlistIndex);
-        nextAt.current = n?.at;
-        setNext(n?.item ?? null);
-      })
-      .catch(() => setNext(null));
-  }, [playlistId, itemId, shuffleSeed, playlistIndex]);
-  useEffect(() => {
-    if (playlistId || item.data?.type !== "episode") return;
+    if (item.data?.type !== "episode") return;
     unwrap(api.GET("/items/{itemId}/next", { params: { path: { itemId } } }))
       .then((n) => setNext((n as ItemSummary) ?? null))
       .catch(() => setNext(null));
-  }, [item.data?.type, itemId, playlistId]);
+  }, [item.data?.type, itemId]);
 
   const [finding, setFinding] = useState(false);
   const restart = (patch: Partial<Selection>, keepMenu = false) => {
@@ -697,10 +661,10 @@ export function VideoPlayer({
     navigate({
         to: "/play/$itemId",
         params: { itemId: String(next.id) },
-      search: { t: 0, pl: playlistId, sh: shuffleSeed, pi: playlistId ? nextAt.current : undefined },
+      search: { t: 0 },
       replace: true,
     });
-  }, [next, navigate, playlistId, shuffleSeed]);
+  }, [next, navigate]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

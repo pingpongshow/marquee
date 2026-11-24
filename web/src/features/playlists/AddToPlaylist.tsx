@@ -3,19 +3,16 @@ import { ListPlus, Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import { playlistsQuery } from "@/api/queries";
-import type { ItemSummary, PlaylistKind } from "@/api/types";
+import type { ItemSummary } from "@/api/types";
 import { Alert, Button, Dialog, Input, Spinner } from "@/components/ui";
 import { useLater } from "@/lib/useLater";
 import { PlaylistMosaic } from "./PlaylistMosaic";
+import { countText } from "./Sharing";
 
-const musicTypes = new Set(["track", "album", "artist"]);
-export const playlistKindFor = (item: Pick<ItemSummary, "type">): PlaylistKind => (musicTypes.has(item.type) ? "audio" : "video");
-
-/** Picks a playlist (or creates one) and adds the item to it. */
-export function AddToPlaylistDialog({ item, onClose }: { item: Pick<ItemSummary, "id" | "type" | "title">; onClose: () => void }) {
-  const kind = playlistKindFor(item);
+/** Picks a playlist (or creates one) and adds the song, album or artist to it. */
+export function AddToPlaylistDialog({ item, onClose }: { item: Pick<ItemSummary, "id" | "title">; onClose: () => void }) {
   const qc = useQueryClient();
-  const lists = useQuery(playlistsQuery(kind));
+  const lists = useQuery(playlistsQuery("audio"));
   // A playlist someone shared with you can't be changed, so it's no target.
   const own = lists.data?.filter((p) => !p.readOnly);
   const [title, setTitle] = useState("");
@@ -24,7 +21,7 @@ export function AddToPlaylistDialog({ item, onClose }: { item: Pick<ItemSummary,
   const add = useMutation({
     mutationFn: async ({ id, name }: { id?: number; name?: string }) => {
       if (id) return unwrap(api.POST("/playlists/{playlistId}/items", { params: { path: { playlistId: id } }, body: { itemIds: [item.id] } }));
-      return unwrap(api.POST("/playlists", { body: { title: name!, kind, itemIds: [item.id] } }));
+      return unwrap(api.POST("/playlists", { body: { title: name!, kind: "audio", itemIds: [item.id] } }));
     },
     onSuccess: (p) => {
       qc.invalidateQueries({ queryKey: ["playlists"] });
@@ -42,7 +39,7 @@ export function AddToPlaylistDialog({ item, onClose }: { item: Pick<ItemSummary,
         {done && <Alert tone="success">Added to {done}.</Alert>}
         {add.isError && <Alert tone="error">{add.error.message}</Alert>}
         <form onSubmit={create} className="flex gap-2">
-          <Input aria-label="New playlist name" placeholder={kind === "audio" ? "New music playlist" : "New video playlist"} value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
+          <Input aria-label="New playlist name" placeholder="New playlist" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
           <Button type="submit" variant="primary" disabled={!title.trim()} loading={add.isPending && !!title}>
             <Plus className="size-4" /> Create
           </Button>
@@ -59,14 +56,14 @@ export function AddToPlaylistDialog({ item, onClose }: { item: Pick<ItemSummary,
                 <PlaylistMosaic playlist={p} className="size-11" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{p.title}</span>
-                  <span className="block text-xs text-muted">{p.itemCount} items</span>
+                  <span className="block text-xs text-muted">{countText(p)}</span>
                 </span>
                 <ListPlus className="size-4 text-muted" aria-hidden />
               </button>
             </li>
           ))}
         </ul>
-        {own?.length === 0 && <p className="text-center text-sm text-muted">No {kind === "audio" ? "music" : "video"} playlists yet. Create one above.</p>}
+        {own?.length === 0 && <p className="text-center text-sm text-muted">No playlists yet. Create one above.</p>}
       </div>
     </Dialog>
   );

@@ -45,11 +45,12 @@ import { RecapCard } from "./RecapCard";
 import { useRadio } from "./useRadio";
 
 /** Pages behind the music home's Library list (/library/{id}/{section}). */
-export type MusicSection = "artists" | "albums" | "songs" | "genres" | "decades" | "moods" | "muse" | "favorites";
+export type MusicSection = "artists" | "albums" | "songs" | "playlists" | "genres" | "decades" | "moods" | "muse" | "favorites";
 export const musicSectionTitles: Record<MusicSection, string> = {
   artists: "Artists",
   albums: "Albums",
   songs: "Songs",
+  playlists: "Playlists",
   genres: "Genres",
   decades: "Decades",
   moods: "Moods & Styles",
@@ -184,27 +185,19 @@ function useShuffleAll(libraryId: number) {
   });
 }
 
-function LibraryRow({ icon, title, count, libraryId, section }: { icon: ReactNode; title: string; count?: number; libraryId: number; section?: MusicSection }) {
-  const cls = "flex items-center gap-4 px-4 py-3 hover:bg-surface-2 [&>svg:first-child]:size-5 [&>svg:first-child]:text-accent";
-  const body = (
-    <>
-      {icon}
-      <span className="flex-1 font-medium">{title}</span>
-      {count !== undefined && <span className="text-sm text-muted tabular-nums">{count.toLocaleString()}</span>}
-      <ChevronRight className="size-4 text-faint" aria-hidden />
-    </>
-  );
+function LibraryRow({ icon, title, count, libraryId, section }: { icon: ReactNode; title: string; count?: number; libraryId: number; section: MusicSection }) {
   return (
     <li>
-      {section ? (
-        <Link to="/library/$libraryId/$section" params={{ libraryId: String(libraryId), section }} className={cls}>
-          {body}
-        </Link>
-      ) : (
-        <Link to="/playlists" className={cls}>
-          {body}
-        </Link>
-      )}
+      <Link
+        to="/library/$libraryId/$section"
+        params={{ libraryId: String(libraryId), section }}
+        className="flex items-center gap-4 px-4 py-3 hover:bg-surface-2 [&>svg:first-child]:size-5 [&>svg:first-child]:text-accent"
+      >
+        {icon}
+        <span className="flex-1 font-medium">{title}</span>
+        {count !== undefined && <span className="text-sm text-muted tabular-nums">{count.toLocaleString()}</span>}
+        <ChevronRight className="size-4 text-faint" aria-hidden />
+      </Link>
     </li>
   );
 }
@@ -247,6 +240,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
         <div className="flex flex-wrap gap-2" role="group" aria-label="Quick actions">
           {ready && <QuickAction icon={<Radio />} label="Library Radio" busy={radio.isPending} onClick={() => radio.mutate({ seed: "library", libraryId })} />}
           <QuickAction icon={<Shuffle />} label="Shuffle All" busy={shuffle.isPending} onClick={() => shuffle.mutate()} />
+          <QuickAction icon={<ListMusic />} label="Playlists" to={{ libraryId, section: "playlists" }} />
           {ready && museOn && <QuickAction icon={<Sparkles />} label="Muse" to={{ libraryId, section: "muse" }} />}
           {inTownOn && <QuickAction icon={<Ticket />} label="In Town" inTown />}
         </div>
@@ -271,7 +265,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
         </Shelf>
       )}
       {!!playlists.data?.length && (
-        <Shelf title="Your Playlists" testId="shelf-playlists" seeAll={<Link to="/playlists">See all</Link>}>
+        <Shelf title="Your Playlists" testId="shelf-playlists" seeAll={<SeeAll libraryId={libraryId} section="playlists" />}>
           {playlists.data.map((p) => (
             <li key={p.id} className="w-36 shrink-0">
               <Link to="/playlist/$playlistId" params={{ playlistId: String(p.id) }} className="group block">
@@ -301,8 +295,8 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
           <LibraryRow icon={<Mic2 />} title="Artists" count={artists.data} libraryId={libraryId} section="artists" />
           <LibraryRow icon={<Disc3 />} title="Albums" count={albums.data} libraryId={libraryId} section="albums" />
           <LibraryRow icon={<Music2 />} title="Songs" count={songs.data} libraryId={libraryId} section="songs" />
+          <LibraryRow icon={<ListMusic />} title="Playlists" count={playlists.data?.length} libraryId={libraryId} section="playlists" />
           <LibraryRow icon={<Heart />} title="Favourites" count={favTracks.data?.total} libraryId={libraryId} section="favorites" />
-          <LibraryRow icon={<ListMusic />} title="Playlists" count={playlists.data?.length} libraryId={libraryId} />
           <LibraryRow icon={<Guitar />} title="Genres" libraryId={libraryId} section="genres" />
           {(ready || !!facets.data?.genres.length) && <LibraryRow icon={<Palette />} title="Moods & Styles" libraryId={libraryId} section="moods" />}
           {!!facets.data?.decades.length && <LibraryRow icon={<CalendarDays />} title="Decades" libraryId={libraryId} section="decades" />}

@@ -10,7 +10,6 @@ import {
   Film,
   Home,
   Image,
-  ListMusic,
   LogOut,
   Menu,
   MonitorPlay,
@@ -258,18 +257,10 @@ export function Shell({ children }: { children: ReactNode }) {
           <MonitorPlay className="size-5" aria-hidden /> VOD Shows
         </Link>
       )}
-      <Link
-        to="/playlists"
-        className={clsx(navItem, "mt-4")}
-        activeProps={navActive}
-        onClick={() => setNavOpen(false)}
-      >
-        <ListMusic className="size-5" aria-hidden /> Playlists
-      </Link>
       {requests.data?.enabled && requests.data.canRequest && (
         <Link
           to="/discover"
-          className={navItem}
+          className={clsx(navItem, "mt-4")}
           activeProps={navActive}
           onClick={() => setNavOpen(false)}
         >

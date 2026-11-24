@@ -5,13 +5,14 @@ import { Bookmark, BookmarkMinus, CircleCheck, CircleSlash, Compass, Disc3, EyeO
 import { clsx } from "clsx";
 import { useState, type MouseEvent } from "react";
 import { api, unwrap } from "@/api/client";
-import { fetchLeaves, meQuery } from "@/api/queries";
+import { allowsPersonalCollections, fetchLeaves, librariesQuery, meQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import { Menu, MenuDivider, MenuItem } from "@/components/Menu";
 import { JourneyDialog } from "../music/Journey";
 import { useSetDisliked } from "../music/Rating";
 import { useRadio } from "../music/useRadio";
 import { AddToPlaylistDialog } from "../playlists/AddToPlaylist";
+import { AddToMyCollectionDialog } from "../playlists/MyCollections";
 import { useMusicActions } from "../player/MusicPlayer";
 import { AddToCollectionDialog } from "./AddToCollection";
 import { MoveTrackDialog } from "./MusicFixes";
@@ -20,8 +21,10 @@ import { hasWatchState, isWatched, markableTypes, useMarkWatched, useRemoveFromC
 
 const music = new Set(["track", "album", "artist"]);
 const watchable = new Set(["movie", "show", "episode", "video"]);
+// What a person's own collection can hold (USER-23).
+const collectable = new Set(["movie", "show", "season", "episode", "video"]);
 
-/** The "…" menu on tracks, albums, artists and videos: queue, playlist and watch-state actions. */
+/** The "…" menu on tracks, albums, artists and videos: queue, playlist, collection and watch-state actions. */
 export function ItemMenu({
   item,
   className,
@@ -53,6 +56,9 @@ export function ItemMenu({
   const radio = useRadio();
   const qc = useQueryClient();
   const admin = !!useQuery(meQuery).data?.isAdmin;
+  const libraries = useQuery(librariesQuery);
+  // Offered only where the item's library lets people keep their own collections.
+  const canCollect = collectable.has(item.type) && allowsPersonalCollections(libraries.data?.find((l) => l.id === item.libraryId));
   const watchlist = useMutation({
     mutationFn: (on: boolean) =>
       on
@@ -135,14 +141,19 @@ export function ItemMenu({
             {item.watchlisted ? "Remove from watchlist" : "Add to watchlist"}
           </MenuItem>
         )}
-        {item.type !== "collection" && (
+        {isMusic && (
           <MenuItem icon={<ListPlus />} onClick={() => setAdding(true)}>
             Add to playlist…
           </MenuItem>
         )}
+        {canCollect && (
+          <MenuItem icon={<ListPlus />} onClick={() => setAdding(true)}>
+            Add to my collection…
+          </MenuItem>
+        )}
         {admin && (item.type === "movie" || item.type === "show" || item.type === "video") && (
           <MenuItem icon={<Layers />} onClick={() => setCollecting(true)}>
-            Add to collection…
+            Add to library collection…
           </MenuItem>
         )}
         {admin && item.type === "track" && (
@@ -162,7 +173,8 @@ export function ItemMenu({
           </MenuItem>
         )}
       </Menu>
-      {adding && <AddToPlaylistDialog item={item} onClose={() => setAdding(false)} />}
+      {adding && isMusic && <AddToPlaylistDialog item={item} onClose={() => setAdding(false)} />}
+      {adding && !isMusic && <AddToMyCollectionDialog item={item} onClose={() => setAdding(false)} />}
       {collecting && <AddToCollectionDialog item={item} onClose={() => setCollecting(false)} />}
       {moving && <MoveTrackDialog track={item} onClose={() => setMoving(false)} />}
       {journey && <JourneyDialog from={item} onClose={() => setJourney(false)} />}

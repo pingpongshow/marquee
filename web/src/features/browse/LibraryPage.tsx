@@ -2,10 +2,10 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { clsx } from "clsx";
-import { ChevronLeft, Filter, Heart, LayoutGrid, List, Sparkles, Star, X } from "lucide-react";
+import { ChevronLeft, Filter, Heart, LayoutGrid, List, Plus, Sparkles, Star, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
-import { librariesQuery, meQuery } from "@/api/queries";
+import { allowsPersonalCollections, librariesQuery, meQuery, playlistsQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import type { operations } from "@/api/schema.gen";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
@@ -21,6 +21,9 @@ import { Poster } from "./Poster";
 import { formatDuration, subtitleFor } from "./format";
 import { sortOptions } from "./sorts";
 import { SaveSmartCollectionDialog } from "./SmartCollection";
+import { PlaylistsPage } from "../playlists/PlaylistsPage";
+import { MyCollections, NewCollectionDialog } from "../playlists/MyCollections";
+import { PlaylistInvites } from "../playlists/Sharing";
 
 type ListQuery = NonNullable<operations["listLibraryItems"]["parameters"]["query"]>;
 export type LibrarySearch = {
@@ -35,8 +38,10 @@ export type LibrarySearch = {
   /** Only the person's favourites (the heart). */
   favs?: boolean;
   view?: "grid" | "list";
-  /** Movie libraries: browse collections instead of movies. */
+  /** Video libraries: browse collections (the person's own and the library's) instead of titles. */
   show?: "collections";
+  /** A music library's Playlists page: the playlist folder that's open. */
+  folder?: number;
 };
 
 const PAGE = 100;
@@ -56,6 +61,7 @@ export function validateLibrarySearch(s: Record<string, unknown>): LibrarySearch
     favs: s.favs === true || s.favs === "1" ? true : undefined,
     view: s.view === "list" ? "list" : undefined,
     show: s.show === "collections" ? "collections" : undefined,
+    folder: typeof s.folder === "number" ? s.folder : undefined,
   };
 }
 
@@ -97,6 +103,7 @@ export function LibraryPage() {
   const section = lib?.type === "music" && isMusicSection(params.section) ? params.section : undefined;
   if (lib?.type === "music") {
     if (section === "favorites") return <FavoritesPage libraryId={id} name={lib.name} />;
+    if (section === "playlists") return <PlaylistsPage library={lib} />;
     if (section === "genres" || section === "decades" || section === "moods" || section === "muse")
       return <MusicSectionPage key={section} libraryId={id} name={lib.name} section={section} />;
     // Old links with filters on the library itself still show the (artist) grid.
@@ -125,7 +132,13 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
   const [seed] = useState(() => Date.now());
 
   const set = (patch: Partial<LibrarySearch>) => void navigate({ to: ".", search: (s: LibrarySearch) => ({ ...s, ...patch }), replace: true });
-  const collections = lib?.type === "movies" && search.show === "collections";
+  // The Collections tab: a movie library's own collections, and in any video library that
+  // allows them the person's own, first (USER-23).
+  const personalOn = allowsPersonalCollections(lib);
+  const collections = (lib?.type === "movies" || personalOn) && search.show === "collections";
+  const mine = useQuery({ ...playlistsQuery("video", id), enabled: collections && personalOn });
+  const myCollections = (collections && personalOn && mine.data) || [];
+  const [creatingCollection, setCreatingCollection] = useState(false);
   const query: ListQuery = collections
     ? { sort, type: "collection" }
     : { sort, type: itemType, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res, minMyRating: search.fav ? 8 : undefined, favorites: search.favs || undefined };
@@ -162,7 +175,7 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
     const ro = new ResizeObserver(measure);
     if (grid.parentElement) for (const el of Array.from(grid.parentElement.children)) if (el !== grid) ro.observe(el);
     return () => ro.disconnect();
-  }, [gridRef, scrollEl, filtersOpen, filtered, total]);
+  }, [gridRef, scrollEl, filtersOpen, filtered, total, collections, myCollections.length]);
   // eslint-disable-next-line react-hooks/incompatible-library -- the compiler isn't in this build, and the warning is only about what it would memoize
   const virt = useVirtualizer({ count: rows, getScrollElement: () => scrollEl, estimateSize: () => rowHeight, overscan: 4, scrollMargin });
   useEffect(() => virt.measure(), [rowHeight, virt]);
@@ -200,11 +213,11 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
         )}
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold">{section ? musicSectionTitles[section] : (lib?.name ?? "Library")}</h1>
-          {lib?.type === "movies" && (
+          {(lib?.type === "movies" || personalOn) && (
             <div className="flex rounded-md bg-surface-2 p-0.5 text-sm" role="tablist" aria-label="Show">
               {(
                 [
-                  [undefined, "Movies"],
+                  [undefined, lib?.type === "movies" ? "Movies" : lib?.type === "videos" ? "Videos" : "Shows"],
                   ["collections", "Collections"],
                 ] as const
               ).map(([v, label]) => (
@@ -220,9 +233,14 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
               ))}
             </div>
           )}
-          {first.data && <span className="text-sm text-muted">{total.toLocaleString()} {filtered ? "matching" : collections ? "collections" : "items"}</span>}
+          {first.data && <span className="text-sm text-muted">{(total + myCollections.length).toLocaleString()} {filtered ? "matching" : collections ? "collections" : "items"}</span>}
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {isVideo && lib && lib.type !== "photos" && <MuseButton libraryId={id} />}
+            {collections && personalOn && (
+              <Button size="sm" variant="primary" onClick={() => setCreatingCollection(true)}>
+                <Plus className="size-4" /> New collection
+              </Button>
+            )}
             {!collections && (
               <Button size="sm" variant={filtersOpen || filtered ? "primary" : "secondary"} onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}>
                 <Filter className="size-4" /> Filter
@@ -339,11 +357,25 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
         {first.isPending && <Spinner />}
         {first.isError && <Alert tone="error">{first.error.message}</Alert>}
         {first.data?.total === 0 &&
+          !collections &&
           (filtered ? (
             <p className="text-muted">Nothing matches these filters.</p>
           ) : (
             <p className="text-muted">Nothing here yet. {lib?.scanStatus !== "idle" ? "A scan is in progress." : "Scan the library from Settings → Libraries."}</p>
           ))}
+        {collections && first.data?.total === 0 && !myCollections.length && !mine.isLoading && (
+          <p className="text-muted">{personalOn ? "No collections yet. Make one with “New collection”, or use “Add to my collection” on any title here." : "No collections yet."}</p>
+        )}
+        {collections && personalOn && <PlaylistInvites libraryId={id} />}
+        {mine.isError && <Alert tone="error">{mine.error.message}</Alert>}
+        {myCollections.length > 0 && (
+          <section className="mb-8" aria-label="My Collections" data-testid="my-collections">
+            {total > 0 && <h2 className="mb-3 text-lg font-semibold">My Collections</h2>}
+            <MyCollections collections={myCollections} shape={shape === "wide" ? "wide" : "poster"} />
+          </section>
+        )}
+        {myCollections.length > 0 && total > 0 && <h2 className="mb-3 text-lg font-semibold">Library collections</h2>}
+        {creatingCollection && <NewCollectionDialog libraryId={id} onClose={() => setCreatingCollection(false)} />}
 
         <div ref={gridRef} className="relative" style={{ height: virt.getTotalSize() }}>
           {width > 0 &&

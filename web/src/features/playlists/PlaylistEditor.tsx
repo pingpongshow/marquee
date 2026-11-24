@@ -36,6 +36,7 @@ import {
   sameOrder,
   shuffleEntries,
   sortEntries,
+  sortKeysFor,
   sortLabels,
   withoutDuplicates,
   type SortKey,
@@ -61,7 +62,8 @@ const musicTypes = new Set(["track", "album", "artist"]);
  * for a range, Ctrl or ⌘-click to add one), then remove them or move them (drag, or the move
  * buttons); sort, shuffle, take out duplicates, filter, and add from the library. Changes are a
  * draft, with undo, until Save sends them in one go. Other playlists can be added to the end of
- * it (Combine).
+ * it (Combine). A collection (kind video, USER-23) is edited here too, worded as one and without
+ * what only music has: artists, albums, lengths, duplicates.
  */
 export function PlaylistEditorPage() {
   const { playlistId } = useParams({ from: "/playlist/$playlistId/edit" });
@@ -111,7 +113,7 @@ export function PlaylistEditorPage() {
 
   const dirty = saved !== null && !sameOrder(saved, draft);
   useBlocker({
-    shouldBlockFn: () => dirty && !window.confirm("Leave without saving your changes to this playlist?"),
+    shouldBlockFn: () => dirty && !window.confirm(`Leave without saving your changes to this ${pl.data?.kind === "video" ? "collection" : "playlist"}?`),
     enableBeforeUnload: dirty,
   });
 
@@ -278,28 +280,33 @@ export function PlaylistEditorPage() {
   if (pl.isError) return <div className="p-8"><Alert tone="error">{pl.error.message}</Alert></div>;
   if (entries.isError) return <div className="p-8"><Alert tone="error">{entries.error.message}</Alert></div>;
   const p = pl.data;
+  const audio = p.kind === "audio";
+  const noun = audio ? "playlist" : "collection";
   if (p.readOnly || p.rules)
     return (
       <div className="space-y-4 p-8">
-        <Alert tone="info">{p.readOnly ? "This playlist was shared with you, so only its owner can edit it." : "A smart playlist fills itself from its rules: change them on its page."}</Alert>
+        <Alert tone="info">{p.readOnly ? `This ${noun} was shared with you, so only its owner can edit it.` : "A smart playlist fills itself from its rules: change them on its page."}</Alert>
         <Link to="/playlist/$playlistId" params={{ playlistId }} className="text-sm text-accent hover:underline">
-          Back to the playlist
+          Back to the {noun}
         </Link>
       </div>
     );
+  const sortKeys = sortKeysFor(p.kind);
+  // A sort the other kind offers isn't chosen here.
+  const sortBy = sortKeys.includes(sortKey) ? sortKey : "title";
 
   const allShownSelected = visible.length > 0 && visible.every((e) => selected.has(e.entryId));
   return (
     <div className="flex min-h-full flex-col p-4 lg:p-8" data-testid="playlist-editor">
       <header className="mb-4 flex flex-wrap items-center gap-3">
-        <Link to="/playlist/$playlistId" params={{ playlistId }} className="rounded-full p-2 text-muted hover:bg-surface-2 hover:text-text" aria-label="Back to the playlist">
+        <Link to="/playlist/$playlistId" params={{ playlistId }} className="rounded-full p-2 text-muted hover:bg-surface-2 hover:text-text" aria-label={`Back to the ${noun}`}>
           <ArrowLeft className="size-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold tracking-wider text-faint uppercase">Edit playlist</div>
+          <div className="text-xs font-semibold tracking-wider text-faint uppercase">Edit {noun}</div>
           <h1 className="truncate text-2xl font-bold">{p.title}</h1>
           <div className="text-sm text-muted" data-testid="editor-summary">
-            {draft.length} {p.kind === "audio" ? "tracks" : "items"} · {formatDuration(totalMs)}
+            {audio ? `${draft.length} tracks · ${formatDuration(totalMs)}` : `${draft.length} ${draft.length === 1 ? "title" : "titles"}`}
             {selectedCount > 0 && ` · ${selectedCount} selected`}
             {dirty && <span className="text-accent"> · Unsaved changes</span>}
           </div>
@@ -312,7 +319,7 @@ export function PlaylistEditorPage() {
             Discard changes
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setCombining(true)}>
-            <Combine className="size-4" /> Add playlists
+            <Combine className="size-4" /> Add {noun}s
           </Button>
           <Button variant="primary" size="sm" onClick={() => save.mutate(draft)} disabled={!dirty} loading={save.isPending} data-testid="editor-save" title="Save (⌘S / Ctrl+S)">
             <Save className="size-4" /> Save
@@ -330,11 +337,11 @@ export function PlaylistEditorPage() {
       <div className="sticky top-0 z-10 -mx-4 mb-3 flex flex-wrap items-center gap-2 border-b border-border bg-bg/95 px-4 py-2 backdrop-blur lg:-mx-8 lg:px-8">
         <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-faint" aria-hidden />
-          <Input aria-label="Filter this playlist" placeholder="Filter" value={filter} onChange={(e) => setFilter(e.target.value)} className="pl-8" />
+          <Input aria-label={`Filter this ${noun}`} placeholder="Filter" value={filter} onChange={(e) => setFilter(e.target.value)} className="pl-8" />
         </div>
         <div className="flex items-center gap-1">
-          <Select aria-label="Sort by" value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} className="w-auto">
-            {(Object.keys(sortLabels) as SortKey[]).map((k) => (
+          <Select aria-label="Sort by" value={sortBy} onChange={(e) => setSortKey(e.target.value as SortKey)} className="w-auto">
+            {sortKeys.map((k) => (
               <option key={k} value={k}>
                 {sortLabels[k]}
               </option>
@@ -343,19 +350,24 @@ export function PlaylistEditorPage() {
           <Button size="sm" variant="ghost" onClick={() => setDescending((d) => !d)} aria-label={descending ? "Descending" : "Ascending"} title={descending ? "Descending" : "Ascending"}>
             {descending ? <ArrowDown className="size-4" /> : <ArrowUp className="size-4" />}
           </Button>
-          <Button size="sm" onClick={() => change(sortEntries(draft, sortKey, descending), `Sorted by ${sortLabels[sortKey].toLowerCase()}.`)}>
+          <Button size="sm" onClick={() => change(sortEntries(draft, sortBy, descending), `Sorted by ${sortLabels[sortBy].toLowerCase()}.`)}>
             Sort
           </Button>
         </div>
         <Button size="sm" variant="ghost" onClick={() => change([...draft].reverse(), "Reversed.")} disabled={draft.length < 2}>
           Reverse
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => change(shuffleEntries(draft), "Shuffled.")} disabled={draft.length < 2}>
-          <Shuffle className="size-4" /> Shuffle
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => change(withoutDuplicates(draft), `Removed ${dupes} duplicate${dupes === 1 ? "" : "s"}.`)} disabled={!dupes} data-testid="editor-dedupe">
-          <CopyX className="size-4" /> Remove duplicates{dupes ? ` (${dupes})` : ""}
-        </Button>
+        {/* A collection holds each title once and has no shuffle. */}
+        {audio && (
+          <Button size="sm" variant="ghost" onClick={() => change(shuffleEntries(draft), "Shuffled.")} disabled={draft.length < 2}>
+            <Shuffle className="size-4" /> Shuffle
+          </Button>
+        )}
+        {audio && (
+          <Button size="sm" variant="ghost" onClick={() => change(withoutDuplicates(draft), `Removed ${dupes} duplicate${dupes === 1 ? "" : "s"}.`)} disabled={!dupes} data-testid="editor-dedupe">
+            <CopyX className="size-4" /> Remove duplicates{dupes ? ` (${dupes})` : ""}
+          </Button>
+        )}
         <Button size="sm" variant={adding ? "secondary" : "ghost"} onClick={() => setAdding((a) => !a)}>
           <Plus className="size-4" /> Add from library
         </Button>
@@ -398,7 +410,7 @@ export function PlaylistEditorPage() {
             <span>{filter.trim() ? `${visible.length} of ${draft.length} match` : "Select all"}</span>
             <span className="ml-auto max-sm:hidden">Shift-click selects a range · drag to move</span>
           </div>
-          {draft.length === 0 && <p className="p-4 text-muted">This playlist is empty. Add from the library, or add other playlists to it.</p>}
+          {draft.length === 0 && <p className="p-4 text-muted">This {noun} is empty. Add from the library, or add other {noun}s to it.</p>}
           <ol className="empty:hidden divide-y divide-border rounded-lg border border-border bg-surface" data-testid="editor-rows">
             {visible.map((e) => (
               <EditorRow
@@ -434,9 +446,9 @@ export function PlaylistEditorPage() {
             </div>
           )}
         </div>
-        {adding && <AddFromLibrary playlistId={id} kind={p.kind} onAdded={() => void entries.refetch()} onClose={() => setAdding(false)} />}
+        {adding && <AddFromLibrary playlistId={id} kind={p.kind} libraryId={p.libraryId} onAdded={() => void entries.refetch()} onClose={() => setAdding(false)} />}
       </div>
-      {combining && <CombinePlaylistsDialog into={p} onClose={() => (setCombining(false), void entries.refetch())} />}
+      {combining && <CombinePlaylistsDialog scope={p.kind === "video" && p.libraryId ? { kind: "video", libraryId: p.libraryId } : { kind: "audio" }} into={p} onClose={() => (setCombining(false), void entries.refetch())} />}
     </div>
   );
 }
@@ -469,6 +481,7 @@ const EditorRow = memo(function EditorRow({
   onDragEnd: () => void;
 }) {
   const it = e.item;
+  const track = it.type === "track";
   const art = it.type === "episode" ? (it.images?.thumb ?? it.images?.poster) : it.images?.poster;
   return (
     <li
@@ -503,14 +516,14 @@ const EditorRow = memo(function EditorRow({
       />
       <GripVertical className="size-4 shrink-0 cursor-grab text-faint max-sm:hidden" aria-hidden />
       <span className="w-8 shrink-0 text-right text-xs text-faint tabular-nums max-sm:hidden">{position}</span>
-      <span className={clsx("shrink-0 overflow-hidden rounded bg-surface-3", it.type === "track" ? "size-9" : "aspect-video w-16")}>
-        {art && <img src={imageUrl(art, it.type === "track" ? 40 : 80)} alt="" loading="lazy" draggable={false} className="size-full object-cover" />}
+      <span className={clsx("shrink-0 overflow-hidden rounded bg-surface-3", track ? "size-9" : it.type === "episode" ? "aspect-video w-16" : "aspect-[2/3] w-7")}>
+        {art && <img src={imageUrl(art, track ? 40 : 80)} alt="" loading="lazy" draggable={false} className="size-full object-cover" />}
       </span>
       <span className="min-w-0 flex-1">
         <span className={clsx("block truncate text-sm", !it.available && "text-faint line-through")}>{it.title}</span>
-        <span className="block truncate text-xs text-muted">{[artistOf(it), it.parentTitle].filter(Boolean).join(" · ")}</span>
+        <span className="block truncate text-xs text-muted">{[artistOf(it), it.parentTitle].filter(Boolean).join(" · ") || (track ? "" : (it.year ?? ""))}</span>
       </span>
-      <span className="w-14 shrink-0 text-right text-sm text-muted tabular-nums max-sm:hidden">{it.type === "track" ? formatTrackTime(it.durationMs) : formatDuration(it.durationMs)}</span>
+      {track && <span className="w-14 shrink-0 text-right text-sm text-muted tabular-nums max-sm:hidden">{formatTrackTime(it.durationMs)}</span>}
       <button
         type="button"
         onClick={(ev) => {
@@ -526,8 +539,11 @@ const EditorRow = memo(function EditorRow({
   );
 });
 
-/** Search the library and add to the end of the playlist (saved at once; albums and artists add their tracks). */
-function AddFromLibrary({ playlistId, kind, onAdded, onClose }: { playlistId: number; kind: "audio" | "video"; onAdded: () => void; onClose: () => void }) {
+/**
+ * Search the library and add to the end (saved at once). A playlist takes an album's or an
+ * artist's tracks; a collection takes titles of its own library, as they are.
+ */
+function AddFromLibrary({ playlistId, kind, libraryId, onAdded, onClose }: { playlistId: number; kind: "audio" | "video"; libraryId?: number; onAdded: () => void; onClose: () => void }) {
   const [q, setQ] = useState("");
   const [typed, setTyped] = useState("");
   useEffect(() => {
@@ -536,7 +552,10 @@ function AddFromLibrary({ playlistId, kind, onAdded, onClose }: { playlistId: nu
   }, [q]);
   const results = useQuery(searchQuery(typed, 20));
   const fits = kind === "audio" ? musicTypes : videoTypes;
-  const groups = results.data?.groups.filter((g) => fits.has(g.type)) ?? [];
+  const groups = (results.data?.groups ?? [])
+    .filter((g) => fits.has(g.type))
+    .map((g) => (kind === "video" ? { ...g, items: g.items.filter((it) => it.libraryId === libraryId) } : g))
+    .filter((g) => g.items.length);
   const [added, setAdded] = useState<Set<number>>(new Set());
   const add = useMutation({
     mutationFn: (item: ItemSummary) => unwrap(api.POST("/playlists/{playlistId}/items", { params: { path: { playlistId } }, body: { itemIds: [item.id] } })),
@@ -554,7 +573,7 @@ function AddFromLibrary({ playlistId, kind, onAdded, onClose }: { playlistId: nu
           <X className="size-4" />
         </button>
       </div>
-      <Input autoFocus aria-label="Search the library" placeholder={kind === "audio" ? "Songs, albums or artists" : "Films, shows or episodes"} value={q} onChange={(e) => setQ(e.target.value)} />
+      <Input autoFocus aria-label="Search the library" placeholder={kind === "audio" ? "Songs, albums or artists" : "Titles in this collection’s library"} value={q} onChange={(e) => setQ(e.target.value)} />
       {add.isError && <div className="mt-2"><Alert tone="error">{add.error.message}</Alert></div>}
       {results.isFetching && <Spinner />}
       {groups.map((g) => (

@@ -155,6 +155,12 @@ export function imageUrl(artworkId: number, width: number) {
   return `/api/v1/images/${artworkId}?w=${w}&${imageAuth()}`;
 }
 
+/** A playlist's or collection's own picture (MUSIC-30); the version makes a changed picture load again. */
+export function playlistImageUrl(playlistId: number, version: string, width: number) {
+  const w = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));
+  return `/api/v1/playlists/${playlistId}/image?w=${w}&v=${encodeURIComponent(version)}&${imageAuth()}`;
+}
+
 export function personPhotoUrl(personId: number, width: number) {
   const w = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));
   return `/api/v1/people/${personId}/photo?w=${w}&${imageAuth()}`;

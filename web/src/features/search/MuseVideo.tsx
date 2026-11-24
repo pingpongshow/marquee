@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { ListPlus, Loader2, Sparkles } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
-import { librariesQuery, useMuseOn } from "@/api/queries";
+import { allowsPersonalCollections, librariesQuery, useMuseOn } from "@/api/queries";
 import { Alert, Button } from "@/components/ui";
 import { toast } from "@/components/Toast";
 import { Poster } from "../browse/Poster";
@@ -43,14 +43,19 @@ export function MuseVideo({ libraryId, initialPrompt = "" }: { libraryId?: numbe
   const muse = useMutation({
     mutationFn: (p: string) => unwrap(api.POST("/muse/video", { body: { prompt: p, libraryId, includeVod: canVod && includeVod } })),
   });
+  // A collection belongs to one library (USER-23): the results save as one when they all come
+  // from the same library, and it lets people keep collections.
+  const resultLibraries = new Set(muse.data?.items.map((i) => i.libraryId));
+  const saveTo = resultLibraries.size === 1 ? libraries.data?.find((l) => resultLibraries.has(l.id)) : undefined;
+  const canSave = allowsPersonalCollections(saveTo);
   const save = useMutation({
     mutationFn: () =>
       unwrap(
         api.POST("/playlists", {
-          body: { title: `Muse: ${muse.variables ?? ""}`.slice(0, 200), kind: "video", itemIds: (muse.data?.items ?? []).map((i) => i.id) },
+          body: { title: `Muse: ${muse.variables ?? ""}`.slice(0, 200), kind: "video", libraryId: saveTo?.id, itemIds: (muse.data?.items ?? []).map((i) => i.id) },
         }),
       ),
-    onSuccess: (pl) => toast(`Saved “${pl.title}”.`, { link: { label: "Open playlist", to: "/playlist/$playlistId", params: { playlistId: String(pl.id) } } }),
+    onSuccess: (pl) => toast(`Saved “${pl.title}”.`, { link: { label: "Open collection", to: "/playlist/$playlistId", params: { playlistId: String(pl.id) } } }),
   });
   const ask = (p: string) => {
     const t = p.trim();
@@ -115,9 +120,9 @@ export function MuseVideo({ libraryId, initialPrompt = "" }: { libraryId?: numbe
               <Sparkles className="mr-1.5 inline size-4 text-accent" aria-hidden />
               {r.understood}
             </p>
-            {r.items.length > 0 && (
+            {canSave && (
               <Button size="sm" className="ml-auto" loading={save.isPending} onClick={() => save.mutate()}>
-                <ListPlus className="size-4" /> Save as playlist
+                <ListPlus className="size-4" /> Save as collection
               </Button>
             )}
           </div>

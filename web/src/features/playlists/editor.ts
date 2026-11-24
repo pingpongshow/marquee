@@ -8,9 +8,13 @@ export const sortLabels: Record<SortKey, string> = {
   artist: "Artist",
   album: "Album",
   duration: "Length",
-  added: "Order added to the playlist",
+  added: "Order added",
   libraryAdded: "Date added to the library",
 };
+
+/** The sorts a list offers: a collection (kind video, USER-23) has no artists, albums or lengths. */
+export const sortKeysFor = (kind: "audio" | "video"): SortKey[] =>
+  kind === "audio" ? ["title", "artist", "album", "duration", "added", "libraryAdded"] : ["title", "added", "libraryAdded"];
 
 /** The artist a row shows: the track's credit, else its album artist (or an episode's show). */
 export const artistOf = (it: ItemSummary) => it.artistCredit ?? it.grandparentTitle ?? "";

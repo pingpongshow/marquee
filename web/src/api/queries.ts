@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, session, unwrap } from "./client";
-import type { LibraryCreate, LibraryUpdate, MeUpdate, ServerSettingsUpdate, UserCreate, UserUpdate } from "./types";
+import type { Library, LibraryCreate, LibraryUpdate, MeUpdate, ServerSettingsUpdate, UserCreate, UserUpdate } from "./types";
 
 export const systemInfoQuery = queryOptions({
   queryKey: ["system", "info"],
@@ -219,11 +219,17 @@ export function useRevokeDevice() {
   });
 }
 
-export const playlistsQuery = (kind?: "video" | "audio") =>
+/** Music playlists (audio), or a video library's collections (video with its library, USER-23). */
+export const playlistsQuery = (kind: "video" | "audio", libraryId?: number) =>
   queryOptions({
-    queryKey: ["playlists", "list", kind ?? "all"],
-    queryFn: () => unwrap(api.GET("/playlists", { params: { query: kind ? { kind } : {} } })),
+    queryKey: ["playlists", "list", kind, libraryId ?? 0],
+    queryFn: () => unwrap(api.GET("/playlists", { params: { query: { kind, libraryId } } })),
   });
+
+const collectionLibraryTypes = new Set(["movies", "shows", "anime", "videos"]);
+/** Whether people can keep their own collections in this library (USER-23): video libraries, unless an admin turned it off. */
+export const allowsPersonalCollections = (lib?: Pick<Library, "type" | "options">) =>
+  !!lib && collectionLibraryTypes.has(lib.type) && lib.options.personalCollections !== false;
 
 export const playlistFoldersQuery = () =>
   queryOptions({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ItemSummary, PlaylistEntry } from "@/api/types";
-import { duplicateCount, matchesFilter, moveSelected, nudgeSelected, rangeIds, sortEntries, withoutDuplicates } from "./editor";
+import { duplicateCount, matchesFilter, moveSelected, nudgeSelected, rangeIds, sortEntries, sortKeysFor, withoutDuplicates } from "./editor";
 
 const entry = (entryId: number, itemId: number, title: string, more: Partial<ItemSummary> = {}): PlaylistEntry => ({
   entryId,
@@ -46,5 +46,10 @@ describe("playlist editor", () => {
   it("filters on every word in title, artist or album", () => {
     expect(list.filter((e) => matchesFilter(e, "bing christ")).map((e) => e.entryId)).toEqual([1, 3, 4]);
     expect(list.filter((e) => matchesFilter(e, "  ")).length).toBe(4);
+  });
+
+  it("offers a collection no music sorts", () => {
+    expect(sortKeysFor("audio")).toContain("artist");
+    expect(sortKeysFor("video")).toEqual(["title", "added", "libraryAdded"]);
   });
 });

@@ -37,7 +37,7 @@ export function AddToCollectionDialog({ item, onClose }: { item: Pick<ItemSummar
     if (title.trim()) add.mutate({ name: title.trim() });
   };
   return (
-    <Dialog open onClose={onClose} title={`Add “${item.title}” to a collection`}>
+    <Dialog open onClose={onClose} title={`Add “${item.title}” to a library collection`}>
       <div className="space-y-4">
         {done && <Alert tone="success">Added to {done}.</Alert>}
         {add.isError && <Alert tone="error">{add.error.message}</Alert>}

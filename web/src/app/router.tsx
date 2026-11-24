@@ -30,7 +30,7 @@ import { InTownPage } from "@/features/music/InTown";
 import { TopSongsPage } from "@/features/music/TopSongs";
 import { PlaylistEditorPage } from "@/features/playlists/PlaylistEditor";
 import { PlaylistPage } from "@/features/playlists/PlaylistPage";
-import { PlaylistsPage } from "@/features/playlists/PlaylistsPage";
+import { PlaylistsRedirect } from "@/features/playlists/PlaylistsPage";
 import { MoodStylePage } from "@/features/music/MoodStylePage";
 import { SearchPage } from "@/features/search/SearchPage";
 import { LinkPage } from "@/features/users/LinkDevice";
@@ -182,11 +182,8 @@ const playRoute = createRoute({
   path: "/play/$itemId",
   validateSearch: (
     s: Record<string, unknown>,
-  ): { t?: number; pl?: number; sh?: number; pi?: number; f?: number; g?: string; vm?: number; vs?: number; ve?: number } => ({
+  ): { t?: number; f?: number; g?: string; vm?: number; vs?: number; ve?: number } => ({
     t: typeof s.t === "number" ? s.t : undefined,
-    pl: typeof s.pl === "number" ? s.pl : undefined,
-    sh: typeof s.sh === "number" ? s.sh : undefined, // a shuffled playlist's seed
-    pi: typeof s.pi === "number" ? s.pi : undefined, // this item's place in the playlist's play order
     f: typeof s.f === "number" ? s.f : undefined, // a specific version's file (LIB-7)
     g: typeof s.g === "string" ? s.g : undefined, // a watch-together group to join
     // The same film (vm) or episode (vs, ve) on demand: played instead if the library's copy can't be.
@@ -234,13 +231,14 @@ const homeRowRoute = createRoute({
   path: "/home/row/$hubId",
   component: HomeRowPage,
 });
+// Playlists live in the music library (/library/{id}/playlists); this address still leads there.
 const playlistsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/playlists",
   validateSearch: (s: Record<string, unknown>): { folder?: number } => ({
     folder: typeof s.folder === "number" ? s.folder : undefined,
   }),
-  component: PlaylistsPage,
+  component: PlaylistsRedirect,
 });
 const playlistRoute = createRoute({
   getParentRoute: () => rootRoute,
