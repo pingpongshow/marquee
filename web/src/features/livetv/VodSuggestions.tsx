@@ -92,7 +92,7 @@ export function VodSuggestionTile({
         </Link>
       ) : null}
       {badge && (
-        <span className="pointer-events-none absolute top-1.5 left-1.5 z-10 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-accent-on-black shadow ring-1 ring-white/15 backdrop-blur-sm">
+        <span className="pointer-events-none absolute top-1.5 left-1.5 z-10 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-accent-on-black shadow ring-1 ring-white/15">
           VOD
         </span>
       )}
@@ -157,7 +157,7 @@ export function VodSuggestionRow({ title, list, className, kind }: { title: stri
           </Link>
         )}
       </div>
-      <ul className="flex gap-4 overflow-x-auto pb-2">
+      <ul className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2">
         {list.map((s) => (
           <VodSuggestionTile key={s.key} s={s} />
         ))}

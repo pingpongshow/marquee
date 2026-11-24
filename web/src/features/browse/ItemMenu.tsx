@@ -56,9 +56,10 @@ export function ItemMenu({
   const radio = useRadio();
   const qc = useQueryClient();
   const admin = !!useQuery(meQuery).data?.isAdmin;
-  const libraries = useQuery(librariesQuery);
-  // Offered only where the item's library lets people keep their own collections.
-  const canCollect = collectable.has(item.type) && allowsPersonalCollections(libraries.data?.find((l) => l.id === item.libraryId));
+  // Offered only where the item's library lets people keep their own collections. Selected
+  // down to that answer: every tile has this menu, and the libraries are polled during a scan.
+  const collects = useQuery({ ...librariesQuery, select: (libs) => allowsPersonalCollections(libs.find((l) => l.id === item.libraryId)) });
+  const canCollect = collectable.has(item.type) && !!collects.data;
   const watchlist = useMutation({
     mutationFn: (on: boolean) =>
       on

@@ -15,7 +15,7 @@ export function SaveBar({ dirty, saving, error, savedAt, onSave, onReset }: { di
   if (!dirty && !showSaved && !error) return null;
 
   return (
-    <div className="sticky bottom-0 -mx-6 mt-6 space-y-3 border-t border-border bg-bg/95 px-6 py-4 backdrop-blur lg:-mx-8 lg:px-8">
+    <div className="sticky bottom-0 -mx-6 mt-6 space-y-3 border-t border-border bg-bg/95 px-6 py-4 backdrop-blur pointer-coarse:backdrop-blur-none lg:-mx-8 lg:px-8">
       {error && <Alert tone="error">{error.message}</Alert>}
       <div className="flex items-center justify-end gap-3">
         {showSaved && !dirty && <span className="text-sm text-success" role="status">Saved</span>}

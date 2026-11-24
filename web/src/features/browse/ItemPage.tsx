@@ -186,7 +186,7 @@ function Cast({ credits }: { credits: Credit[] }) {
       {people.length > 0 && (
         <>
           <h2 className="mb-4 text-lg font-semibold">Cast</h2>
-          <ul className="flex gap-4 overflow-x-auto pb-2">
+          <ul className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2">
             {people.map((c) => (
               <li key={c.personId} className="w-24 shrink-0 text-center">
                 <Link to="/person/$personId" params={{ personId: String(c.personId) }} className="group block">
@@ -358,7 +358,7 @@ function Extras({ item }: { item: ItemDetail }) {
   return (
     <section className="mt-10">
       <h2 className="mb-4 text-lg font-semibold">Extras</h2>
-      <ul className="flex gap-4 overflow-x-auto pb-2">
+      <ul className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2">
         {item.extras.map((x) => (
           <li key={x.id} className="w-60 shrink-0">
             <Link to="/play/$itemId" params={{ itemId: String(x.id) }} search={{}} className="group block">
@@ -392,7 +392,7 @@ function CollectionShelf({ collection, current }: { collection: ItemSummary; cur
           {collection.title}
         </Link>
       </h2>
-      <ul className="flex gap-4 overflow-x-auto pb-2">
+      <ul className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2">
         {list.map((r) => (
           <li key={r.id} className="w-36 shrink-0">
             <Link to="/item/$itemId" params={{ itemId: String(r.id) }} className="group block">
@@ -422,7 +422,7 @@ function Related({ item }: { item: ItemDetail }) {
   return (
     <section className="mt-10">
       <h2 className="mb-4 text-lg font-semibold">{square ? "Sounds like this" : "More like this"}</h2>
-      <ul className="flex gap-4 overflow-x-auto pb-2">
+      <ul className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2">
         {related.data.map((r) => (
           <li key={r.id} className="w-36 shrink-0">
             <Link to="/item/$itemId" params={{ itemId: String(r.id) }} className="group block">

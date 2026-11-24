@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Bookmark, BookmarkCheck, Check, ChevronRight, Library, Play, RotateCcw, Tv } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { api, unwrap } from "@/api/client";
+import { api, unwrap, vodImageUrl } from "@/api/client";
 import { toast } from "@/components/Toast";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "@/features/browse/format";
@@ -92,7 +92,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
     <div className="relative">
       {s.backdropUrl && (
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] overflow-hidden" aria-hidden>
-          <img src={s.backdropUrl} alt="" className="size-full object-cover object-top opacity-35" />
+          <img src={vodImageUrl(s.backdropUrl, 960)} alt="" className="size-full object-cover object-top opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/60 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-bg/80 to-transparent" />
         </div>
@@ -237,7 +237,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                     aria-label={`Play ${epLabel(e)} ${e.title}`}
                   >
                     {e.stillUrl ? (
-                      <img src={e.stillUrl} alt="" loading="lazy" className="size-full object-cover" />
+                      <img src={vodImageUrl(e.stillUrl, 320)} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
                     ) : (
                       <div className="grid size-full place-items-center text-faint">
                         <Tv className="size-8" aria-hidden />
@@ -332,7 +332,7 @@ export function VodEpisodePlayerPage({ seriesId, episodeId, startMs }: { seriesI
       overlay={(time, duration) =>
         next && !dismissed && duration > 0 && duration - time < UP_NEXT_AT ? (
           <div className="absolute right-8 bottom-28 w-80 overflow-hidden rounded-lg border border-white/15 bg-black/85 text-white shadow-2xl backdrop-blur">
-            {next.stillUrl && <img src={next.stillUrl} alt="" className="aspect-video w-full object-cover" />}
+            {next.stillUrl && <img src={vodImageUrl(next.stillUrl, 320)} alt="" className="aspect-video w-full object-cover" />}
             <div className="space-y-2 p-3">
               <div className="text-xs text-white/60 uppercase">Up next in {Math.max(0, Math.ceil(duration - time))}s</div>
               <div className="truncate font-semibold">

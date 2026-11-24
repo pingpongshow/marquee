@@ -113,7 +113,7 @@ export function MoodStylePage() {
       {isMood && moodAlbums.length > 0 && (
         <section>
           <h2 className="mb-3 text-lg font-semibold">Albums with this feel</h2>
-          <ul className="flex gap-4 overflow-x-auto pb-2">
+          <ul className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2">
             {moodAlbums.map((t) => (
               <li key={t.parentId} className="w-40 shrink-0">
                 <Link

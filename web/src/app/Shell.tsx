@@ -350,7 +350,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </aside>
           </div>
         )}
-        <main ref={mainRef} className="theme-page min-w-0 flex-1 overflow-y-auto">
+        <main ref={mainRef} className="theme-page min-w-0 flex-1 overflow-y-auto overscroll-y-contain">
           {children}
           {music.current && <div className="h-24" aria-hidden />}
         </main>

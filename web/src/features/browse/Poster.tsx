@@ -1,7 +1,7 @@
 import { clsx } from "clsx";
 import { Disc3, Film, Layers, Music, Tv, Video } from "lucide-react";
 import { useState } from "react";
-import { imageUrl } from "@/api/client";
+import { imageUrl, vodImageUrl } from "@/api/client";
 import type { ItemSummary } from "@/api/types";
 
 const icons = { movie: Film, show: Tv, season: Tv, episode: Tv, artist: Music, album: Disc3, track: Music, video: Video, collection: Layers };
@@ -37,7 +37,7 @@ export function Poster({
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const Icon = icons[item.type] ?? Film;
   const artId = shape === "wide" ? (item.images?.thumb ?? item.images?.backdrop) : item.images?.poster;
-  const url = src ?? (artId ? imageUrl(artId, width) : undefined);
+  const url = vodImageUrl(src, width) ?? (artId ? imageUrl(artId, width) : undefined);
   const failed = !!url && failedUrl === url;
   const h = hue(item.title);
   return (

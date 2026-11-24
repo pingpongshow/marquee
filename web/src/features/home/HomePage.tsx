@@ -71,7 +71,9 @@ export function HomePage() {
                 See all <ChevronRight className="size-4" aria-hidden />
               </Link>
             </div>
-            <ul className="flex gap-4 overflow-x-auto px-6 pb-2 lg:px-8">
+            {/* A row scrolls sideways only, and keeps a sideways swipe to itself: on a phone a
+                vertical swipe that starts on it must go straight to the page. */}
+            <ul className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain px-6 pb-2 lg:px-8">
               {mixed
                 ? mixed.map((e) =>
                     e.vod ? (

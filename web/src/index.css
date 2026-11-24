@@ -50,6 +50,13 @@ body,
   height: 100%;
 }
 
+/* The page itself never scrolls: <main> does. On a phone a swipe at the top or bottom of
+   <main> would otherwise drag the whole app (bars and all) and stall the scroll. */
+html,
+body {
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);

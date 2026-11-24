@@ -3019,6 +3019,8 @@ export interface paths {
         parameters: {
             query?: {
                 kind?: "poster" | "backdrop";
+                /** @description Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. */
+                w?: components["parameters"]["ImageWidth"];
             };
             header?: never;
             path: {
@@ -3026,7 +3028,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork). */
+        /** A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork). With w it's resized to that width; without, it's the source's own image, which can be very large. */
         get: operations["vodMovieImage"];
         put?: never;
         post?: never;
@@ -3284,6 +3286,8 @@ export interface paths {
                 kind?: "poster" | "backdrop";
                 /** @description A season's poster instead of the series' (kind is ignored). */
                 season?: number;
+                /** @description Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. */
+                w?: components["parameters"]["ImageWidth"];
             };
             header?: never;
             path: {
@@ -3365,7 +3369,10 @@ export interface paths {
     };
     "/livetv/vod/episodes/{episodeId}/image": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. */
+                w?: components["parameters"]["ImageWidth"];
+            };
             header?: never;
             path: {
                 episodeId: number;
@@ -14563,6 +14570,8 @@ export interface operations {
         parameters: {
             query?: {
                 kind?: "poster" | "backdrop";
+                /** @description Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. */
+                w?: components["parameters"]["ImageWidth"];
             };
             header?: never;
             path: {
@@ -15046,6 +15055,8 @@ export interface operations {
                 kind?: "poster" | "backdrop";
                 /** @description A season's poster instead of the series' (kind is ignored). */
                 season?: number;
+                /** @description Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. */
+                w?: components["parameters"]["ImageWidth"];
             };
             header?: never;
             path: {
@@ -15197,7 +15208,10 @@ export interface operations {
     };
     vodEpisodeImage: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. */
+                w?: components["parameters"]["ImageWidth"];
+            };
             header?: never;
             path: {
                 episodeId: number;

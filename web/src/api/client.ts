@@ -155,6 +155,17 @@ export function imageUrl(artworkId: number, width: number) {
   return `/api/v1/images/${artworkId}?w=${w}&${imageAuth()}`;
 }
 
+/**
+ * An on demand picture (a film's or series' poster, backdrop or still) at a display width.
+ * Sources send these at any size, and a row of full-size ones stutters on a phone; other
+ * addresses are returned as they are.
+ */
+export function vodImageUrl(url: string | undefined, width: number) {
+  if (!url || !/^\/api\/v1\/livetv\/vod\/.+\/image(\?|$)/.test(url)) return url;
+  const w = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));
+  return `${url}${url.includes("?") ? "&" : "?"}w=${w}`;
+}
+
 /** A playlist's or collection's own picture (MUSIC-30); the version makes a changed picture load again. */
 export function playlistImageUrl(playlistId: number, version: string, width: number) {
   const w = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));

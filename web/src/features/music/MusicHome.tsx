@@ -132,7 +132,7 @@ function Shelf({ title, seeAll, children, testId }: { title: string; seeAll?: Re
         <h2 className="text-lg font-semibold">{title}</h2>
         {seeAll && <span className="ml-auto text-sm text-muted hover:text-text">{seeAll}</span>}
       </div>
-      <ul className="flex gap-4 overflow-x-auto pb-2">{children}</ul>
+      <ul className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2">{children}</ul>
     </section>
   );
 }

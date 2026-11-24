@@ -220,7 +220,7 @@ export function MiniPlayer() {
   const t = m.current!.item;
   const [queueOpen, setQueueOpen] = useState(false);
   return (
-    <div className="theme-bar fixed inset-x-0 bottom-0 z-40 border-t border-border backdrop-blur">
+    <div className="theme-bar fixed inset-x-0 bottom-0 z-40 border-t border-border backdrop-blur pointer-coarse:backdrop-blur-none">
       {/* Its own row, as tall as the slider's handle (Safari's is ~20 px), so the handle
           never sits on the artwork below. */}
       <div className="px-3 pt-1 sm:px-4">

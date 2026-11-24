@@ -334,7 +334,7 @@ export function PlaylistEditorPage() {
         </div>
       )}
 
-      <div className="sticky top-0 z-10 -mx-4 mb-3 flex flex-wrap items-center gap-2 border-b border-border bg-bg/95 px-4 py-2 backdrop-blur lg:-mx-8 lg:px-8">
+      <div className="sticky top-0 z-10 -mx-4 mb-3 flex flex-wrap items-center gap-2 border-b border-border bg-bg/95 px-4 py-2 backdrop-blur pointer-coarse:backdrop-blur-none lg:-mx-8 lg:px-8">
         <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-faint" aria-hidden />
           <Input aria-label={`Filter this ${noun}`} placeholder="Filter" value={filter} onChange={(e) => setFilter(e.target.value)} className="pl-8" />

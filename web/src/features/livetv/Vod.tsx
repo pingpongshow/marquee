@@ -3,7 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Bookmark, BookmarkCheck, Check, ChevronLeft, ChevronRight, EyeOff, Filter, MoreHorizontal, Play, RotateCcw, Search, X } from "lucide-react";
 import { clsx } from "clsx";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api, unwrap } from "@/api/client";
+import { api, unwrap, vodImageUrl } from "@/api/client";
 import type { ContinueEntry } from "@/api/types";
 import { Menu, MenuItem } from "@/components/Menu";
 import { toast } from "@/components/Toast";
@@ -413,7 +413,7 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
       {showResumeRow && (
         <section>
           <h2 className="mb-3 text-lg font-semibold">Continue Watching</h2>
-          <ul className="flex gap-4 overflow-x-auto pb-2">
+          <ul className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2">
             {shows
               ? resumeShows.map((m) => (
                   <ResumeTile key={m.id} title={m.title} entry={m.nextEpisode ? ({ key: `vodEpisode:${m.nextEpisode.id}`, vodEpisode: m.nextEpisode } as ContinueEntry) : undefined}>
@@ -466,7 +466,7 @@ function FollowingRow() {
   return (
     <section data-testid="vod-following">
       <h2 className="mb-3 text-lg font-semibold">Following</h2>
-      <ul className="flex gap-4 overflow-x-auto pb-2">
+      <ul className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2">
         {list.map((f) => (
           <li key={f.seriesId} className="w-36 shrink-0">
             <Link to="/vod/shows/$seriesId" params={{ seriesId: String(f.seriesId) }} className="group block">
@@ -518,7 +518,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
     <div className="relative">
       {m.backdropUrl && (
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] overflow-hidden" aria-hidden>
-          <img src={m.backdropUrl} alt="" className="size-full object-cover object-top opacity-35" />
+          <img src={vodImageUrl(m.backdropUrl, 960)} alt="" className="size-full object-cover object-top opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/60 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-bg/80 to-transparent" />
         </div>
