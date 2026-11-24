@@ -5053,6 +5053,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * An episode&#39;s still, fetched once and cached (no sign-in needed, like artwork).
      * 
      * @param episodeId 
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
      * @return java.io.File
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -5062,8 +5063,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun vodEpisodeImage(episodeId: kotlin.Long) : java.io.File {
-        val localVarResponse = vodEpisodeImageWithHttpInfo(episodeId = episodeId)
+    fun vodEpisodeImage(episodeId: kotlin.Long, w: kotlin.Int? = null) : java.io.File {
+        val localVarResponse = vodEpisodeImageWithHttpInfo(episodeId = episodeId, w = w)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as java.io.File
@@ -5085,14 +5086,15 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * An episode&#39;s still, fetched once and cached (no sign-in needed, like artwork).
      * 
      * @param episodeId 
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
      * @return ApiResponse<java.io.File?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun vodEpisodeImageWithHttpInfo(episodeId: kotlin.Long) : ApiResponse<java.io.File?> {
-        val localVariableConfig = vodEpisodeImageRequestConfig(episodeId = episodeId)
+    fun vodEpisodeImageWithHttpInfo(episodeId: kotlin.Long, w: kotlin.Int?) : ApiResponse<java.io.File?> {
+        val localVariableConfig = vodEpisodeImageRequestConfig(episodeId = episodeId, w = w)
 
         return request<Unit, java.io.File>(
             localVariableConfig
@@ -5103,11 +5105,17 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * To obtain the request config of the operation vodEpisodeImage
      *
      * @param episodeId 
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
      * @return RequestConfig
      */
-    fun vodEpisodeImageRequestConfig(episodeId: kotlin.Long) : RequestConfig<Unit> {
+    fun vodEpisodeImageRequestConfig(episodeId: kotlin.Long, w: kotlin.Int?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (w != null) {
+                    put("w", listOf(w.toString()))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
@@ -5140,10 +5148,11 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * GET /livetv/vod/movies/{movieId}/image
-     * A film&#39;s poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+     * A film&#39;s poster or backdrop, fetched once and cached (no sign-in needed, like artwork). With w it&#39;s resized to that width; without, it&#39;s the source&#39;s own image, which can be very large.
      * 
      * @param movieId 
      * @param kind  (optional, default to Kind.POSTER)
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
      * @return java.io.File
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -5153,8 +5162,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun vodMovieImage(movieId: kotlin.Long, kind: KindVodMovieImage? = KindVodMovieImage.POSTER) : java.io.File {
-        val localVarResponse = vodMovieImageWithHttpInfo(movieId = movieId, kind = kind)
+    fun vodMovieImage(movieId: kotlin.Long, kind: KindVodMovieImage? = KindVodMovieImage.POSTER, w: kotlin.Int? = null) : java.io.File {
+        val localVarResponse = vodMovieImageWithHttpInfo(movieId = movieId, kind = kind, w = w)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as java.io.File
@@ -5173,18 +5182,19 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * GET /livetv/vod/movies/{movieId}/image
-     * A film&#39;s poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+     * A film&#39;s poster or backdrop, fetched once and cached (no sign-in needed, like artwork). With w it&#39;s resized to that width; without, it&#39;s the source&#39;s own image, which can be very large.
      * 
      * @param movieId 
      * @param kind  (optional, default to Kind.POSTER)
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
      * @return ApiResponse<java.io.File?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun vodMovieImageWithHttpInfo(movieId: kotlin.Long, kind: KindVodMovieImage?) : ApiResponse<java.io.File?> {
-        val localVariableConfig = vodMovieImageRequestConfig(movieId = movieId, kind = kind)
+    fun vodMovieImageWithHttpInfo(movieId: kotlin.Long, kind: KindVodMovieImage?, w: kotlin.Int?) : ApiResponse<java.io.File?> {
+        val localVariableConfig = vodMovieImageRequestConfig(movieId = movieId, kind = kind, w = w)
 
         return request<Unit, java.io.File>(
             localVariableConfig
@@ -5196,14 +5206,18 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      *
      * @param movieId 
      * @param kind  (optional, default to Kind.POSTER)
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
      * @return RequestConfig
      */
-    fun vodMovieImageRequestConfig(movieId: kotlin.Long, kind: KindVodMovieImage?) : RequestConfig<Unit> {
+    fun vodMovieImageRequestConfig(movieId: kotlin.Long, kind: KindVodMovieImage?, w: kotlin.Int?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
                 if (kind != null) {
                     put("kind", listOf(kind.value))
+                }
+                if (w != null) {
+                    put("w", listOf(w.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
@@ -5487,6 +5501,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param seriesId 
      * @param kind  (optional, default to Kind.POSTER)
      * @param season A season&#39;s poster instead of the series&#39; (kind is ignored). (optional)
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
      * @return java.io.File
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -5496,8 +5511,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun vodSeriesImage(seriesId: kotlin.Long, kind: KindVodSeriesImage? = KindVodSeriesImage.POSTER, season: kotlin.Int? = null) : java.io.File {
-        val localVarResponse = vodSeriesImageWithHttpInfo(seriesId = seriesId, kind = kind, season = season)
+    fun vodSeriesImage(seriesId: kotlin.Long, kind: KindVodSeriesImage? = KindVodSeriesImage.POSTER, season: kotlin.Int? = null, w: kotlin.Int? = null) : java.io.File {
+        val localVarResponse = vodSeriesImageWithHttpInfo(seriesId = seriesId, kind = kind, season = season, w = w)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as java.io.File
@@ -5521,14 +5536,15 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param seriesId 
      * @param kind  (optional, default to Kind.POSTER)
      * @param season A season&#39;s poster instead of the series&#39; (kind is ignored). (optional)
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
      * @return ApiResponse<java.io.File?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun vodSeriesImageWithHttpInfo(seriesId: kotlin.Long, kind: KindVodSeriesImage?, season: kotlin.Int?) : ApiResponse<java.io.File?> {
-        val localVariableConfig = vodSeriesImageRequestConfig(seriesId = seriesId, kind = kind, season = season)
+    fun vodSeriesImageWithHttpInfo(seriesId: kotlin.Long, kind: KindVodSeriesImage?, season: kotlin.Int?, w: kotlin.Int?) : ApiResponse<java.io.File?> {
+        val localVariableConfig = vodSeriesImageRequestConfig(seriesId = seriesId, kind = kind, season = season, w = w)
 
         return request<Unit, java.io.File>(
             localVariableConfig
@@ -5541,9 +5557,10 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param seriesId 
      * @param kind  (optional, default to Kind.POSTER)
      * @param season A season&#39;s poster instead of the series&#39; (kind is ignored). (optional)
+     * @param w Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. (optional)
      * @return RequestConfig
      */
-    fun vodSeriesImageRequestConfig(seriesId: kotlin.Long, kind: KindVodSeriesImage?, season: kotlin.Int?) : RequestConfig<Unit> {
+    fun vodSeriesImageRequestConfig(seriesId: kotlin.Long, kind: KindVodSeriesImage?, season: kotlin.Int?, w: kotlin.Int?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -5552,6 +5569,9 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
                 }
                 if (season != null) {
                     put("season", listOf(season.toString()))
+                }
+                if (w != null) {
+                    put("w", listOf(w.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()

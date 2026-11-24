@@ -39,6 +39,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -81,7 +82,7 @@ import coil3.compose.AsyncImage
 
 /**
  * The bar above the tabs while music plays: opens Now Playing, with the track's own buttons (which
- * don't) for adding it to a playlist, its heart and rating, and play and next. Narrow phones
+ * don't) for adding it to a playlist, its heart and rating, play and next, and a ✕ that closes the player. Narrow phones
  * shorten the title rather than the buttons.
  */
 @Composable
@@ -118,6 +119,8 @@ fun MiniPlayer(onOpen: () -> Unit) {
                 }
                 IconButton(onClick = music::toggle, Modifier.size(40.dp)) { Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pause" else "Play") }
                 IconButton(onClick = music::next, Modifier.size(40.dp)) { Icon(Icons.Filled.SkipNext, "Next track") }
+                // Stops the music and takes the bar away until something is played again.
+                IconButton(onClick = music::close, Modifier.size(36.dp)) { Icon(Icons.Filled.Close, "Close player", Modifier.size(20.dp)) }
             }
         }
     }
@@ -212,6 +215,10 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
                     IconButton(::saveQueue, Modifier.focusRing()) {
                         Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Save as playlist", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+                // TV has no bar to close: stopping the music and emptying the queue is here.
+                if (marquee.isTv) IconButton({ music.close(); onClose() }, Modifier.focusRing()) {
+                    Icon(Icons.Filled.Close, "Close player", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 SleepButton()
                 if (!offline) DJButton()

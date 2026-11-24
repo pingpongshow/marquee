@@ -722,11 +722,35 @@ class MusicController(private val context: Context, private val marquee: Marquee
             else -> Player.REPEAT_MODE_OFF
         }
     }
-    fun stop() = with {
+    fun stop() = with { end(it) }
+
+    /** Stops the music and empties the queue: the track playing is reported as left, and the service drops its notification. */
+    private fun end(c: MediaController) {
         newQueue(null, null)
         _sleep.value = null
-        it.stop()
-        it.clearMediaItems()
+        c.stop()
+        c.clearMediaItems()
+    }
+
+    // Set while the player is being closed, so the queue on its way out isn't saved again.
+    private var closing = false
+
+    /**
+     * Closes the player (the bar's ✕): the music stops, here and on a Cast device, the bar goes
+     * until something is played again, and the queue isn't put back when the app next opens.
+     */
+    fun close() = with { c ->
+        if (casting) {
+            casting = false
+            marquee.cast.onFinished = null
+            marquee.cast.pause()
+        }
+        closing = true
+        end(c)
+        closing = false
+        _playing.value = false
+        saveJob?.cancel()
+        saveJob = scope.launch(Dispatchers.IO) { savedFile.delete() }
     }
 
     // Carrying on after the app closes: the queue is saved on the device as it changes, when it
@@ -736,7 +760,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
     /** Saves the queue (after a moment, so changes together save once; [now] at once). */
     private fun saveQueue(p: Player, now: Boolean = false) {
         val owner = SavedQueue.owner(marquee.server?.id, marquee.userId) ?: return
-        if (p.mediaItemCount == 0) return
+        if (p.mediaItemCount == 0 || closing) return
         lastPositionSave = System.currentTimeMillis()
         val entries = (0 until p.mediaItemCount).map { meta(p.getMediaItemAt(it)) }
         val q = SavedQueue(owner, entries.mapNotNull { summaries[it.id] }.distinctBy { it.id },
