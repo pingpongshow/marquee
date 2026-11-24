@@ -178,6 +178,11 @@ struct MusicHomeView: View {
                     guard !tracks.isEmpty else { throw MarqueeError("There's no music here yet.") }
                     music.play(tracks, source: "Shuffle All")
                 }
+                // Playlists are music's own (there's no Playlists tab): one tap from the top.
+                NavigationLink(value: Route.playlists) { roundLabel("Playlists", "music.note.list") }
+                    .buttonStyle(roundStyle)
+                    .accessibilityLabel("Playlists")
+                    .accessibilityIdentifier("musicPlaylists")
                 if soundprint, app.museOn {
                     NavigationLink(value: Route.musicMuse(library: libraryID)) { roundLabel("Muse", "wand.and.stars") }
                         .buttonStyle(roundStyle)

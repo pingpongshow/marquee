@@ -14,6 +14,7 @@ final class PlaylistChanges {
     }
 }
 
+/// A playlist's or collection's artwork: the picture its owner gave it, or a mosaic of what's in it.
 struct PlaylistMosaic: View {
     @Environment(AppSession.self) private var app
     let playlist: Playlist
@@ -22,8 +23,11 @@ struct PlaylistMosaic: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.25))
-            Image(systemName: playlist.kind == .audio ? "music.note.list" : "list.and.film").font(.title).foregroundStyle(.secondary)
-            if playlist.imageIds.count >= 4 {
+            Image(systemName: playlist.isCollection ? "rectangle.stack" : "music.note.list").font(.title).foregroundStyle(.secondary)
+            if let own = app.playlistImageURL(playlist, width: Int(size)) {
+                // Its owner's picture (MUSIC-30), in place of the mosaic.
+                CachedImage(fill: own)
+            } else if playlist.imageIds.count >= 4 {
                 Grid(horizontalSpacing: 0, verticalSpacing: 0) {
                     GridRow { tile(0); tile(1) }
                     GridRow { tile(2); tile(3) }
@@ -42,7 +46,7 @@ struct PlaylistMosaic: View {
     }
 }
 
-/// A playlist's cover, title and length; opens it.
+/// A playlist's (or one of the person's collections') cover, title and length; opens it.
 struct PlaylistCard: View {
     let playlist: Playlist
     var size: CGFloat
@@ -71,7 +75,7 @@ struct PlaylistCard: View {
     private var titles: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(playlist.title).font(.subheadline.weight(.medium)).lineLimit(1)
-            Text("\(playlist.itemCount) \(playlist.kind == .audio ? "tracks" : "items")").font(.caption).foregroundStyle(.secondary)
+            Text(playlist.countText).font(.caption).foregroundStyle(.secondary)
             if let owner = playlist.sharedBy {
                 Text(owner).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     .accessibilityIdentifier("playlist.sharedBy")
@@ -81,6 +85,16 @@ struct PlaylistCard: View {
 }
 
 extension Playlist {
+    /// A video playlist is one of the person's collections (USER-23): titles of one video
+    /// library that open their own pages. Only music playlists are called playlists.
+    var isCollection: Bool { kind == .video }
+
+    /// "12 tracks", or "3 titles" for a collection.
+    var countText: String {
+        let (one, many) = isCollection ? ("title", "titles") : ("track", "tracks")
+        return "\(itemCount) \(itemCount == 1 ? one : many)"
+    }
+
     /// "Shared by <owner>", on a playlist someone else shared with this person.
     var sharedBy: String? {
         guard readOnly == true else { return nil }
@@ -88,8 +102,8 @@ extension Playlist {
     }
 }
 
-/// A playlist someone shared with this person, waiting for them to accept (MUSIC-24).
-private struct PlaylistInviteRow: View {
+/// A playlist or collection someone shared with this person, waiting for them to accept (MUSIC-24).
+struct PlaylistInviteRow: View {
     let playlist: Playlist
     let accept: () -> Void
     let decline: () -> Void
@@ -128,7 +142,7 @@ private struct PlaylistInviteRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(playlist.title).font(.subheadline.weight(.semibold)).lineLimit(2)
                 Text(playlist.sharedBy ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Text(playlist.itemCount == 1 ? "1 \(playlist.kind == .audio ? "track" : "item")" : "\(playlist.itemCount) \(playlist.kind == .audio ? "tracks" : "items")")
+                Text(playlist.countText)
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
@@ -147,6 +161,8 @@ private struct PlaylistInviteRow: View {
     }
 }
 
+/// The person's music playlists, in the Music area. (Video ones are collections, kept in their
+/// library: USER-23.)
 struct PlaylistsView: View {
     @Environment(AppSession.self) private var app
     /// Shows the playlists in this folder of the person's (MUSIC-28); nil, the top level.
@@ -191,7 +207,6 @@ struct PlaylistsView: View {
                 .padding(.horizontal, sidePadding)
                 .padding(.top, sidePadding)
             }
-            // Video playlists first (movies and episodes, a few at most), then the music ones.
             LazyVGrid(columns: [GridItem(.adaptive(minimum: cell), spacing: 16, alignment: .top)], alignment: .leading, spacing: 20) {
                 if folderID == nil, !folders.list.isEmpty {
                     Section {
@@ -204,8 +219,7 @@ struct PlaylistsView: View {
                             .accessibilityIdentifier("playlists.folders")
                     }
                 }
-                section("Video Playlists", kind: .video)
-                section("Music Playlists", kind: .audio)
+                section
             }
             .padding(sidePadding)
             if let error, playlists.isEmpty {
@@ -225,7 +239,7 @@ struct PlaylistsView: View {
                     .focusable()
                     #endif
             } else if playlists.isEmpty, invites.isEmpty, folders.list.isEmpty {
-                ContentUnavailableView("No playlists", systemImage: "music.note.list", description: Text("Use “Add to Playlist” on any track, album, movie or episode."))
+                ContentUnavailableView("No playlists", systemImage: "music.note.list", description: Text("Use “Add to Playlist” on any song, album or artist."))
                     #if os(tvOS)
                     // Something to hold focus: with nothing focusable the TV's sidebar closed
                     // onto an empty page, and Back then left the app instead of reopening it.
@@ -318,12 +332,12 @@ struct PlaylistsView: View {
     }
 
     private func loadInvites() async {
-        if let list = try? await app.playlistInvites() { invites = list }
+        // A collection's invitation shows in its library.
+        if let list = try? await app.playlistInvites() { invites = list.filter { !$0.isCollection } }
     }
 
-    @ViewBuilder private func section(_ title: String, kind: Schemas.PlaylistKind) -> some View {
-        let all = shown
-        let list = all.filter { $0.kind == kind }
+    @ViewBuilder private var section: some View {
+        let list = shown
         if !list.isEmpty {
             Section {
                 ForEach(list, id: \.id) { p in
@@ -337,11 +351,11 @@ struct PlaylistsView: View {
                         }
                 }
             } header: {
-                // Headed only when both kinds are there, or there are folders above.
-                if list.count != all.count || (folderID == nil && !folders.list.isEmpty) {
-                    Text(title).font(.title2.bold()).frame(maxWidth: .infinity, alignment: .leading)
+                // Headed only when there are folders above.
+                if folderID == nil, !folders.list.isEmpty {
+                    Text("Playlists").font(.title2.bold()).frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityAddTraits(.isHeader)
-                        .accessibilityIdentifier("playlists.\(kind.rawValue)")
+                        .accessibilityIdentifier("playlists.audio")
                 }
             }
         }
@@ -351,7 +365,7 @@ struct PlaylistsView: View {
         async let asked: Void = loadInvites()
         async let filed: Void = folders.load(app)
         do {
-            playlists = try await app.playlists()
+            playlists = try await app.playlists(kind: .audio)
             error = nil
         } catch is CancellationError {
         } catch {
@@ -369,10 +383,11 @@ struct PlaylistsView: View {
     #endif
 }
 
+/// A music playlist's page; or, for a video one, one of the person's collections (USER-23): a
+/// grid of titles that open their own pages. Nothing plays through a collection.
 struct PlaylistView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
-    @Environment(VideoPresenter.self) private var video
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
     #if !os(tvOS)
@@ -385,13 +400,77 @@ struct PlaylistView: View {
     @State private var error: String?
     /// Someone else's playlist, shared with this person: asking whether to remove it.
     @State private var confirmingRemove = false
+    /// A collection's new name being typed, and asking whether to delete it.
+    @State private var renaming = false
+    @State private var newTitle = ""
+    @State private var confirmingDelete = false
+    @State private var changingPicture = false
     #if !os(tvOS)
     @State private var sharing = false
     /// The editor is open (MUSIC-29).
     @State private var editing = false
+    /// Combine is open, with the library's collections to choose from.
+    @State private var combining = false
+    @State private var siblings: [Playlist] = []
     #endif
 
+    private var isCollection: Bool { playlist?.isCollection == true }
+
     var body: some View {
+        Group {
+            if let p = playlist, p.isCollection { collection(p) } else { tracks }
+        }
+        .overlay {
+            if let error, playlist == nil {
+                ContentUnavailableView {
+                    Label("Couldn't load this", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Try Again") { Task { await load() } }
+                }
+            } else if !loaded {
+                ProgressView()
+            }
+        }
+        // No word for it until it has loaded: a collection is never called a playlist.
+        .navigationTitle(playlist?.title ?? "")
+        .task { if !loaded { await load() } }
+        .refreshable { await load() }
+        .onChange(of: PlaylistChanges.shared.version) { Task { await load() } }
+        #if !os(tvOS)
+        .sheet(isPresented: $sharing) {
+            if let playlist { PlaylistShareSheet(playlist: playlist) { Task { await load() } }.macSheetFrame() }
+        }
+        .sheet(isPresented: $editing) {
+            if let playlist { PlaylistEditSheet(playlist: playlist, entries: entries) { Task { await load() } }.macSheetFrame() }
+        }
+        .sheet(isPresented: $combining) { CombinePlaylistsSheet(playlists: siblings).macSheetFrame() }
+        #endif
+        .alert("Remove “\(playlist?.title ?? "")”?", isPresented: $confirmingRemove) {
+            Button("Remove", role: .destructive) { remove() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("It goes from your \(isCollection ? "collections" : "playlists"). You'd need \(playlist?.ownerName ?? "the owner") to share it again to get it back.")
+        }
+        .playlistPicture(isPresented: $changingPicture, playlist: playlist) { playlist = $0 }
+        .alert("Rename Collection", isPresented: $renaming) {
+            TextField("Name", text: $newTitle)
+                .accessibilityIdentifier("collection.name")
+            Button("Rename") { rename() }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Delete “\(playlist?.title ?? "")”?", isPresented: $confirmingDelete) {
+            Button("Delete Collection", role: .destructive) { delete() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Only the collection goes: its titles stay in the library.")
+        }
+    }
+
+    // MARK: A playlist
+
+    private var tracks: some View {
         List {
             if let p = playlist {
                 header(p)
@@ -404,9 +483,9 @@ struct PlaylistView: View {
                     Button { play(i) } label: {
                         // At iPhone width a song's time joins its subtitle, leaving the title room beside the row's buttons.
                         let time = formatTime(seconds: Double(e.item.durationMs ?? 0) / 1000)
-                        let timeInline = sizeClass == .compact && e.item._type == .track
+                        let timeInline = sizeClass == .compact
                         HStack(spacing: 12) {
-                            ArtworkView(item: e.item, shape: e.item._type == .track ? .square : .wide, width: 60).frame(width: e.item._type == .track ? 44 : 80)
+                            ArtworkView(item: e.item, shape: .square, width: 60).frame(width: 44)
                             VStack(alignment: .leading) {
                                 Text(e.item.title).lineLimit(1)
                                 Text(timeInline ? "\(time) · \(e.item.subtitle)" : e.item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -421,9 +500,9 @@ struct PlaylistView: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu { ItemMenuItems(item: e.item) }
-                    if e.item._type == .track { TrackRadioButton(track: e.item) }
+                    TrackRadioButton(track: e.item)
                     if FavoriteStore.canFavorite(e.item) { RowFavorite(item: e.item) }
-                    if e.item._type == .track { RowRating(item: e.item, gap: isTV ? 8 : 4) }
+                    RowRating(item: e.item, gap: isTV ? 8 : 4)
                 }
                 .macRowHover()
                 .macKeyboardRow(id: Int64(i)) { play(i) }
@@ -431,40 +510,9 @@ struct PlaylistView: View {
         }
         .listStyle(.plain)
         .macFocusList(entries.indices.map(Int64.init))
-        .overlay {
-            if let error, playlist == nil {
-                ContentUnavailableView {
-                    Label("Couldn't load the playlist", systemImage: "exclamationmark.triangle")
-                } description: {
-                    Text(error)
-                } actions: {
-                    Button("Try Again") { Task { await load() } }
-                }
-            } else if !loaded {
-                ProgressView()
-            }
-        }
-        .navigationTitle(playlist?.title ?? "Playlist")
-        .task { if !loaded { await load() } }
-        .refreshable { await load() }
-        .onChange(of: PlaylistChanges.shared.version) { Task { await load() } }
-        #if !os(tvOS)
-        .sheet(isPresented: $sharing) {
-            if let playlist { PlaylistShareSheet(playlist: playlist) { Task { await load() } }.macSheetFrame() }
-        }
-        .sheet(isPresented: $editing) {
-            if let playlist { PlaylistEditSheet(playlist: playlist, entries: entries) { Task { await load() } }.macSheetFrame() }
-        }
-        #endif
-        .alert("Remove “\(playlist?.title ?? "")”?", isPresented: $confirmingRemove) {
-            Button("Remove", role: .destructive) { remove() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("It goes from your playlists. You'd need \(playlist?.ownerName ?? "the owner") to share it again to get it back.")
-        }
     }
 
-    /// Takes a playlist someone shared off this person's list; theirs stays as it is.
+    /// Takes a playlist or collection someone shared off this person's list; theirs stays as it is.
     private func remove() {
         ActionError.run {
             try await app.removePlaylistShare(id)
@@ -488,7 +536,7 @@ struct PlaylistView: View {
                     PlaylistMosaic(playlist: p, size: coverSize)
                     VStack(alignment: .leading, spacing: 8) {
                         titles(p)
-                        actions(labelledOnly: true)
+                        actions(p, labelledOnly: true)
                     }
                 }
                 .accessibilityIdentifier("playlistHeader")
@@ -501,7 +549,7 @@ struct PlaylistView: View {
         VStack(alignment: .leading, spacing: 12) {
             PlaylistMosaic(playlist: p, size: 160)
             titles(p)
-            actions(labelledOnly: false)
+            actions(p, labelledOnly: false)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("playlistHeader")
@@ -510,7 +558,7 @@ struct PlaylistView: View {
     private func titles(_ p: Playlist) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(p.title).font(.title2.bold()).lineLimit(3)
-            Text("\(p.itemCount) items · \(formatDuration(ms: p.durationMs))").foregroundStyle(.secondary).lineLimit(1)
+            Text(p.isCollection ? p.countText : "\(p.itemCount) items · \(formatDuration(ms: p.durationMs))").foregroundStyle(.secondary).lineLimit(1)
             if let shared = p.sharedBy ?? sharedWith(p) {
                 Text(shared).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                     .accessibilityIdentifier("playlist.sharedBy")
@@ -525,33 +573,53 @@ struct PlaylistView: View {
         return "Shared with \(n) \(n == 1 ? "person" : "people")"
     }
 
+    @ViewBuilder private func actions(_ p: Playlist, labelledOnly: Bool) -> some View {
+        if p.isCollection { collectionActions(p, labelledOnly: labelledOnly) } else { playlistActions(labelledOnly: labelledOnly) }
+    }
+
     /// Play and Shuffle first; Download and Pin to Home turn icon-only when there's no room.
-    private func actions(labelledOnly: Bool) -> some View {
+    private func playlistActions(labelledOnly: Bool) -> some View {
         HeaderActions(labelledOnly: labelledOnly) {
             Button { play(0) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
             Button { play(0, shuffle: true) } label: { Label("Shuffle", systemImage: "shuffle") }.buttonStyle(.bordered)
         } secondary: {
             #if !os(tvOS)
             PlaylistDownloadButton(id: id)
-            if let p = playlist, p.readOnly != true, p.rules == nil, !entries.isEmpty {
-                Button { editing = true } label: { Label("Edit", systemImage: "pencil") }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("playlist.edit")
-            }
-            if let p = playlist, p.readOnly != true {
-                Button { sharing = true } label: { Label("Share", systemImage: "person.2") }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("playlist.share")
-            }
+            if let p = playlist, p.readOnly != true, p.rules == nil, !entries.isEmpty { editButton }
+            if playlist?.readOnly != true { shareButton }
             #endif
+            if playlist?.readOnly != true { pictureButton }
             PinToHomeButton(rowID: AppSession.pinnedRowID(playlist: id))
             if let p = playlist { PlaylistFolderButton(playlist: p) }
-            if playlist?.readOnly == true {
-                Button { confirmingRemove = true } label: { Label("Remove", systemImage: "minus.circle") }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("playlist.remove")
-            }
+            if playlist?.readOnly == true { removeButton }
         }
+    }
+
+    #if !os(tvOS)
+    private var editButton: some View {
+        Button { editing = true } label: { Label("Edit", systemImage: "pencil") }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("playlist.edit")
+    }
+
+    private var shareButton: some View {
+        Button { sharing = true } label: { Label("Share", systemImage: "person.2") }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("playlist.share")
+    }
+    #endif
+
+    /// Its owner's own picture for it (MUSIC-30).
+    private var pictureButton: some View {
+        Button { changingPicture = true } label: { Label("Change Picture", systemImage: "photo") }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("playlist.picture")
+    }
+
+    private var removeButton: some View {
+        Button { confirmingRemove = true } label: { Label("Remove", systemImage: "minus.circle") }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("playlist.remove")
     }
 
     private var compact: Bool {
@@ -565,8 +633,12 @@ struct PlaylistView: View {
 
     #if os(tvOS)
     private let coverSize: CGFloat = 260
+    private let posterWidth: CGFloat = 230
+    private let posterGap: CGFloat = 50
     #else
     private let coverSize: CGFloat = 140
+    private let posterWidth: CGFloat = 110
+    private let posterGap: CGFloat = 14
     #endif
 
     private func load() async {
@@ -588,16 +660,103 @@ struct PlaylistView: View {
     private func play(_ start: Int, shuffle: Bool = false) {
         let items = entries.map(\.item)
         guard !items.isEmpty else { return }
-        if playlist?.kind == .audio {
-            music.play(items, start: start, shuffle: shuffle, source: playlist?.title)
-        } else if shuffle {
-            // Every item once, in a random order, one after another.
-            let order = items.map(\.id).shuffled()
-            video.play(order[0], startMs: 0, playlistID: id, order: order, position: 0)
-        } else {
-            video.play(items[start].id, startMs: 0, playlistID: id, position: start)
+        music.play(items, start: start, shuffle: shuffle, source: playlist?.title)
+    }
+
+    // MARK: A collection
+
+    /// The titles as posters, like a library's grid: each opens its own page. No Play, Shuffle
+    /// or download, and no folders (those are for music playlists).
+    private func collection(_ p: Playlist) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: isTV ? 40 : 16) {
+                header(p)
+                    #if os(tvOS)
+                    .focusSection()
+                    #endif
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: posterWidth, maximum: posterWidth * 1.4), spacing: posterGap, alignment: .top)], spacing: posterGap) {
+                    ForEach(entries, id: \.entryId) { e in
+                        PosterCard(item: e.item, width: posterWidth, onRemoveFromCollection: p.readOnly == true ? nil : { take(e) })
+                    }
+                }
+                .accessibilityIdentifier("collectionGrid")
+                if loaded, entries.isEmpty {
+                    ContentUnavailableView("Nothing in this collection yet", systemImage: "rectangle.stack",
+                                           description: Text(p.readOnly == true ? "" : "Use “Add to My Collection” on a title in this library."))
+                }
+            }
+            .padding(.horizontal, sidePadding)
+            .padding(.vertical)
         }
     }
+
+    /// The owner's: Edit (reorder and remove), Share, Rename, Pin to Home, Change Picture, Combine, Delete. One
+    /// shared with this person can only be pinned or removed from theirs. The TV has no editor
+    /// or sharing; a title is taken out from its tile's menu there.
+    private func collectionActions(_ p: Playlist, labelledOnly: Bool) -> some View {
+        HeaderActions(labelledOnly: labelledOnly) {
+            if p.readOnly == true {
+                removeButton
+            } else {
+                #if !os(tvOS)
+                if !entries.isEmpty { editButton }
+                shareButton
+                #endif
+                Button { newTitle = p.title; renaming = true } label: { Label("Rename", systemImage: "character.cursor.ibeam") }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("collection.rename")
+            }
+        } secondary: {
+            PinToHomeButton(rowID: AppSession.pinnedRowID(playlist: id))
+            if p.readOnly != true {
+                pictureButton
+                #if !os(tvOS)
+                Button { combine(p) } label: { Label("Combine", systemImage: "arrow.triangle.merge") }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("collection.combine")
+                #endif
+                Button(role: .destructive) { confirmingDelete = true } label: { Label("Delete", systemImage: "trash") }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("collection.delete")
+            }
+        }
+    }
+
+    private func rename() {
+        let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, title != playlist?.title else { return }
+        ActionError.run {
+            playlist = try await app.renamePlaylist(id, title: title)
+            PlaylistChanges.shared.changed()
+        }
+    }
+
+    private func delete() {
+        ActionError.run {
+            try await app.deletePlaylist(id)
+            PlaylistChanges.shared.changed()
+            dismiss()
+        }
+    }
+
+    /// Takes one title out of the collection (its tile's menu).
+    private func take(_ e: PlaylistEntry) {
+        ActionError.run {
+            try await app.removePlaylistItem(id, entryID: e.entryId)
+            PlaylistChanges.shared.changed()
+        }
+    }
+
+    #if !os(tvOS)
+    /// Combine works within one library: its other collections are the choices.
+    private func combine(_ p: Playlist) {
+        ActionError.run {
+            siblings = try await app.playlists(kind: .video, libraryId: p.libraryId)
+            guard siblings.count >= 2 else { throw MarqueeError("There's no other collection in this library to combine it with.") }
+            combining = true
+        }
+    }
+    #endif
 }
 
 #if !os(tvOS)
@@ -635,7 +794,8 @@ struct PlaylistShareSheet: View {
                     } header: {
                         Text("People")
                     } footer: {
-                        Text("They see it once they accept, and can play it but not change it.")
+                        Text(playlist.isCollection ? "They see it once they accept, and can browse it but not change it."
+                             : "They see it once they accept, and can play it but not change it.")
                     }
                 } else if error == nil {
                     ProgressView()
@@ -733,7 +893,8 @@ struct PlaylistDownloadButton: View {
 
 /// The playlist editor: select several to delete, drag to reorder, sort, take out duplicates,
 /// then Save sends the new order in one go. Nothing changes until then; Cancel leaves it as it
-/// was. For the person's own playlists (not smart ones, which fill themselves).
+/// was. For the person's own playlists (not smart ones, which fill themselves), and their
+/// collections (USER-23), which have no music sorts and hold each title once.
 struct PlaylistEditSheet: View {
     @Environment(AppSession.self) private var app
     @Environment(\.dismiss) private var dismiss
@@ -777,7 +938,7 @@ struct PlaylistEditSheet: View {
             #if os(iOS)
             .environment(\.editMode, .constant(.active))
             #endif
-            .navigationTitle("Edit Playlist")
+            .navigationTitle(playlist.isCollection ? "Edit Collection" : "Edit Playlist")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -795,7 +956,7 @@ struct PlaylistEditSheet: View {
                 #endif
             }
             .overlay { if saving { ProgressView().controlSize(.large) } }
-            .alert("Couldn't save the playlist", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+            .alert(playlist.isCollection ? "Couldn't save the collection" : "Couldn't save the playlist", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(error ?? "")
@@ -822,19 +983,23 @@ struct PlaylistEditSheet: View {
         Menu {
             Section("Sort") {
                 Button("Title", systemImage: "textformat") { sort { $0.item.title } }
-                Button("Artist", systemImage: "music.mic") { sort { $0.item.artistCredit ?? $0.item.grandparentTitle ?? "" } }
-                Button("Album", systemImage: "square.stack") { sort { $0.item.parentTitle ?? "" } }
+                if !playlist.isCollection {
+                    Button("Artist", systemImage: "music.mic") { sort { $0.item.artistCredit ?? $0.item.grandparentTitle ?? "" } }
+                    Button("Album", systemImage: "square.stack") { sort { $0.item.parentTitle ?? "" } }
+                }
                 Button("Date Added, Oldest First", systemImage: "calendar") { entries.sort { $0.entryId < $1.entryId } }
                 Button("Date Added, Newest First", systemImage: "calendar") { entries.sort { $0.entryId > $1.entryId } }
                 Button("Reverse", systemImage: "arrow.up.arrow.down") { entries.reverse() }
-                Button("Shuffle", systemImage: "shuffle") { entries.shuffle() }
+                if !playlist.isCollection { Button("Shuffle", systemImage: "shuffle") { entries.shuffle() } }
             }
-            let dupes = duplicateIDs
-            Button("Remove \(dupes.count) Duplicate\(dupes.count == 1 ? "" : "s")", systemImage: "square.on.square.dashed") {
-                entries.removeAll { dupes.contains($0.entryId) }
-                selection.subtract(dupes)
+            if !playlist.isCollection {
+                let dupes = duplicateIDs
+                Button("Remove \(dupes.count) Duplicate\(dupes.count == 1 ? "" : "s")", systemImage: "square.on.square.dashed") {
+                    entries.removeAll { dupes.contains($0.entryId) }
+                    selection.subtract(dupes)
+                }
+                .disabled(dupes.isEmpty)
             }
-            .disabled(dupes.isEmpty)
         } label: {
             Label("Arrange", systemImage: "arrow.up.arrow.down.circle")
         }
@@ -843,8 +1008,8 @@ struct PlaylistEditSheet: View {
 
     private func row(_ e: PlaylistEntry) -> some View {
         HStack(spacing: 12) {
-            ArtworkView(item: e.item, shape: e.item._type == .track ? .square : .wide, width: 44)
-                .frame(width: e.item._type == .track ? 36 : 64)
+            ArtworkView(item: e.item, shape: .for(e.item), width: 64)
+                .frame(width: PosterShape.for(e.item) == .wide ? 64 : 36)
             VStack(alignment: .leading) {
                 Text(e.item.title).lineLimit(1)
                 Text(e.item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -881,7 +1046,8 @@ struct PlaylistEditSheet: View {
 
 /// Combines playlists (MUSIC-29), such as several Christmas ones into one: picked in order, into
 /// a new playlist or the end of one of the person's own, with or without duplicates, and the
-/// originals kept or deleted (only their own; shared ones stay).
+/// originals kept or deleted (only their own; shared ones stay). Also the collections of one
+/// video library (USER-23), which never repeat a title.
 struct CombinePlaylistsSheet: View {
     @Environment(AppSession.self) private var app
     @Environment(\.dismiss) private var dismiss
@@ -896,11 +1062,13 @@ struct CombinePlaylistsSheet: View {
     @State private var working = false
     @State private var error: String?
 
-    private var kind: Schemas.PlaylistKind? { picked.first.flatMap { id in playlists.first { $0.id == id }?.kind } }
+    /// Given one library's collections rather than music playlists.
+    private var collections: Bool { playlists.first?.isCollection == true }
+    private var noun: String { collections ? "collection" : "playlist" }
 
-    /// The person's own, non-smart playlists of the picked kind: where they can go.
+    /// The person's own, non-smart ones: where they can go.
     private var destinations: [Playlist] {
-        playlists.filter { $0.readOnly != true && $0.rules == nil && (kind == nil || $0.kind == kind) }
+        playlists.filter { $0.readOnly != true && $0.rules == nil }
     }
 
     private var ready: Bool {
@@ -914,11 +1082,9 @@ struct CombinePlaylistsSheet: View {
                 Section {
                     ForEach(playlists, id: \.id) { p in
                         let at = picked.firstIndex(of: p.id)
-                        let allowed = kind == nil || p.kind == kind
                         Button {
                             if let at { picked.remove(at: at) } else { picked.append(p.id) }
                             if title.isEmpty, picked.count == 1 { title = p.title }
-                            if let into, !destinations.contains(where: { $0.id == into }) { self.into = nil }
                         } label: {
                             HStack {
                                 Image(systemName: at == nil ? "circle" : "\(at! + 1).circle.fill")
@@ -926,41 +1092,36 @@ struct CombinePlaylistsSheet: View {
                                     .font(.title3)
                                 VStack(alignment: .leading) {
                                     Text(p.title).lineLimit(1)
-                                    Text("\(p.itemCount) items\(p.readOnly == true ? " · shared by \(p.ownerName ?? "someone")" : "")")
+                                    Text("\(p.countText)\(p.readOnly == true ? " · shared by \(p.ownerName ?? "someone")" : "")")
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
-                                Spacer()
-                                Image(systemName: p.kind == .audio ? "music.note.list" : "film").foregroundStyle(.secondary)
                             }
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .disabled(!allowed && at == nil)
                         .accessibilityAddTraits(at == nil ? [] : .isSelected)
                     }
                 } header: {
-                    Text("Playlists to combine, in order")
-                } footer: {
-                    Text("Music and video playlists can't be combined.")
+                    Text(collections ? "Collections to combine, in order" : "Playlists to combine, in order")
                 }
                 Section("Into") {
                     Picker("Into", selection: $into) {
-                        Text("A new playlist").tag(Int64?.none)
+                        Text("A new \(noun)").tag(Int64?.none)
                         ForEach(destinations, id: \.id) { Text($0.title).tag(Optional($0.id)) }
                     }
                     if into == nil {
-                        TextField("New playlist's title", text: $title)
+                        TextField("New \(noun)'s title", text: $title)
                             .accessibilityIdentifier("combine.title")
                     }
                 }
                 Section {
-                    Toggle("Leave out duplicates", isOn: $skipDuplicates)
+                    if !collections { Toggle("Leave out duplicates", isOn: $skipDuplicates) }
                     Toggle("Delete the originals", isOn: $deleteSources)
                 } footer: {
-                    Text("Only your own playlists are deleted: ones shared with you stay.")
+                    Text("Only your own \(noun)s are deleted: ones shared with you stay.")
                 }
             }
-            .navigationTitle("Combine Playlists")
+            .navigationTitle(collections ? "Combine Collections" : "Combine Playlists")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -973,7 +1134,7 @@ struct CombinePlaylistsSheet: View {
                 }
             }
             .overlay { if working { ProgressView().controlSize(.large) } }
-            .alert("Couldn't combine the playlists", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+            .alert("Couldn't combine the \(noun)s", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(error ?? "")

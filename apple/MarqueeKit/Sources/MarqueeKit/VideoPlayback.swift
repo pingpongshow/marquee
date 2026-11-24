@@ -30,8 +30,6 @@ public final class VideoPlayback {
     public private(set) var session: PlaybackSession?
     public private(set) var item: ItemDetail?
     public private(set) var nextUp: Item?
-    /// Where `nextUp` is in the playlist's play order (nil outside a playlist).
-    public private(set) var nextUpPosition: Int?
     public private(set) var activeMarker: Marker?
     public private(set) var errorMessage: String?
     /// Set when the profile's time limit or viewing hours refused or ended playback (kids'
@@ -61,12 +59,6 @@ public final class VideoPlayback {
     public var nightMode: Bool { session?.nightMode ?? false }
 
     private let app: AppSession
-    private let playlistID: Int64?
-    /// A shuffled playlist's play order (item ids); nil = the playlist's own order.
-    private let order: [Int64]?
-    /// Where this video is in the playlist's play order, when the player was told (Up Next
-    /// moved on to it); otherwise its first place there.
-    private let playlistPosition: Int?
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var endObserver: NSObjectProtocol?
@@ -117,11 +109,8 @@ public final class VideoPlayback {
     /// the person's pick. Nil until the player has settled on one.
     @ObservationIgnored private var shownAudioOption: AVMediaSelectionOption?
 
-    public init(app: AppSession, playlistID: Int64? = nil, order: [Int64]? = nil, position: Int? = nil) {
+    public init(app: AppSession) {
         self.app = app
-        self.playlistID = playlistID
-        self.order = order
-        playlistPosition = position
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] t in
             MainActor.assumeIsolated { self?.tick(t.seconds) }
         }
@@ -578,25 +567,10 @@ public final class VideoPlayback {
 
     private func loadNext(_ itemID: Int64) {
         Task {
-            if let playlistID, let entries = try? await app.playlistItems(playlistID) {
-                // Up next in the playlist (shuffled or in order); nothing after its last item.
-                // From its own place when that's known: found by id alone, a video that's in the
-                // playlist twice led back to what follows its first place, for ever.
-                let ids = order ?? entries.map(\.item.id)
-                let at = playlistPosition.flatMap { ids.indices.contains($0) && ids[$0] == itemID ? $0 : nil } ?? ids.firstIndex(of: itemID)
-                let next = at.flatMap { $0 + 1 < ids.count ? $0 + 1 : nil }
-                if let next, order == nil {
-                    nextUp = entries[next].item
-                } else {
-                    nextUp = next.flatMap { i in entries.first { $0.item.id == ids[i] }?.item }
-                }
-                nextUpPosition = nextUp == nil ? nil : next
-            } else if item?.type == .episode {
+            if item?.type == .episode {
                 nextUp = await app.next(after: itemID)
-                nextUpPosition = nil
             } else {
                 nextUp = nil
-                nextUpPosition = nil
             }
         }
     }

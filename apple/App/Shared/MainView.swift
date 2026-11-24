@@ -3,8 +3,8 @@ import SwiftUI
 
 // The Mac's MainView, with its sidebar and bar along the bottom, is in App/macOS.
 #if !os(macOS)
-/// Tabs: Home, each library, Playlists, Search and Settings. On iPad and Apple TV they're
-/// the main sidebar; on iPhone a tab bar.
+/// Tabs: Home, each library, Search and Settings. On iPad and Apple TV they're the main
+/// sidebar; on iPhone a tab bar. Playlists are music's: in the music library (MUSIC-29).
 struct MainView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
@@ -236,11 +236,10 @@ struct MainView: View {
         .environment(\.openNowPlaying, OpenNowPlayingAction { showNowPlaying = true })
     }
 
-    /// Playlists, Discover, Downloads (iPad), Now Playing (TV; also the bar along the bottom),
-    /// Settings and Search.
+    /// Discover, Downloads (iPad), Now Playing (TV; also the bar along the bottom), Settings
+    /// and Search.
     @TabContentBuilder<String>
     private var otherTabs: some TabContent<String> {
-        Tab("Playlists", systemImage: "music.note.list", value: "playlists") { stack { PlaylistsView() } }
         #if !MARQUEE_APP_STORE
         if !compact && canDiscover {
             Tab("Discover", systemImage: "safari", value: "discover") { stack { DiscoverView() } }
@@ -311,6 +310,7 @@ struct MainView: View {
         #endif
         do {
             libraries = try await app.libraries()
+            CollectionLibraries.shared.update(libraries)
             librariesError = nil
         } catch is CancellationError {
         } catch {
@@ -480,9 +480,6 @@ struct LibrariesList: View {
             #if !os(tvOS)
             Section {
                 // Value links only: mixing them with view links in one stack re-pushes screens.
-                NavigationLink(value: Route.playlists) {
-                    Label("Playlists", systemImage: "music.note.list").foregroundStyle(.primary)
-                }
                 NavigationLink(value: Route.downloads) {
                     Label("Downloads", systemImage: "arrow.down.circle").foregroundStyle(.primary)
                 }

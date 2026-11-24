@@ -1,5 +1,6 @@
 import Foundation
 import MarqueeAPI
+import OpenAPIRuntime
 
 public typealias Library = Components.Schemas.Library
 public typealias Hub = Components.Schemas.Hub
@@ -171,8 +172,10 @@ public extension AppSession {
         }
     }
 
-    func playlists(kind: Schemas.PlaylistKind? = nil) async throws -> [Playlist] {
-        try await api.listPlaylists(query: .init(kind: kind)).ok.body.json
+    /// Music playlists (`kind: .audio`), or the person's collections of a video library
+    /// (`kind: .video` with the library, USER-23): their own and the ones shared that they accepted.
+    func playlists(kind: Schemas.PlaylistKind? = nil, libraryId: Int64? = nil) async throws -> [Playlist] {
+        try await api.listPlaylists(query: .init(kind: kind, libraryId: libraryId)).ok.body.json
     }
 
     /// Everyone's ratings and comments on an item, with the average.
@@ -197,14 +200,14 @@ public extension AppSession {
     func playlist(_ id: Int64) async throws -> Playlist {
         switch try await api.getPlaylist(path: .init(playlistId: id)) {
         case let .ok(ok): return try ok.body.json
-        case .notFound: throw MarqueeError("This playlist is gone.")
-        default: throw MarqueeError("Couldn't load the playlist.")
+        case .notFound: throw MarqueeError("It's gone: deleted, or no longer shared with you.")
+        default: throw MarqueeError("The server didn't answer as expected.")
         }
     }
 
     /// Every entry of the playlist. The server sends at most 2000 at a time: the rest are asked
     /// for until its total is reached (the editor saves the list it was given, and one page of a
-    /// longer playlist dropped everything after it; Up Next stopped there too).
+    /// longer playlist dropped everything after it).
     func playlistItems(_ id: Int64) async throws -> [PlaylistEntry] {
         var all: [PlaylistEntry] = []
         var seen = Set<Int64>()
@@ -226,8 +229,71 @@ public extension AppSession {
         }
     }
 
-    func createPlaylist(title: String, kind: Schemas.PlaylistKind, items: [Int64]) async throws -> Playlist {
-        try await api.createPlaylist(body: .json(.init(title: title, kind: kind, itemIds: items))).created.body.json
+    /// A music playlist, or a collection (`kind: .video`) in the video library given: a
+    /// collection belongs to one library and holds only its titles (USER-23).
+    func createPlaylist(title: String, kind: Schemas.PlaylistKind, libraryId: Int64? = nil, items: [Int64]) async throws -> Playlist {
+        let collection = kind == .video
+        switch try await api.createPlaylist(body: .json(.init(title: title, kind: kind, itemIds: items, libraryId: libraryId))) {
+        case let .created(r): return try r.body.json
+        case let .badRequest(r): throw MarqueeError((try? r.body.json.message) ?? (collection ? "This library doesn't take collections." : "Couldn't make the playlist."))
+        default: throw MarqueeError(collection ? "Couldn't make the collection." : "Couldn't make the playlist.")
+        }
+    }
+
+    func renamePlaylist(_ id: Int64, title: String) async throws -> Playlist {
+        switch try await api.updatePlaylist(path: .init(playlistId: id), body: .json(.init(title: title))) {
+        case let .ok(r): return try r.body.json
+        case let .badRequest(r): throw MarqueeError((try? r.body.json.message) ?? "That name can't be used.")
+        case .notFound: throw MarqueeError("It's gone.")
+        default: throw MarqueeError("Couldn't rename it.")
+        }
+    }
+
+    // MARK: A playlist's or collection's own picture (MUSIC-30)
+
+    /// Gives it a picture from an image file's bytes (JPEG, PNG or WebP, up to 20 MB), in place
+    /// of the mosaic. Only its owner can.
+    func uploadPlaylistImage(_ id: Int64, data: Data) async throws -> Playlist {
+        switch try await api.uploadPlaylistImage(path: .init(playlistId: id), body: .image_Ast_(HTTPBody(data))) {
+        case let .ok(r): return try r.body.json
+        case let .badRequest(r): throw MarqueeError((try? r.body.json.message) ?? "That image can't be used.")
+        case .notFound: throw MarqueeError("Only its owner can change the picture.")
+        default: throw MarqueeError("Couldn't save the picture.")
+        }
+    }
+
+    /// Gives it the picture at a web address: the server downloads it and keeps its own copy.
+    func setPlaylistImageLink(_ id: Int64, url: String) async throws -> Playlist {
+        switch try await api.setPlaylistImageLink(path: .init(playlistId: id), body: .json(.init(url: url))) {
+        case let .ok(r): return try r.body.json
+        case let .badRequest(r): throw MarqueeError((try? r.body.json.message) ?? "That link can't be used.")
+        case .notFound: throw MarqueeError("Only its owner can change the picture.")
+        default: throw MarqueeError("Couldn't save the picture.")
+        }
+    }
+
+    /// Back to the mosaic of what's in it.
+    func removePlaylistImage(_ id: Int64) async throws -> Playlist {
+        switch try await api.removePlaylistImage(path: .init(playlistId: id)) {
+        case let .ok(r): return try r.body.json
+        case .notFound: throw MarqueeError("Only its owner can change the picture.")
+        default: throw MarqueeError("Couldn't remove the picture.")
+        }
+    }
+
+    /// Takes one entry out of a playlist or collection.
+    func removePlaylistItem(_ playlist: Int64, entryID: Int64) async throws {
+        switch try await api.removePlaylistItem(path: .init(playlistId: playlist, entryId: entryID)) {
+        case .noContent, .notFound: return
+        default: throw MarqueeError("Couldn't remove it.")
+        }
+    }
+
+    func deletePlaylist(_ id: Int64) async throws {
+        switch try await api.deletePlaylist(path: .init(playlistId: id)) {
+        case .noContent, .notFound: return
+        default: throw MarqueeError("Couldn't delete it.")
+        }
     }
 
     // MARK: Editing and combining playlists (MUSIC-29)

@@ -1,7 +1,8 @@
 import MarqueeKit
 import SwiftUI
 
-/// Asks MainView to show the add-to-playlist sheet (menus can't present sheets themselves).
+/// Asks MainView to show the add-to-playlist (or, for a video, add-to-my-collection) sheet: menus
+/// can't present sheets themselves.
 @MainActor @Observable
 final class PlaylistPicker {
     static let shared = PlaylistPicker()
@@ -107,7 +108,12 @@ struct ItemMenuItems: View {
             // Continue Watching, On Deck and episode tiles: the show's page.
             RouteMenuItem(route: .item(show)) { Label("Go to Show", systemImage: "tv") }
         }
-        Button { PlaylistPicker.shared.item = item } label: { Label("Add to Playlist…", systemImage: "text.badge.plus") }
+        if item.isMusic {
+            Button { PlaylistPicker.shared.item = item } label: { Label("Add to Playlist…", systemImage: "text.badge.plus") }
+        } else if CollectionLibraries.shared.takes(item) {
+            // One of the person's own collections in the item's library (USER-23).
+            Button { PlaylistPicker.shared.item = item } label: { Label("Add to My Collection…", systemImage: "rectangle.stack.badge.plus") }
+        }
         if item._type == .track, let album = item.parentId {
             RouteMenuItem(route: .item(album)) { Label("Go to Album", systemImage: "square.stack") }
         }
@@ -152,7 +158,8 @@ struct ItemMenuItems: View {
     }
 }
 
-/// Pick or create a playlist for an item.
+/// Pick or create a playlist for a music item; for a video one, a collection of the person's
+/// own in the item's library (USER-23). The item goes in as it is: a show stays a show.
 struct AddToPlaylistSheet: View {
     @Environment(AppSession.self) private var app
     @Environment(\.dismiss) private var dismiss
@@ -165,24 +172,27 @@ struct AddToPlaylistSheet: View {
     /// playlists).
     @State private var working = false
 
-    private var kind: Schemas.PlaylistKind { item.isMusic ? .audio : .video }
+    private var collection: Bool { !item.isMusic }
+    private var kind: Schemas.PlaylistKind { collection ? .video : .audio }
+    /// A collection belongs to the item's library.
+    private var libraryID: Int64? { collection ? item.libraryId : nil }
 
     var body: some View {
         NavigationStack {
             List {
                 if let done { Label("Added to \(done)", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
                 if let error { ErrorBanner(message: error) }
-                Section("New playlist") {
+                Section(collection ? "New collection" : "New playlist") {
                     HStack {
                         TextField("Name", text: $newTitle)
                         Button("Create") {
                             let title = newTitle.trimmingCharacters(in: .whitespaces)
-                            run { try await app.createPlaylist(title: title, kind: kind, items: [item.id]).title }
+                            run { try await app.createPlaylist(title: title, kind: kind, libraryId: libraryID, items: [item.id]).title }
                         }
                         .disabled(working || newTitle.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
-                Section(kind == .audio ? "Music playlists" : "Video playlists") {
+                Section(collection ? "My collections" : "Playlists") {
                     ForEach(playlists, id: \.id) { p in
                         Button {
                             run {
@@ -196,10 +206,10 @@ struct AddToPlaylistSheet: View {
                     }
                 }
             }
-            .navigationTitle("Add to Playlist")
+            .navigationTitle(collection ? "Add to My Collection" : "Add to Playlist")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-            // Playlists shared with this person can't be changed by them.
-            .task { playlists = ((try? await app.playlists(kind: kind)) ?? []).filter { $0.readOnly != true } }
+            // Ones shared with this person can't be changed by them.
+            .task { playlists = ((try? await app.playlists(kind: kind, libraryId: libraryID)) ?? []).filter { $0.readOnly != true } }
         }
     }
 

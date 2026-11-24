@@ -14,9 +14,6 @@ struct HomeView: View {
     @State private var error: String?
 
     @State private var groups: [WatchGroup] = []
-    /// Video playlists, a row on the TV's Home: the Playlists tab sits at the far end of the
-    /// top bar, out of sight behind the libraries.
-    @State private var videoPlaylists: [Playlist] = []
     @State private var editing = false
     /// A film or episode on demand playing from Continue Watching.
     #if !MARQUEE_APP_STORE
@@ -104,11 +101,6 @@ struct HomeView: View {
                     }
                 }
                 #if os(tvOS)
-                if !videoPlaylists.isEmpty {
-                    ShelfRow(title: "Video Playlists") {
-                        ForEach(videoPlaylists, id: \.id) { PlaylistCard(playlist: $0, size: 250) }
-                    }
-                }
                 if loaded {
                     HStack(spacing: 30) {
                         Button { editing = true } label: { Label("Edit Home", systemImage: "slider.horizontal.3") }
@@ -307,7 +299,6 @@ struct HomeView: View {
             loadedAt = Date()
             error = nil
             #if os(tvOS)
-            if let lists = try? await app.playlists(kind: .video) { videoPlaylists = lists }
             saveTopShelf()
             #endif
         } catch {

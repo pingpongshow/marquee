@@ -772,38 +772,6 @@ extension MarqueeTVUITests {
         shot("tv-fav3-now-playing")
     }
 
-    /// Video playlists are on the Playlists tab; Play starts the first item.
-    func testVideoPlaylistTV() throws {
-        let token = try temporaryAccount()
-        let created = try api("POST", "/playlists", ["title": "UI6 TV Movies", "kind": "video", "itemIds": [322, 8]], token: token)
-        XCTAssertNotNil(created["id"])
-        try signIn(as: token)
-        XCTAssertTrue(app.buttons["Playlists"].firstMatch.waitForExistence(timeout: 10), "a Playlists tab")
-        app.openSection("Playlists")
-        let card = app.buttons["UI6 TV Movies"].firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 10), "the video playlist is listed")
-        remote.press(.down)
-        XCTAssertTrue(card.hasFocus, "focus is on \(focused.label)")
-        shot("tv-b6-playlists")
-        remote.press(.select)
-        XCTAssertTrue(app.staticTexts["00 Long Test"].waitForExistence(timeout: 10), "its items")
-        sleep(1)
-        // Focus starts on the first item; the actions are above it.
-        remote.press(.up) // to the header's actions
-        for _ in 0..<4 where focused.label != "Play" { remote.press(.left) }
-        XCTAssertEqual(focused.label, "Play")
-        let before = try activeSessionIDs()
-        remote.press(.select)
-        try eventually(20, "a video starts") {
-            let fresh = try activeSessionIDs().subtracting(before)
-            return !fresh.isEmpty
-        }
-        let sessions = try list("/playback/sessions", token: adminToken ?? "")
-        XCTAssertTrue(sessions.contains { $0["itemId"] as? Int == 322 }, "00 Long Test plays first")
-        shot("tv-b6-playing")
-        remote.press(.menu)
-    }
-
     /// Back from a title, the grid is where it was, with focus on that title.
     func testLibraryKeepsFocusAfterBack() throws {
         _ = try signInTemporaryUser()

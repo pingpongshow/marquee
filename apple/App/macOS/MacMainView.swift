@@ -13,6 +13,8 @@ final class MacNavigation {
     var paths: [String: NavigationPath] = [:]
     var showNowPlaying = false
     var searchFocused = false
+    /// There's a music library: Playlists (music's own) is listed under it, and in the Go menu.
+    var hasMusic = false
 
     func select(_ row: String) { selection = row }
 
@@ -162,7 +164,12 @@ struct MainView: View {
                     row("Search", "magnifyingglass", MacNavigation.search)
                     ForEach(LibraryEntry.list(libraries, liveTV: hasLiveTV, vodMovies: hasVodMovies, vodShows: hasVodShows)) { entry in
                         switch entry {
-                        case .library(let lib): row(lib.name, icon(lib._type), "library-\(lib.id)")
+                        case .library(let lib):
+                            row(lib.name, icon(lib._type), "library-\(lib.id)")
+                            // Playlists are music's: under the (last) music library, as in Apple Music.
+                            if lib.id == libraries.last(where: { $0._type == .music })?.id {
+                                row("Playlists", "music.note.list", MacNavigation.playlists).padding(.leading, 14)
+                            }
                         case .liveTV: row("Live TV", "antenna.radiowaves.left.and.right", "livetv")
                         case .vodMovies: row("VOD Movies", "film.stack", "vodMovies")
                         case .vodShows: row("VOD Shows", "play.tv", "vodShows")
@@ -173,7 +180,6 @@ struct MainView: View {
                     }
                 }
                 Section {
-                    row("Playlists", "music.note.list", MacNavigation.playlists)
                     row("Downloads", "arrow.down.circle", MacNavigation.downloads)
                     if canDiscover { row("Discover", "safari", MacNavigation.discover) }
                     row("Settings", "gearshape", MacNavigation.settings)
@@ -265,6 +271,8 @@ struct MainView: View {
         async let vod = try? app.vodStatus()
         do {
             libraries = try await app.libraries()
+            CollectionLibraries.shared.update(libraries)
+            nav.hasMusic = libraries.contains { $0._type == .music }
             librariesError = nil
         } catch is CancellationError {
         } catch {

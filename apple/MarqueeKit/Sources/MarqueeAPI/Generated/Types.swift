@@ -1384,7 +1384,9 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}/leaves`.
     /// - Remark: Generated from `#/paths//items/{itemId}/leaves/get(itemLeaves)`.
     func itemLeaves(_ input: Operations.ItemLeaves.Input) async throws -> Operations.ItemLeaves.Output
-    /// Your playlists.
+    /// Your music playlists (kind audio) and your collections (kind video, USER-23).
+    ///
+    /// A video playlist is a personal collection: a list of titles from one video library, kept under that library, that opens each title's page rather than playing through. It holds films, shows, seasons, episodes and videos as they were added (a show stays a show), and can be renamed, reordered, shared and deleted like a playlist. Collections of a library whose personalCollections option is off aren't listed.
     ///
     /// - Remark: HTTP `GET /playlists`.
     /// - Remark: Generated from `#/paths//playlists/get(listPlaylists)`.
@@ -1401,6 +1403,28 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /playlists/{playlistId}`.
     /// - Remark: Generated from `#/paths//playlists/{playlistId}/delete(deletePlaylist)`.
     func deletePlaylist(_ input: Operations.DeletePlaylist.Input) async throws -> Operations.DeletePlaylist.Output
+    /// A playlist's or collection's own picture (MUSIC-30), resized to a cached width. For anyone who can open it.
+    ///
+    /// Usable directly in <img> tags with the image key (?key=). Add ?v=<the playlist's imageVersion> so a changed picture is fetched again: responses are immutable.
+    ///
+    /// - Remark: HTTP `GET /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/get(getPlaylistImage)`.
+    func getPlaylistImage(_ input: Operations.GetPlaylistImage.Input) async throws -> Operations.GetPlaylistImage.Output
+    /// Upload a picture (JPEG, PNG or WebP, up to 20 MB) for your playlist or collection (MUSIC-30). It's shown in place of the mosaic of its items, to you and to everyone it's shared with.
+    ///
+    /// - Remark: HTTP `POST /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/post(uploadPlaylistImage)`.
+    func uploadPlaylistImage(_ input: Operations.UploadPlaylistImage.Input) async throws -> Operations.UploadPlaylistImage.Output
+    /// Use the image at a link as your playlist's or collection's picture (MUSIC-30). The server downloads it once and keeps its own copy; links to this server or the home network are refused.
+    ///
+    /// - Remark: HTTP `PUT /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/put(setPlaylistImageLink)`.
+    func setPlaylistImageLink(_ input: Operations.SetPlaylistImageLink.Input) async throws -> Operations.SetPlaylistImageLink.Output
+    /// Back to the mosaic of its items (MUSIC-30).
+    ///
+    /// - Remark: HTTP `DELETE /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/delete(removePlaylistImage)`.
+    func removePlaylistImage(_ input: Operations.RemovePlaylistImage.Input) async throws -> Operations.RemovePlaylistImage.Output
     /// Your playlist folders (MUSIC-28), by name.
     ///
     /// Folders are optional and your own. Each playlist, yours or one shared with you, is in one of your folders at most (its folderId); the rest are at the top level.
@@ -5027,7 +5051,9 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Your playlists.
+    /// Your music playlists (kind audio) and your collections (kind video, USER-23).
+    ///
+    /// A video playlist is a personal collection: a list of titles from one video library, kept under that library, that opens each title's page rather than playing through. It holds films, shows, seasons, episodes and videos as they were added (a show stays a show), and can be renamed, reordered, shared and deleted like a playlist. Collections of a library whose personalCollections option is off aren't listed.
     ///
     /// - Remark: HTTP `GET /playlists`.
     /// - Remark: Generated from `#/paths//playlists/get(listPlaylists)`.
@@ -5082,6 +5108,66 @@ extension APIProtocol {
         headers: Operations.DeletePlaylist.Input.Headers = .init()
     ) async throws -> Operations.DeletePlaylist.Output {
         try await deletePlaylist(Operations.DeletePlaylist.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// A playlist's or collection's own picture (MUSIC-30), resized to a cached width. For anyone who can open it.
+    ///
+    /// Usable directly in <img> tags with the image key (?key=). Add ?v=<the playlist's imageVersion> so a changed picture is fetched again: responses are immutable.
+    ///
+    /// - Remark: HTTP `GET /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/get(getPlaylistImage)`.
+    public func getPlaylistImage(
+        path: Operations.GetPlaylistImage.Input.Path,
+        query: Operations.GetPlaylistImage.Input.Query = .init(),
+        headers: Operations.GetPlaylistImage.Input.Headers = .init()
+    ) async throws -> Operations.GetPlaylistImage.Output {
+        try await getPlaylistImage(Operations.GetPlaylistImage.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Upload a picture (JPEG, PNG or WebP, up to 20 MB) for your playlist or collection (MUSIC-30). It's shown in place of the mosaic of its items, to you and to everyone it's shared with.
+    ///
+    /// - Remark: HTTP `POST /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/post(uploadPlaylistImage)`.
+    public func uploadPlaylistImage(
+        path: Operations.UploadPlaylistImage.Input.Path,
+        headers: Operations.UploadPlaylistImage.Input.Headers = .init(),
+        body: Operations.UploadPlaylistImage.Input.Body
+    ) async throws -> Operations.UploadPlaylistImage.Output {
+        try await uploadPlaylistImage(Operations.UploadPlaylistImage.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Use the image at a link as your playlist's or collection's picture (MUSIC-30). The server downloads it once and keeps its own copy; links to this server or the home network are refused.
+    ///
+    /// - Remark: HTTP `PUT /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/put(setPlaylistImageLink)`.
+    public func setPlaylistImageLink(
+        path: Operations.SetPlaylistImageLink.Input.Path,
+        headers: Operations.SetPlaylistImageLink.Input.Headers = .init(),
+        body: Operations.SetPlaylistImageLink.Input.Body
+    ) async throws -> Operations.SetPlaylistImageLink.Output {
+        try await setPlaylistImageLink(Operations.SetPlaylistImageLink.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Back to the mosaic of its items (MUSIC-30).
+    ///
+    /// - Remark: HTTP `DELETE /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/delete(removePlaylistImage)`.
+    public func removePlaylistImage(
+        path: Operations.RemovePlaylistImage.Input.Path,
+        headers: Operations.RemovePlaylistImage.Input.Headers = .init()
+    ) async throws -> Operations.RemovePlaylistImage.Output {
+        try await removePlaylistImage(Operations.RemovePlaylistImage.Input(
             path: path,
             headers: headers
         ))

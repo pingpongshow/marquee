@@ -31,7 +31,7 @@ struct UpNextContent {
     var background: URL?
 }
 
-/// Up Next, after an episode (or a playlist entry) has played to its end: full screen over the
+/// Up Next, after an episode has played to its end: full screen over the
 /// show's art. The one that ended on the left (select it to play it again), the next one in the
 /// middle with a countdown that plays it at zero (select it to play now), and the next one's
 /// details on the right. Close, Menu on the Siri Remote or Esc leaves the player. On a narrow

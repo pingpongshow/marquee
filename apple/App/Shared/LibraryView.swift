@@ -75,6 +75,16 @@ struct LibraryGrid: View {
 
     private var libraryID: Int64 { library.id }
     private var isMusic: Bool { library._type == .music }
+    /// People keep their own collections in this library (USER-23): Collections shows them first.
+    private var personal: Bool { type == nil && library.takesPersonalCollections }
+    /// What Collections' other choice is called: what the library holds.
+    private var titlesName: String {
+        switch library._type {
+        case .movies: "Movies"
+        case .shows, .anime: "Shows"
+        default: "Videos"
+        }
+    }
     private var title: String {
         switch type {
         case .artist: "Artists"
@@ -121,6 +131,9 @@ struct LibraryGrid: View {
     private var grid: some View {
         ScrollView {
             if let error { ErrorBanner(message: error).padding() }
+            if showCollections, personal {
+                MyCollections(library: library, width: minWidth, gap: gap, libraryHasCollections: !items.isEmpty)
+            }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth, maximum: minWidth * 1.4), spacing: gap, alignment: .top)], spacing: gap) {
                 ForEach(items, id: \.id) { item in
                     PosterCard(item: item, width: minWidth)
@@ -131,7 +144,8 @@ struct LibraryGrid: View {
             .padding(.vertical)
             .accessibilityIdentifier("libraryGrid")
             if loading { ProgressView().padding() }
-            if !loading, error == nil, items.isEmpty, generation > 0 {
+            // Under the person's own collections there's New collection, never "Nothing here".
+            if !loading, error == nil, items.isEmpty, generation > 0, !(showCollections && personal) {
                 let favs = favoritesOnly && !showCollections
                 ContentUnavailableView(favs ? "No favourites here yet" : ratedOnly ? "Nothing rated 4★ or more" : unwatchedOnly ? "Nothing left to watch" : "Nothing here yet",
                                        systemImage: favs ? "heart" : ratedOnly ? "star" : "square.grid.2x2",
@@ -151,9 +165,10 @@ struct LibraryGrid: View {
 
     private var sortMenu: some View {
         Menu {
-            if library._type == .movies {
+            // Also where the library has no collections of its own, for the person's.
+            if library._type == .movies || personal {
                 Picker("Show", selection: $showCollections) {
-                    Text("Movies").tag(false)
+                    Text(titlesName).tag(false)
                     Text("Collections").tag(true)
                 }
             }

@@ -144,6 +144,7 @@ struct MarqueeCommands: Commands {
                 .keyboardShortcut("1")
             Button("Playlists") { go(MacNavigation.playlists) }
                 .keyboardShortcut("2")
+                .disabled(!MacNavigation.shared.hasMusic)
             Button("Downloads") { go(MacNavigation.downloads) }
                 .keyboardShortcut("3")
             Button("Search") {

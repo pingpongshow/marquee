@@ -52551,7 +52551,9 @@ public enum Operations {
             }
         }
     }
-    /// Your playlists.
+    /// Your music playlists (kind audio) and your collections (kind video, USER-23).
+    ///
+    /// A video playlist is a personal collection: a list of titles from one video library, kept under that library, that opens each title's page rather than playing through. It holds films, shows, seasons, episodes and videos as they were added (a show stays a show), and can be renamed, reordered, shared and deleted like a playlist. Collections of a library whose personalCollections option is off aren't listed.
     ///
     /// - Remark: HTTP `GET /playlists`.
     /// - Remark: Generated from `#/paths//playlists/get(listPlaylists)`.
@@ -52562,12 +52564,21 @@ public enum Operations {
             public struct Query: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/playlists/GET/query/kind`.
                 public var kind: Components.Schemas.PlaylistKind?
+                /// Only the collections (kind video) of this library.
+                ///
+                /// - Remark: Generated from `#/paths/playlists/GET/query/libraryId`.
+                public var libraryId: Swift.Int64?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - kind:
-                public init(kind: Components.Schemas.PlaylistKind? = nil) {
+                ///   - libraryId: Only the collections (kind video) of this library.
+                public init(
+                    kind: Components.Schemas.PlaylistKind? = nil,
+                    libraryId: Swift.Int64? = nil
+                ) {
                     self.kind = kind
+                    self.libraryId = libraryId
                 }
             }
             public var query: Operations.ListPlaylists.Input.Query
@@ -53371,6 +53382,837 @@ public enum Operations {
             /// Not found.
             ///
             /// - Remark: Generated from `#/paths//playlists/{playlistId}/delete(deletePlaylist)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// A playlist's or collection's own picture (MUSIC-30), resized to a cached width. For anyone who can open it.
+    ///
+    /// Usable directly in <img> tags with the image key (?key=). Add ?v=<the playlist's imageVersion> so a changed picture is fetched again: responses are immutable.
+    ///
+    /// - Remark: HTTP `GET /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/get(getPlaylistImage)`.
+    public enum GetPlaylistImage {
+        public static let id: Swift.String = "getPlaylistImage"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/GET/path/playlistId`.
+                public var playlistId: Components.Parameters.PlaylistId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - playlistId:
+                public init(playlistId: Components.Parameters.PlaylistId) {
+                    self.playlistId = playlistId
+                }
+            }
+            public var path: Operations.GetPlaylistImage.Input.Path
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
+                ///
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/GET/query/w`.
+                public var w: Components.Parameters.ImageWidth?
+                /// The playlist's imageVersion: it only makes the address change with the picture.
+                ///
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/GET/query/v`.
+                public var v: Swift.String?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - w: Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
+                ///   - v: The playlist's imageVersion: it only makes the address change with the picture.
+                public init(
+                    w: Components.Parameters.ImageWidth? = nil,
+                    v: Swift.String? = nil
+                ) {
+                    self.w = w
+                    self.v = v
+                }
+            }
+            public var query: Operations.GetPlaylistImage.Input.Query
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetPlaylistImage.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetPlaylistImage.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetPlaylistImage.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.GetPlaylistImage.Input.Path,
+                query: Operations.GetPlaylistImage.Input.Query = .init(),
+                headers: Operations.GetPlaylistImage.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/GET/responses/200/headers/Cache-Control`.
+                    public var cacheControl: Swift.String?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - cacheControl:
+                    public init(cacheControl: Swift.String? = nil) {
+                        self.cacheControl = cacheControl
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetPlaylistImage.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/GET/responses/200/content/image\/jpeg`.
+                    case jpeg(OpenAPIRuntime.HTTPBody)
+                    /// The associated value of the enum case if `self` is `.jpeg`.
+                    ///
+                    /// - Throws: An error if `self` is not `.jpeg`.
+                    /// - SeeAlso: `.jpeg`.
+                    public var jpeg: OpenAPIRuntime.HTTPBody {
+                        get throws {
+                            switch self {
+                            case let .jpeg(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetPlaylistImage.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetPlaylistImage.Output.Ok.Headers = .init(),
+                    body: Operations.GetPlaylistImage.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Image.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/get(getPlaylistImage)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetPlaylistImage.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetPlaylistImage.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/get(getPlaylistImage)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/get(getPlaylistImage)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case jpeg
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "image/jpeg":
+                    self = .jpeg
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .jpeg:
+                    return "image/jpeg"
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .jpeg,
+                    .json
+                ]
+            }
+        }
+    }
+    /// Upload a picture (JPEG, PNG or WebP, up to 20 MB) for your playlist or collection (MUSIC-30). It's shown in place of the mosaic of its items, to you and to everyone it's shared with.
+    ///
+    /// - Remark: HTTP `POST /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/post(uploadPlaylistImage)`.
+    public enum UploadPlaylistImage {
+        public static let id: Swift.String = "uploadPlaylistImage"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/POST/path/playlistId`.
+                public var playlistId: Components.Parameters.PlaylistId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - playlistId:
+                public init(playlistId: Components.Parameters.PlaylistId) {
+                    self.playlistId = playlistId
+                }
+            }
+            public var path: Operations.UploadPlaylistImage.Input.Path
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UploadPlaylistImage.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UploadPlaylistImage.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.UploadPlaylistImage.Input.Headers
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/POST/requestBody/content/image\/*`.
+                case image_Ast_(OpenAPIRuntime.HTTPBody)
+            }
+            public var body: Operations.UploadPlaylistImage.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.UploadPlaylistImage.Input.Path,
+                headers: Operations.UploadPlaylistImage.Input.Headers = .init(),
+                body: Operations.UploadPlaylistImage.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.Playlist)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.Playlist {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UploadPlaylistImage.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.UploadPlaylistImage.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The playlist as it is now.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/post(uploadPlaylistImage)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.UploadPlaylistImage.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.UploadPlaylistImage.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/post(uploadPlaylistImage)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/post(uploadPlaylistImage)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/post(uploadPlaylistImage)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Use the image at a link as your playlist's or collection's picture (MUSIC-30). The server downloads it once and keeps its own copy; links to this server or the home network are refused.
+    ///
+    /// - Remark: HTTP `PUT /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/put(setPlaylistImageLink)`.
+    public enum SetPlaylistImageLink {
+        public static let id: Swift.String = "setPlaylistImageLink"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/PUT/path/playlistId`.
+                public var playlistId: Components.Parameters.PlaylistId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - playlistId:
+                public init(playlistId: Components.Parameters.PlaylistId) {
+                    self.playlistId = playlistId
+                }
+            }
+            public var path: Operations.SetPlaylistImageLink.Input.Path
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetPlaylistImageLink.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetPlaylistImageLink.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.SetPlaylistImageLink.Input.Headers
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/PUT/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/PUT/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// The image's own address (https://…): a JPEG, PNG or WebP.
+                    ///
+                    /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/PUT/requestBody/json/url`.
+                    public var url: Swift.String
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - url: The image's own address (https://…): a JPEG, PNG or WebP.
+                    public init(url: Swift.String) {
+                        self.url = url
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case url
+                    }
+                }
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/PUT/requestBody/content/application\/json`.
+                case json(Operations.SetPlaylistImageLink.Input.Body.JsonPayload)
+            }
+            public var body: Operations.SetPlaylistImageLink.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.SetPlaylistImageLink.Input.Path,
+                headers: Operations.SetPlaylistImageLink.Input.Headers = .init(),
+                body: Operations.SetPlaylistImageLink.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/PUT/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/PUT/responses/200/content/application\/json`.
+                    case json(Components.Schemas.Playlist)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.Playlist {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SetPlaylistImageLink.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SetPlaylistImageLink.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The playlist as it is now.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/put(setPlaylistImageLink)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.SetPlaylistImageLink.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.SetPlaylistImageLink.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/put(setPlaylistImageLink)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/put(setPlaylistImageLink)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/put(setPlaylistImageLink)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Back to the mosaic of its items (MUSIC-30).
+    ///
+    /// - Remark: HTTP `DELETE /playlists/{playlistId}/image`.
+    /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/delete(removePlaylistImage)`.
+    public enum RemovePlaylistImage {
+        public static let id: Swift.String = "removePlaylistImage"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/DELETE/path/playlistId`.
+                public var playlistId: Components.Parameters.PlaylistId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - playlistId:
+                public init(playlistId: Components.Parameters.PlaylistId) {
+                    self.playlistId = playlistId
+                }
+            }
+            public var path: Operations.RemovePlaylistImage.Input.Path
+            /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemovePlaylistImage.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemovePlaylistImage.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RemovePlaylistImage.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.RemovePlaylistImage.Input.Path,
+                headers: Operations.RemovePlaylistImage.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/DELETE/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/playlists/{playlistId}/image/DELETE/responses/200/content/application\/json`.
+                    case json(Components.Schemas.Playlist)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.Playlist {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RemovePlaylistImage.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RemovePlaylistImage.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The playlist as it is now.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/delete(removePlaylistImage)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RemovePlaylistImage.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RemovePlaylistImage.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/delete(removePlaylistImage)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//playlists/{playlistId}/image/delete(removePlaylistImage)/responses/404`.
             ///
             /// HTTP response code: `404 notFound`.
             case notFound(Components.Responses.NotFound)

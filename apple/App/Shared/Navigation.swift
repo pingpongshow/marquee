@@ -178,22 +178,13 @@ private func settingsPage(_ page: SettingsPage) -> some View {
 struct VideoRequest: Identifiable, Hashable {
     let itemID: Int64
     var startMs: Int64?
-    var playlistID: Int64?
-    /// A shuffled playlist's play order (item ids); nil = the playlist's order.
-    var order: [Int64]?
     /// A watch-together group to join.
     var groupID: String?
     /// Started from a film or episode on demand that the library has: if the library's copy
     /// can't be played, the player closes and reports it (`failedLibraryItem`) so the page
     /// plays the stream on demand instead.
     var vodFallback = false
-    /// Its place in the playlist's play order, when known (Up Next knows where it is): a
-    /// playlist can hold the same video more than once.
-    var position: Int?
-    /// How many times Up Next has moved on in this player. Part of the id, so the same video
-    /// again (twice in a row in a playlist) is still another request and starts.
-    var advance = 0
-    var id: String { "\(itemID)-\(startMs ?? -1)-\(playlistID ?? 0)-\(groupID ?? "")" + (advance > 0 ? "-\(advance)" : "") }
+    var id: String { "\(itemID)-\(startMs ?? -1)-\(groupID ?? "")" }
 }
 
 /// Lets any view start a video; MainView presents the player.
@@ -202,10 +193,8 @@ final class VideoPresenter {
     var request: VideoRequest?
     /// A library copy that couldn't be played, for the page on demand that started it.
     var failedLibraryItem: Int64?
-    func play(_ itemID: Int64, startMs: Int64? = nil, playlistID: Int64? = nil, order: [Int64]? = nil, group: String? = nil,
-              vodFallback: Bool = false, position: Int? = nil) {
+    func play(_ itemID: Int64, startMs: Int64? = nil, group: String? = nil, vodFallback: Bool = false) {
         failedLibraryItem = nil
-        request = VideoRequest(itemID: itemID, startMs: startMs, playlistID: playlistID, order: order, groupID: group,
-                               vodFallback: vodFallback, position: position)
+        request = VideoRequest(itemID: itemID, startMs: startMs, groupID: group, vodFallback: vodFallback)
     }
 }

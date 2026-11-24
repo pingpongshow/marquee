@@ -125,7 +125,7 @@ struct PlayerView: View {
             #endif
             music.pause() // a video takes over from the music
             Task { await app.refreshInfo() } // the rating request switch may have changed (USER-19)
-            let p = VideoPlayback(app: app, playlistID: request.playlistID, order: request.order, position: request.position)
+            let p = VideoPlayback(app: app)
             playback = p
             #if os(macOS)
             MacVideo.shared.began(player: p.player, playback: p, close: close)
@@ -541,8 +541,7 @@ struct PlayerView: View {
         endUpNext()
         let old = playback, oldTogether = together
         // Not the watch-together group: a group watches one video, and the others are still on it.
-        let following = VideoRequest(itemID: next.id, startMs: 0, playlistID: request.playlistID, order: request.order,
-                                     position: playback?.nextUpPosition, advance: request.advance + 1)
+        let following = VideoRequest(itemID: next.id, startMs: 0)
         Task {
             await old?.stop()
             oldTogether?.leave()

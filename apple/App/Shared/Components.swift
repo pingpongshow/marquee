@@ -505,6 +505,8 @@ struct PosterCard: View {
     var onRemoveFromContinue: (() -> Void)?
     /// On a Home suggestion row (USER-16): its menu offers Not interested.
     var suggestion = false
+    /// In one of the person's own collections (USER-23): its menu takes it out.
+    var onRemoveFromCollection: (() -> Void)?
 
     #if os(tvOS)
     static let defaultWidth: CGFloat = 250
@@ -549,6 +551,10 @@ struct PosterCard: View {
     @ViewBuilder private var menu: some View {
         if let onRemoveFromContinue { RemoveFromContinueButton(action: onRemoveFromContinue) }
         if suggestion && (item._type == .movie || item._type == .show) { NotInterestedButton(item: item) }
+        if let onRemoveFromCollection {
+            Button(role: .destructive, action: onRemoveFromCollection) { Label("Remove from Collection", systemImage: "minus.circle") }
+                .accessibilityIdentifier("removeFromCollection")
+        }
         ItemMenuItems(item: item)
     }
 

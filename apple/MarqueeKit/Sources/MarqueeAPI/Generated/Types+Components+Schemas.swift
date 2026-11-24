@@ -7470,6 +7470,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/LibraryOptions/scanIntervalHours`.
             public var scanIntervalHours: Swift.Int?
+            /// Video libraries (USER-23): people can keep their own collections of its titles (playlists of kind video). On unless turned off; off hides them and refuses new ones, and keeps the ones already made.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LibraryOptions/personalCollections`.
+            public var personalCollections: Swift.Bool?
             /// Creates a new `LibraryOptions`.
             ///
             /// - Parameters:
@@ -7479,13 +7483,15 @@ extension Components {
             ///   - includeInHome:
             ///   - includeInSearch:
             ///   - scanIntervalHours: 0 = rely on file watching only.
+            ///   - personalCollections: Video libraries (USER-23): people can keep their own collections of its titles (playlists of kind video). On unless turned off; off hides them and refuses new ones, and keeps the ones already made.
             public init(
                 language: Swift.String? = nil,
                 episodeOrdering: Components.Schemas.LibraryOptions.EpisodeOrderingPayload? = nil,
                 ignorePatterns: [Swift.String]? = nil,
                 includeInHome: Swift.Bool? = nil,
                 includeInSearch: Swift.Bool? = nil,
-                scanIntervalHours: Swift.Int? = nil
+                scanIntervalHours: Swift.Int? = nil,
+                personalCollections: Swift.Bool? = nil
             ) {
                 self.language = language
                 self.episodeOrdering = episodeOrdering
@@ -7493,6 +7499,7 @@ extension Components {
                 self.includeInHome = includeInHome
                 self.includeInSearch = includeInSearch
                 self.scanIntervalHours = scanIntervalHours
+                self.personalCollections = personalCollections
             }
             public enum CodingKeys: String, CodingKey {
                 case language
@@ -7501,6 +7508,7 @@ extension Components {
                 case includeInHome
                 case includeInSearch
                 case scanIntervalHours
+                case personalCollections
             }
         }
         /// - Remark: Generated from `#/components/schemas/Library`.
@@ -13051,6 +13059,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Playlist/folderId`.
             public var folderId: Swift.Int64?
+            /// Collections (kind video, USER-23): the video library it belongs to; it takes titles from that library only.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Playlist/libraryId`.
+            public var libraryId: Swift.Int64?
+            /// Set when its owner gave it a picture of its own (MUSIC-30): show /playlists/{id}/image?v=<this> in place of the mosaic of imageIds. It changes when the picture does.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Playlist/imageVersion`.
+            public var imageVersion: Swift.String?
             /// Creates a new `Playlist`.
             ///
             /// - Parameters:
@@ -13067,6 +13083,8 @@ extension Components {
             ///   - sharedWithAll: Your playlist is shared with everyone on the server.
             ///   - shareCount: How many people your playlist is offered to or shared with by name.
             ///   - folderId: The folder of yours it's in (MUSIC-28). Left out at the top level.
+            ///   - libraryId: Collections (kind video, USER-23): the video library it belongs to; it takes titles from that library only.
+            ///   - imageVersion: Set when its owner gave it a picture of its own (MUSIC-30): show /playlists/{id}/image?v=<this> in place of the mosaic of imageIds. It changes when the picture does.
             public init(
                 id: Swift.Int64,
                 title: Swift.String,
@@ -13080,7 +13098,9 @@ extension Components {
                 ownerName: Swift.String? = nil,
                 sharedWithAll: Swift.Bool? = nil,
                 shareCount: Swift.Int? = nil,
-                folderId: Swift.Int64? = nil
+                folderId: Swift.Int64? = nil,
+                libraryId: Swift.Int64? = nil,
+                imageVersion: Swift.String? = nil
             ) {
                 self.id = id
                 self.title = title
@@ -13095,6 +13115,8 @@ extension Components {
                 self.sharedWithAll = sharedWithAll
                 self.shareCount = shareCount
                 self.folderId = folderId
+                self.libraryId = libraryId
+                self.imageVersion = imageVersion
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -13110,6 +13132,8 @@ extension Components {
                 case sharedWithAll
                 case shareCount
                 case folderId
+                case libraryId
+                case imageVersion
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaylistFolder`.
@@ -13281,6 +13305,10 @@ extension Components {
             public var itemIds: [Swift.Int64]?
             /// - Remark: Generated from `#/components/schemas/PlaylistCreate/rules`.
             public var rules: Components.Schemas.SmartRules?
+            /// Required for kind video (USER-23): the video library the collection belongs to. A collection can't have rules.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaylistCreate/libraryId`.
+            public var libraryId: Swift.Int64?
             /// Creates a new `PlaylistCreate`.
             ///
             /// - Parameters:
@@ -13288,22 +13316,26 @@ extension Components {
             ///   - kind:
             ///   - itemIds:
             ///   - rules:
+            ///   - libraryId: Required for kind video (USER-23): the video library the collection belongs to. A collection can't have rules.
             public init(
                 title: Swift.String,
                 kind: Components.Schemas.PlaylistKind,
                 itemIds: [Swift.Int64]? = nil,
-                rules: Components.Schemas.SmartRules? = nil
+                rules: Components.Schemas.SmartRules? = nil,
+                libraryId: Swift.Int64? = nil
             ) {
                 self.title = title
                 self.kind = kind
                 self.itemIds = itemIds
                 self.rules = rules
+                self.libraryId = libraryId
             }
             public enum CodingKeys: String, CodingKey {
                 case title
                 case kind
                 case itemIds
                 case rules
+                case libraryId
             }
         }
         /// Which playlists to combine and where (MUSIC-29). Give intoId to add them to the end of one of your playlists, or a title for a new one.

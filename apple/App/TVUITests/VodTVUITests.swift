@@ -267,7 +267,7 @@ final class VodTVUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground, "still in the app")
         // The video libraries, then Live TV and VOD (video too), then Music. (The DVR's Recorded TV
         // library is inside Live TV.)
-        let names = ["Home", "Anime", "Movies", "Live TV", "VOD Movies", "VOD Shows", "Music", "Playlists", "Settings", "Search"]
+        let names = ["Home", "Anime", "Movies", "Live TV", "VOD Movies", "VOD Shows", "Music", "Settings", "Search"]
         let items = try names.map { try XCTUnwrap(app.sidebarItem($0), "\($0) is in the sidebar") }
         for (a, b) in zip(items, items.dropFirst()) {
             XCTAssertLessThan(a.frame.midY, b.frame.midY, "\(a.label) comes before \(b.label)")

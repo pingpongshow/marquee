@@ -591,6 +591,15 @@ public final class AppSession {
     /// token (false: /me hasn't answered yet). Token URLs shouldn't go into a disk cache.
     public var imageURLsUseKey: Bool { imageKey != nil }
 
+    /// The picture its owner gave a playlist or collection (MUSIC-30); nil when it has none
+    /// and shows the mosaic. The version is in the URL, so a changed picture loads again.
+    public func playlistImageURL(_ playlist: Components.Schemas.Playlist, width: Int) -> URL? {
+        guard let version = playlist.imageVersion, let baseURL else { return nil }
+        var c = URLComponents(url: baseURL.appending(path: "api/v1/playlists/\(playlist.id)/image"), resolvingAgainstBaseURL: false)!
+        c.queryItems = [.init(name: "w", value: String(max(1, width * Self.displayScale))), .init(name: "v", value: version), imageAuth]
+        return c.url
+    }
+
     public func personPhotoURL(_ personID: Int64, width: Int) -> URL? {
         guard let baseURL else { return nil }
         var c = URLComponents(url: baseURL.appending(path: "api/v1/people/\(personID)/photo"), resolvingAgainstBaseURL: false)!

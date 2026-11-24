@@ -31,13 +31,14 @@ final class VideoMuse {
         }
     }
 
-    /// The results as a video playlist named after the prompt.
-    func save(_ app: AppSession) {
+    /// The results as one of the person's collections in the library asked about, named after
+    /// the prompt (USER-23: a collection belongs to one library).
+    func save(_ app: AppSession, library: Int64) {
         guard let r = result, let asked, !r.items.isEmpty else { return }
         Task {
             do {
                 let ids = r.items.map(\.id)
-                let p = try await app.createPlaylist(title: "Muse: \(asked)", kind: .video, items: ids)
+                let p = try await app.createPlaylist(title: "Muse: \(asked)", kind: .video, libraryId: library, items: ids)
                 saved = "Saved “\(p.title)”"
             } catch {
                 self.error = error.localizedDescription
@@ -74,7 +75,7 @@ struct VideoMuseView: View {
                         .accessibilityIdentifier("muse.includeVod")
                 }
                 #endif
-                VideoMuseResults(muse: muse)
+                VideoMuseResults(muse: muse, libraryID: libraryID)
             }
             .padding(.vertical)
         }
@@ -142,6 +143,8 @@ struct VideoMuseChips: View {
 struct VideoMuseResults: View {
     @Environment(AppSession.self) private var app
     let muse: VideoMuse
+    /// The library Muse was asked about: its results can be kept as a collection there.
+    var libraryID: Int64? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -171,8 +174,9 @@ struct VideoMuseResults: View {
                             Label(s, systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.green).lineLimit(1)
                                 .accessibilityElement(children: .combine)
                                 .accessibilityIdentifier("museSaved")
-                        } else {
-                            Button { muse.save(app) } label: { Label("Save as Playlist", systemImage: "text.badge.plus") }
+                        } else if let libraryID, CollectionLibraries.shared.ids.contains(libraryID) {
+                            // Muse across every library has no one library to keep a collection in.
+                            Button { muse.save(app, library: libraryID) } label: { Label("Save as Collection", systemImage: "rectangle.stack.badge.plus") }
                                 .buttonStyle(.bordered)
                         }
                     }

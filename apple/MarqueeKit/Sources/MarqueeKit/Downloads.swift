@@ -322,17 +322,17 @@ public final class Downloads {
     /// Keeps a playlist on the device: downloads what's new in it, at the qualities chosen in
     /// Settings, and drops what left it (tracks downloaded on their own are never removed).
     public func syncPlaylist(_ id: Int64) async {
-        guard let app, let entriesNow = try? await app.playlistItems(id) else { return }
-        let items = entriesNow.map(\.item).filter { [.track, .movie, .episode, .video].contains($0._type) }
+        // Playlists are music. A video one is a collection now (a list of titles, not something
+        // to download): one kept on the device before that stays as it was, still playable.
+        guard let app, let p = try? await app.playlist(id), p.kind == .audio,
+              let entriesNow = try? await app.playlistItems(id) else { return }
+        let items = entriesNow.map(\.item).filter { $0._type == .track }
         let now = Set(items.map(\.id))
         let before = syncedPlaylists[id] ?? []
         syncedPlaylists[id] = now
-        savePlaylists()
         // What the offline library needs to show it without the server.
-        if let p = try? await app.playlist(id) {
-            playlistInfo[id] = SyncedPlaylist(id: id, title: p.title, isAudio: p.kind == .audio, items: items.map(\.id))
-            savePlaylists()
-        }
+        playlistInfo[id] = SyncedPlaylist(id: id, title: p.title, isAudio: true, items: items.map(\.id))
+        savePlaylists()
         for it in items where entries[it.id] == nil {
             try? await download(it)
             entries[it.id]?.viaPlaylist = true
