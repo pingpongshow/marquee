@@ -50,6 +50,13 @@ func TestHistoryMixes(t *testing.T) {
 		}
 		d.Exec(`INSERT INTO user_item_state (user_id, item_id, play_count, rating, last_viewed_at) VALUES (1, ?, 4, 10, `+last+`)`, i)
 	}
+	// Known without a play: 41–44 rated, 45 loved, 46 turned down, 47 started; 48 is another
+	// copy of the played track 1.
+	d.Exec(`INSERT INTO user_item_state (user_id, item_id, rating) VALUES (1, 41, 6), (1, 42, 2), (1, 43, 10), (1, 44, 8)`)
+	d.Exec(`INSERT INTO user_item_state (user_id, item_id, favorite_at) VALUES (1, 45, '2024-01-01T00:00:00Z')`)
+	d.Exec(`INSERT INTO user_item_state (user_id, item_id, disliked_at) VALUES (1, 46, '2024-01-01T00:00:00Z')`)
+	d.Exec(`INSERT INTO user_item_state (user_id, item_id, view_offset_ms) VALUES (1, 47, 30000)`)
+	ix.Get(1).Copy, ix.Get(48).Copy = "same song", "same song"
 	s := &Service{DB: d, Index: ix}
 	mixes := s.DailyMixes(ctx, 1, "", nil)
 	byID := map[string]Mix{}
@@ -62,12 +69,12 @@ func TestHistoryMixes(t *testing.T) {
 		}
 	}
 	for _, id := range byID["discovery"].IDs {
-		if id <= 40 {
-			t.Errorf("discovery has played track %d", id)
+		if id <= 48 {
+			t.Errorf("discovery has a track they know: %d", id)
 		}
 	}
 	for _, id := range byID["rediscover"].IDs {
-		if id > 15 {
+		if id > 15 && (id < 43 || id > 45) { // 43–45 are favourites never played
 			t.Errorf("rediscover has recently played track %d", id)
 		}
 	}

@@ -81,7 +81,7 @@ type MuseFilters struct {
 	GenreTracks map[int64]bool  // tracks tagged with any of the genres (nil = no genre filter)
 	Liked       map[int64]bool  // favourites
 	Loved       []float32       // the sound of their favourites (for LikeFavourites)
-	Played      map[int64]bool  // ever played
+	Heard       Filter          // already known to them (Service.Heard)
 	Fresh       map[int64]bool  // added in the last 60 days
 	Old         map[int64]bool  // favourites not played for six months
 	DurationMS  map[int64]int64 // track lengths (for length limits)
@@ -135,7 +135,7 @@ func (q MusicQuery) Keep(f MuseFilters, base Filter, withGenres bool) Filter {
 		if withGenres && f.GenreTracks != nil && !f.GenreTracks[t.ItemID] {
 			return false
 		}
-		if q.Favourites && !f.Liked[t.ItemID] || q.Unplayed && f.Played[t.ItemID] || q.New && !f.Fresh[t.ItemID] || q.Rediscover && !f.Old[t.ItemID] {
+		if q.Favourites && !f.Liked[t.ItemID] || q.Unplayed && f.Heard(t) || q.New && !f.Fresh[t.ItemID] || q.Rediscover && !f.Old[t.ItemID] {
 			return false
 		}
 		if q.MaxTrackMinutes > 0 {
@@ -525,7 +525,7 @@ func (s *Service) museFilters(ctx context.Context, userID int64, q MusicQuery) M
 		f.Loved = s.Taste(ctx, userID, s.Liked(ctx, userID))
 	}
 	if q.Unplayed {
-		f.Played = ids(`SELECT item_id FROM user_item_state WHERE user_id = ? AND play_count > 0`, userID)
+		f.Heard = s.Heard(ctx, userID)
 	}
 	if q.New {
 		f.Fresh = ids(`SELECT id FROM items WHERE type = 'track' AND added_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-60 days')`)

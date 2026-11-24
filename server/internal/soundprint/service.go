@@ -851,16 +851,15 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 	if taste == nil {
 		return nil
 	}
-	played := map[int64]bool{}
+	heard := s.Heard(ctx, userID)
 	artistPlays := map[int64]int{}
-	rows, err := s.DB.QueryContext(ctx, `SELECT s.item_id, s.play_count, COALESCE(i.grandparent_id, 0) FROM user_item_state s JOIN items i ON i.id = s.item_id
+	rows, err := s.DB.QueryContext(ctx, `SELECT s.play_count, COALESCE(i.grandparent_id, 0) FROM user_item_state s JOIN items i ON i.id = s.item_id
 		WHERE s.user_id = ? AND i.type = 'track' AND s.play_count > 0`, userID)
 	if err == nil {
 		for rows.Next() {
-			var id, artist int64
+			var artist int64
 			var n int
-			if rows.Scan(&id, &n, &artist) == nil {
-				played[id] = true
+			if rows.Scan(&n, &artist) == nil {
 				artistPlays[artist] += n
 			}
 		}
@@ -870,9 +869,9 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 	langs := LanguagesOf(liked)
 	var out []Mix
 
-	// Discovery: unplayed, near their taste; artists they've played a lot count against, and
-	// artists listeners call similar to the ones they love are lifted.
-	disc := Options{Keep: func(t *Track) bool { return allowed(t) && !played[t.ItemID] }, Avoid: map[int64]float64{}, Rand: r, Jitter: mixJitter,
+	// Discovery: nothing they've heard, near their taste; artists they've played a lot count
+	// against, and artists listeners call similar to the ones they love are lifted.
+	disc := Options{Keep: func(t *Track) bool { return allowed(t) && !heard(t) }, Avoid: map[int64]float64{}, Rand: r, Jitter: mixJitter,
 		Arc: true, Languages: langs}
 	for _, t := range s.Index.Where(disc.Keep) {
 		if n := artistPlays[t.ArtistID]; n > 0 {
@@ -972,6 +971,30 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		}
 	}
 	return out
+}
+
+// Heard tells the tracks someone already knows from the ones that would be new to them. A
+// play count alone misses songs they rated, loved or turned down without a play being kept
+// (ratings brought over from Plex, a rating given from a list, a play that stopped short),
+// and the other copies of a song they know: the same recording on a compilation is not a
+// discovery (MUSIC-17).
+func (s *Service) Heard(ctx context.Context, userID int64) Filter {
+	ids, copies := map[int64]bool{}, map[string]bool{}
+	rows, err := s.DB.QueryContext(ctx, `SELECT item_id FROM user_item_state WHERE user_id = ? AND (play_count > 0 OR rating IS NOT NULL
+		OR favorite_at IS NOT NULL OR liked_at IS NOT NULL OR disliked_at IS NOT NULL OR last_viewed_at IS NOT NULL OR view_offset_ms > 0)`, userID)
+	if err == nil {
+		for rows.Next() {
+			var id int64
+			if rows.Scan(&id) == nil {
+				ids[id] = true
+				if t := s.Index.Get(id); t != nil && t.Copy != "" {
+					copies[t.Copy] = true
+				}
+			}
+		}
+		rows.Close()
+	}
+	return func(t *Track) bool { return ids[t.ItemID] || (t.Copy != "" && copies[t.Copy]) }
 }
 
 // discoverySimilarAffinity is how much Discovery lifts artists similar to the ones loved.
