@@ -178,7 +178,7 @@ struct VodSeriesView: View {
                 .padding(.bottom, 40)
             }
         }
-        .navigationTitle(isTV ? "" : s.title)
+        .navigationTitle(ownTitle(s.title))
     }
 
     @ViewBuilder private func backdrop(_ s: VodSeriesDetail) -> some View {

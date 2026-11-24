@@ -688,7 +688,7 @@ struct VodMovieView: View {
                 .padding(.bottom, 40)
             }
         }
-        .navigationTitle(isTV ? "" : m.title)
+        .navigationTitle(ownTitle(m.title))
     }
 
     @ViewBuilder private func backdrop(_ m: VodMovieDetail) -> some View {

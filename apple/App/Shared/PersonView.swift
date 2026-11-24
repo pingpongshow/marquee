@@ -42,7 +42,8 @@ struct PersonView: View {
                 ProgressView().padding(.top, 80)
             }
         }
-        .navigationTitle(person?.name ?? "")
+        // Not on the TV: it would stay at the top over the page as it scrolls (the name is in the page).
+        .navigationTitle(ownTitle(person?.name))
         .task { if person == nil { await load() } }
     }
 

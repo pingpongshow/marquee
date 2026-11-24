@@ -434,7 +434,9 @@ struct PlaylistView: View {
             }
         }
         // No word for it until it has loaded: a collection is never called a playlist.
-        .navigationTitle(playlist?.title ?? "")
+        // Not on the TV either: there it would stay at the top over the page as it scrolls (the
+        // header has the title).
+        .navigationTitle(ownTitle(playlist?.title))
         .task { if !loaded { await load() } }
         .refreshable { await load() }
         .onChange(of: PlaylistChanges.shared.version) { Task { await load() } }

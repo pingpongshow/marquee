@@ -39386,7 +39386,7 @@ public enum Operations {
             }
         }
     }
-    /// A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+    /// A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork). With w it's resized to that width; without, it's the source's own image, which can be very large.
     ///
     /// - Remark: HTTP `GET /livetv/vod/movies/{movieId}/image`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/image/get(vodMovieImage)`.
@@ -39415,12 +39415,21 @@ public enum Operations {
                 }
                 /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/image/GET/query/kind`.
                 public var kind: Operations.VodMovieImage.Input.Query.KindPayload?
+                /// Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/image/GET/query/w`.
+                public var w: Components.Parameters.ImageWidth?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - kind:
-                public init(kind: Operations.VodMovieImage.Input.Query.KindPayload? = nil) {
+                ///   - w: Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
+                public init(
+                    kind: Operations.VodMovieImage.Input.Query.KindPayload? = nil,
+                    w: Components.Parameters.ImageWidth? = nil
+                ) {
                     self.kind = kind
+                    self.w = w
                 }
             }
             public var query: Operations.VodMovieImage.Input.Query
@@ -42861,17 +42870,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/query/season`.
                 public var season: Swift.Int?
+                /// Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/query/w`.
+                public var w: Components.Parameters.ImageWidth?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - kind:
                 ///   - season: A season's poster instead of the series' (kind is ignored).
+                ///   - w: Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
                 public init(
                     kind: Operations.VodSeriesImage.Input.Query.KindPayload? = nil,
-                    season: Swift.Int? = nil
+                    season: Swift.Int? = nil,
+                    w: Components.Parameters.ImageWidth? = nil
                 ) {
                     self.kind = kind
                     self.season = season
+                    self.w = w
                 }
             }
             public var query: Operations.VodSeriesImage.Input.Query
@@ -44023,6 +44039,21 @@ public enum Operations {
                 }
             }
             public var path: Operations.VodEpisodeImage.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/image/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/image/GET/query/w`.
+                public var w: Components.Parameters.ImageWidth?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - w: Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
+                public init(w: Components.Parameters.ImageWidth? = nil) {
+                    self.w = w
+                }
+            }
+            public var query: Operations.VodEpisodeImage.Input.Query
             /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/image/GET/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodEpisodeImage.AcceptableContentType>]
@@ -44039,12 +44070,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.VodEpisodeImage.Input.Path,
+                query: Operations.VodEpisodeImage.Input.Query = .init(),
                 headers: Operations.VodEpisodeImage.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }

@@ -41,10 +41,21 @@ struct MiniPlayerBar: View {
                 Button { music.next() } label: { Image(systemName: "forward.fill").font(.title3).frame(width: 36, height: 36).contentShape(Rectangle()) }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Next track")
+                // Stops the music and puts the bar away until something is played again.
+                Button { music.close() } label: { Image(systemName: "xmark").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).frame(width: 30, height: 36).contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close player")
+                    .accessibilityIdentifier("mini.close")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+            #if os(iOS)
+            // Swiped down: closed, like the ✕.
+            .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { g in
+                if g.translation.height > 40, abs(g.translation.width) < g.translation.height { music.close() }
+            })
+            #endif
             .overlay(alignment: .bottom) { MiniPlayerProgress().padding(.horizontal, 10) }
             .padding(.horizontal, 10)
             .padding(.bottom, 4)
@@ -62,27 +73,36 @@ struct TVNowPlayingBar: View {
 
     var body: some View {
         if let t = music.current?.item {
-            Button { openNowPlaying() } label: {
-                HStack(spacing: 24) {
-                    ArtworkView(item: t, shape: .square, width: 72).frame(width: 72)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(t.title).font(.headline).lineLimit(1)
-                        Text(t.artistCredit ?? t.grandparentTitle ?? "").font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+            HStack(spacing: 24) {
+                Button { openNowPlaying() } label: {
+                    HStack(spacing: 24) {
+                        ArtworkView(item: t, shape: .square, width: 72).frame(width: 72)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(t.title).font(.headline).lineLimit(1)
+                            Text(t.artistCredit ?? t.grandparentTitle ?? "").font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                        Label(music.playing ? "Playing" : "Paused", systemImage: music.playing ? "waveform" : "pause.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
                     }
-                    Spacer(minLength: 0)
-                    Label(music.playing ? "Playing" : "Paused", systemImage: music.playing ? "waveform" : "pause.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
+                    .overlay(alignment: .bottom) { MiniPlayerProgress().padding(.horizontal, 20).padding(.bottom, 4) }
                 }
-                .padding(.horizontal, 28)
-                .padding(.vertical, 14)
-                .overlay(alignment: .bottom) { MiniPlayerProgress().padding(.horizontal, 20).padding(.bottom, 4) }
+                .buttonStyle(.card)
+                .accessibilityLabel("Now Playing: \(t.title)")
+                .accessibilityValue(music.playing ? "Playing" : "Paused")
+                .accessibilityIdentifier("nowPlayingBar")
+                .frame(maxWidth: 1200)
+                // Right from the bar: stops the music and puts the bar away.
+                Button { music.close() } label: { Image(systemName: "xmark").font(.headline).padding(8) }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.circle)
+                    .accessibilityLabel("Close player")
+                    .accessibilityIdentifier("nowPlayingBar.close")
             }
-            .buttonStyle(.card)
-            .accessibilityLabel("Now Playing: \(t.title)")
-            .accessibilityValue(music.playing ? "Playing" : "Paused")
-            .accessibilityIdentifier("nowPlayingBar")
-            .frame(maxWidth: 1200)
+            .focusSection()
             .padding(.bottom, 24)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { MiniPlayerMetrics.shared.height = $0 + 24 }
         }

@@ -135,8 +135,8 @@ struct MacQueueList: View {
     }
 }
 
-/// + (add to playlist), Track Radio, ♡ and ★ for the song playing, the song list, then the
-/// output picker.
+/// + (add to playlist), Track Radio, ♡ and ★ for the song playing, the song list, the output
+/// picker, then ✕ (stop and clear what's playing).
 struct MacSongActions: View {
     @Environment(MusicPlayer.self) private var music
     @Environment(AppSession.self) private var app
@@ -167,6 +167,10 @@ struct MacSongActions: View {
                     }
             }
             MacOutputButton(scope: .music)
+            if music.current != nil {
+                // Stops the music and empties the bar ("Not Playing") until something is played again.
+                MacBarButton(systemImage: "xmark", label: "Stop and Clear", identifier: "bar.close") { music.close() }
+            }
         }
     }
 }

@@ -99,7 +99,7 @@ struct ItemDetailView: View {
         .sheet(item: $matching) { MusicMatchSheet(item: $0) { afterMusicFix() } }
         .sheet(item: $moving) { MoveTrackSheet(track: $0) { afterMusicFix() } }
         #endif
-        .navigationTitle(detail?.title ?? "")
+        .navigationTitle(ownTitle(detail?.title))
         .task(id: id) {
             guard loadedID != id else { return }
             await load()

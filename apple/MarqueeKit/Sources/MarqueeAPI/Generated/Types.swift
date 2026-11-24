@@ -1059,7 +1059,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/vod/movies/{movieId}`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/get(getVodMovie)`.
     func getVodMovie(_ input: Operations.GetVodMovie.Input) async throws -> Operations.GetVodMovie.Output
-    /// A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+    /// A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork). With w it's resized to that width; without, it's the source's own image, which can be very large.
     ///
     /// - Remark: HTTP `GET /livetv/vod/movies/{movieId}/image`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/image/get(vodMovieImage)`.
@@ -4246,7 +4246,7 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+    /// A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork). With w it's resized to that width; without, it's the source's own image, which can be very large.
     ///
     /// - Remark: HTTP `GET /livetv/vod/movies/{movieId}/image`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/image/get(vodMovieImage)`.
@@ -4562,10 +4562,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/image/get(vodEpisodeImage)`.
     public func vodEpisodeImage(
         path: Operations.VodEpisodeImage.Input.Path,
+        query: Operations.VodEpisodeImage.Input.Query = .init(),
         headers: Operations.VodEpisodeImage.Input.Headers = .init()
     ) async throws -> Operations.VodEpisodeImage.Output {
         try await vodEpisodeImage(Operations.VodEpisodeImage.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }

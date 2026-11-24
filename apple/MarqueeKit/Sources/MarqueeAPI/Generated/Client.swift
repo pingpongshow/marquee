@@ -24562,7 +24562,7 @@ public struct Client: APIProtocol {
             }
         )
     }
-    /// A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+    /// A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork). With w it's resized to that width; without, it's the source's own image, which can be very large.
     ///
     /// - Remark: HTTP `GET /livetv/vod/movies/{movieId}/image`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/image/get(vodMovieImage)`.
@@ -24588,6 +24588,13 @@ public struct Client: APIProtocol {
                     explode: true,
                     name: "kind",
                     value: input.query.kind
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "w",
+                    value: input.query.w
                 )
                 converter.setAcceptHeader(
                     in: &request.headerFields,
@@ -26702,6 +26709,13 @@ public struct Client: APIProtocol {
                     name: "season",
                     value: input.query.season
                 )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "w",
+                    value: input.query.w
+                )
                 converter.setAcceptHeader(
                     in: &request.headerFields,
                     contentTypes: input.headers.accept
@@ -27371,6 +27385,13 @@ public struct Client: APIProtocol {
                     method: .get
                 )
                 suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "w",
+                    value: input.query.w
+                )
                 converter.setAcceptHeader(
                     in: &request.headerFields,
                     contentTypes: input.headers.accept

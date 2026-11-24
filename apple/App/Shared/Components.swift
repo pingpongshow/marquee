@@ -958,6 +958,17 @@ let isTV = true
 let isTV = false
 #endif
 
+/// The navigation title of a page that shows its own title in its content (an item, a person,
+/// a playlist). In a bar it would stay at the top while the page, with the same title, scrolls
+/// under it, so the iPhone, iPad and Apple TV show none; the Mac keeps it as the window's title.
+func ownTitle(_ title: String?) -> String {
+    #if os(macOS)
+    return title ?? ""
+    #else
+    return ""
+    #endif
+}
+
 /// A label with its title, or only its icon (the title stays its accessibility label). An
 /// icon alone is as tall as a line of text, so icon-only buttons match labelled ones.
 struct AdaptiveLabelStyle: LabelStyle {

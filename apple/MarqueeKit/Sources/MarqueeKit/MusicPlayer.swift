@@ -581,6 +581,17 @@ public final class MusicPlayer {
         if !nowPlayingBorrowed { MPNowPlayingInfoCenter.default().nowPlayingInfo = nil }
     }
 
+    /// The person closed the player (the ✕ on the bar): stops as `stop()` does, and the queue
+    /// isn't kept for the next launch either. (Signing out only stops: that music waits.)
+    public func close() {
+        stop()
+        saveTask?.cancel()
+        // Noted as well as removed: a save from a moment ago may still be writing the file.
+        UserDefaults.standard.set(saveOwner, forKey: Self.closedKey)
+        UserDefaults.standard.removeObject(forKey: Self.positionKey)
+        try? FileManager.default.removeItem(at: Self.savedQueueFile)
+    }
+
     /// Shows a short message in Now Playing (a track that wouldn't play, a Chromecast error).
     public func showError(_ message: String) {
         error = message
@@ -1392,6 +1403,8 @@ public final class MusicPlayer {
     }
 
     private static let positionKey = "marquee.musicPosition"
+    /// Whose saved queue was closed and must not come back (cleared by the next queue saved).
+    private static let closedKey = "marquee.musicClosed"
 
     /// Saves the queue a moment after it changes (several changes at once save once).
     private func scheduleSave() {
@@ -1408,6 +1421,7 @@ public final class MusicPlayer {
     /// was stopped by signing out or switching profile, and the person's music waits for them.
     private func saveQueueNow() {
         guard let owner = saveOwner, queue.current != nil else { return }
+        UserDefaults.standard.removeObject(forKey: Self.closedKey)
         let saved = SavedMusic(owner: owner, queue: queue.saved, sourceTitle: source?.title, sourceRadio: source?.radio,
                                sourceContext: source?.context, sourceStation: source?.isStation ?? false)
         let file = Self.savedQueueFile
@@ -1432,7 +1446,8 @@ public final class MusicPlayer {
     /// it stopped, so play carries on from there. Nothing happens when something is already in
     /// the queue, or the saved music is someone else's.
     public func restoreSavedQueue() {
-        guard queue.current == nil, remote == nil, let owner = saveOwner else { return }
+        guard queue.current == nil, remote == nil, let owner = saveOwner,
+              UserDefaults.standard.string(forKey: Self.closedKey) != owner else { return }
         let file = Self.savedQueueFile
         Task {
             let saved: SavedMusic? = await Task.detached(priority: .userInitiated) {
