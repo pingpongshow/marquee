@@ -151,7 +151,7 @@ func (s *Store) PlaylistShareTargets(ctx context.Context, uid int64) ([]Playlist
 
 // PlaylistInvites lists the playlists offered to someone that they haven't answered.
 func (s *Store) PlaylistInvites(ctx context.Context, acc Access) ([]Playlist, error) {
-	return s.scanPlaylists(ctx, acc, `SELECT `+playlistCols+` FROM playlists pl WHERE pl.kind IN ('video', 'audio') AND `+invitedShare+` ORDER BY pl.updated_at DESC`,
+	return s.scanPlaylists(ctx, acc, `SELECT `+playlistCols+` FROM playlists pl WHERE pl.kind IN ('video', 'audio') AND `+collectionsOn+` AND `+invitedShare+` ORDER BY pl.updated_at DESC`,
 		acc.UserID, acc.UserID, acc.UserID)
 }
 

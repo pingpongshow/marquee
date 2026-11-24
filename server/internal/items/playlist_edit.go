@@ -9,8 +9,9 @@ import (
 
 // ---------- Editing and combining playlists (MUSIC-29) ----------
 
-// ErrPlaylistMix is returned when combining playlists of different kinds (songs and videos).
-var ErrPlaylistMix = errors.New("music and video playlists can't be combined")
+// ErrPlaylistMix is returned when combining a playlist with a collection, or collections of
+// different libraries.
+var ErrPlaylistMix = errors.New("playlists combine with playlists, and collections with collections of the same library")
 
 // SetPlaylistOrder puts uid's playlist's entries in the order given and removes the ones left
 // out, in one go: the playlist editor's sort, shuffle, drag and bulk remove. Entries the
@@ -102,6 +103,7 @@ type MergeOptions struct {
 // must be of one kind. Returns the playlist they went into.
 func (s *Store) MergePlaylists(ctx context.Context, acc Access, sourceIDs []int64, opt MergeOptions) (Playlist, error) {
 	var kind string
+	var library int64
 	var sources []Playlist
 	seenSource := map[int64]bool{}
 	for _, sid := range sourceIDs {
@@ -113,10 +115,10 @@ func (s *Store) MergePlaylists(ctx context.Context, acc Access, sourceIDs []int6
 		if err != nil {
 			return Playlist{}, err
 		}
-		if kind != "" && p.Kind != kind {
+		if kind != "" && (p.Kind != kind || p.LibraryID != library) {
 			return Playlist{}, ErrPlaylistMix
 		}
-		kind = p.Kind
+		kind, library = p.Kind, p.LibraryID
 		sources = append(sources, p)
 	}
 	var into Playlist
@@ -128,7 +130,7 @@ func (s *Store) MergePlaylists(ctx context.Context, acc Access, sourceIDs []int6
 		if p.Rules != nil {
 			return Playlist{}, ErrSmartPlaylist
 		}
-		if kind != "" && p.Kind != kind {
+		if kind != "" && (p.Kind != kind || p.LibraryID != library) {
 			return Playlist{}, ErrPlaylistMix
 		}
 		into = p
@@ -140,13 +142,23 @@ func (s *Store) MergePlaylists(ctx context.Context, acc Access, sourceIDs []int6
 		if title == "" {
 			title = sources[0].Title
 		}
-		p, err := s.CreatePlaylist(ctx, acc, title, kind, nil, nil)
+		var p Playlist
+		var err error
+		if kind == "video" {
+			p, err = s.CreateOwnCollection(ctx, acc, title, library, nil)
+		} else {
+			p, err = s.CreatePlaylist(ctx, acc, title, kind, nil, nil)
+		}
 		if err != nil {
 			return Playlist{}, err
 		}
 		into = p
 	}
 
+	// A collection has each title once, whatever was asked.
+	if kind == "video" {
+		opt.SkipDuplicates = true
+	}
 	have := map[int64]bool{}
 	if opt.SkipDuplicates && opt.IntoID != 0 {
 		err := eachRow(ctx, s.db, `SELECT item_id FROM playlist_items WHERE playlist_id = ?`, []any{into.ID}, func(r *sql.Rows) error {

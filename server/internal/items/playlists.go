@@ -9,7 +9,11 @@ import (
 	"time"
 )
 
-var ErrPlaylistKind = errors.New("none of these items fit this playlist (video playlists take movies, episodes and videos; music playlists take tracks)")
+var ErrPlaylistKind = errors.New("none of these items fit (a collection takes films, shows, seasons, episodes and videos from its own library; a playlist takes tracks)")
+
+// ErrCollectionLibrary is returned when a collection (a video playlist, USER-23) is made
+// without a video library that allows them.
+var ErrCollectionLibrary = errors.New("a collection belongs to a video library that allows collections")
 
 type Playlist struct {
 	ID         int64
@@ -28,6 +32,11 @@ type Playlist struct {
 	ShareCount    int
 	// FolderID is the viewer's folder the playlist is in (MUSIC-28), 0 if none.
 	FolderID int64
+	// LibraryID is the video library a collection (kind video) belongs to (USER-23).
+	LibraryID int64
+	// Cover is the picture its owner gave it (MUSIC-30): a path inside the image cache, "" for
+	// the mosaic of its items.
+	Cover string
 }
 
 type PlaylistEntry struct {
@@ -37,11 +46,20 @@ type PlaylistEntry struct {
 
 var leafTypes = map[string]string{"video": "'movie', 'episode', 'video'", "audio": "'track'"}
 
+// collectionTypes are what a collection holds, as added: a show stays a show.
+var collectionTypes = map[string]bool{"movie": true, "show": true, "season": true, "episode": true, "video": true}
+
+// collectionsOn is the SQL test for playlist pl being a music playlist, or a collection whose
+// library still allows them (the library's personalCollections option, on unless turned off).
+const collectionsOn = `(pl.kind = 'audio' OR EXISTS (SELECT 1 FROM libraries l WHERE l.id = pl.library_id
+	AND COALESCE(json_extract(l.options, '$.personalCollections'), 1) != 0))`
+
 const playlistCols = `pl.id, pl.title, pl.kind, pl.updated_at, COALESCE(pl.smart_rule, ''), pl.user_id,
 	(SELECT COUNT(*) FROM playlist_items x WHERE x.playlist_id = pl.id),
 	(SELECT COALESCE(SUM(i.duration_ms), 0) FROM playlist_items x JOIN items i ON i.id = x.item_id WHERE x.playlist_id = pl.id),
 	pl.shared_with_all, (SELECT display_name FROM users u WHERE u.id = pl.user_id),
-	(SELECT COUNT(*) FROM playlist_shares sh WHERE sh.playlist_id = pl.id AND sh.status IN ('pending', 'accepted'))`
+	(SELECT COUNT(*) FROM playlist_shares sh WHERE sh.playlist_id = pl.id AND sh.status IN ('pending', 'accepted')),
+	COALESCE(pl.library_id, 0), COALESCE(pl.cover_path, '')`
 
 // scanPlaylists reads playlists as acc sees them: on someone else's playlist, only what acc
 // may see counts, and a smart one fills in from acc's own library and history.
@@ -56,7 +74,7 @@ func (s *Store) scanPlaylists(ctx context.Context, acc Access, q string, args ..
 		var p Playlist
 		var updated, rules string
 		var owner int64
-		if err := rows.Scan(&p.ID, &p.Title, &p.Kind, &updated, &rules, &owner, &p.ItemCount, &p.DurationMS, &p.SharedWithAll, &p.OwnerName, &p.ShareCount); err != nil {
+		if err := rows.Scan(&p.ID, &p.Title, &p.Kind, &updated, &rules, &owner, &p.ItemCount, &p.DurationMS, &p.SharedWithAll, &p.OwnerName, &p.ShareCount, &p.LibraryID, &p.Cover); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -126,14 +144,28 @@ func (s *Store) scanPlaylists(ctx context.Context, acc Access, q string, args ..
 	return out, nil
 }
 
-// Playlists lists a user's playlists and those shared with them that they accepted (kind "" =
-// all), most recently changed first.
+// Playlists lists a user's playlists and collections and those shared with them that they
+// accepted (kind "" = all), most recently changed first.
 func (s *Store) Playlists(ctx context.Context, acc Access, kind string) ([]Playlist, error) {
-	q := `SELECT ` + playlistCols + ` FROM playlists pl WHERE (pl.user_id = ? OR ` + acceptedShare + `) AND pl.kind IN ('video', 'audio')`
+	return s.playlistsIn(ctx, acc, kind, 0)
+}
+
+// OwnCollections lists the collections (USER-23) of one video library: the user's own and those
+// shared with them that they accepted.
+func (s *Store) OwnCollections(ctx context.Context, acc Access, libraryID int64) ([]Playlist, error) {
+	return s.playlistsIn(ctx, acc, "video", libraryID)
+}
+
+func (s *Store) playlistsIn(ctx context.Context, acc Access, kind string, libraryID int64) ([]Playlist, error) {
+	q := `SELECT ` + playlistCols + ` FROM playlists pl WHERE (pl.user_id = ? OR ` + acceptedShare + `) AND pl.kind IN ('video', 'audio') AND ` + collectionsOn
 	args := []any{acc.UserID, acc.UserID}
 	if kind != "" {
 		q += ` AND pl.kind = ?`
 		args = append(args, kind)
+	}
+	if libraryID != 0 {
+		q += ` AND pl.library_id = ?`
+		args = append(args, libraryID)
 	}
 	return s.scanPlaylists(ctx, acc, q+` ORDER BY pl.updated_at DESC`, args...)
 }
@@ -151,7 +183,36 @@ func (s *Store) Playlist(ctx context.Context, uid, id int64) (Playlist, error) {
 	return list[0], nil
 }
 
+// CreateOwnCollection makes a collection of the user's own (USER-23) in a video library that allows them.
+func (s *Store) CreateOwnCollection(ctx context.Context, acc Access, title string, libraryID int64, itemIDs []int64) (Playlist, error) {
+	var ok bool
+	err := s.db.QueryRowContext(ctx, `SELECT type IN ('movies', 'shows', 'anime', 'videos') AND COALESCE(json_extract(options, '$.personalCollections'), 1) != 0
+		FROM libraries WHERE id = ?`, libraryID).Scan(&ok)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && !ok) {
+		return Playlist{}, ErrCollectionLibrary
+	}
+	if err != nil {
+		return Playlist{}, err
+	}
+	res, err := s.db.ExecContext(ctx, `INSERT INTO playlists (user_id, title, kind, library_id) VALUES (?, ?, 'video', ?)`, acc.UserID, strings.TrimSpace(title), libraryID)
+	if err != nil {
+		return Playlist{}, err
+	}
+	id, _ := res.LastInsertId()
+	if len(itemIDs) > 0 {
+		if err := s.AddToPlaylist(ctx, acc, id, itemIDs); err != nil && !errors.Is(err, ErrPlaylistKind) {
+			return Playlist{}, err
+		}
+	}
+	return s.Playlist(ctx, acc.UserID, id)
+}
+
+// CreatePlaylist makes a music playlist; a collection (kind video) is made with
+// CreateOwnCollection, which gives it its library.
 func (s *Store) CreatePlaylist(ctx context.Context, acc Access, title, kind string, itemIDs []int64, rules *SmartRules) (Playlist, error) {
+	if kind == "video" {
+		return Playlist{}, ErrCollectionLibrary
+	}
 	var raw any
 	if rules != nil {
 		if err := rules.Validate(); err != nil {
@@ -171,6 +232,27 @@ func (s *Store) CreatePlaylist(ctx context.Context, acc Access, title, kind stri
 		}
 	}
 	return s.Playlist(ctx, acc.UserID, id)
+}
+
+// SetPlaylistCover gives uid's playlist or collection a picture of its own (MUSIC-30), or takes
+// it away (path ""). It returns the picture's file it replaced when nothing else uses it, for
+// the caller to remove.
+func (s *Store) SetPlaylistCover(ctx context.Context, uid, id int64, path string) (string, error) {
+	p, err := s.Playlist(ctx, uid, id)
+	if err != nil {
+		return "", err
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE playlists SET cover_path = NULLIF(?, ''), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, path, id); err != nil {
+		return "", err
+	}
+	if p.Cover == "" || p.Cover == path {
+		return "", nil
+	}
+	var others int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM playlists WHERE cover_path = ?`, p.Cover).Scan(&others); err != nil || others > 0 {
+		return "", err
+	}
+	return p.Cover, nil
 }
 
 func (s *Store) RenamePlaylist(ctx context.Context, uid, id int64, title string) error {
@@ -193,8 +275,9 @@ func (s *Store) touchPlaylist(ctx context.Context, q string, args ...any) error 
 	return nil
 }
 
-// AddToPlaylist appends items, expanding shows, seasons, artists and albums into their
-// episodes or tracks. Items that don't fit the playlist's kind are skipped.
+// AddToPlaylist appends items. A playlist takes tracks, with artists and albums expanded into
+// theirs; a collection takes titles of its own library as they are (a show stays a show), each
+// once. Items that don't fit are skipped.
 func (s *Store) AddToPlaylist(ctx context.Context, acc Access, id int64, itemIDs []int64) error {
 	pl, err := s.Playlist(ctx, acc.UserID, id)
 	if err != nil {
@@ -204,6 +287,13 @@ func (s *Store) AddToPlaylist(ctx context.Context, acc Access, id int64, itemIDs
 		return ErrSmartPlaylist
 	}
 	var add []int64
+	if pl.Kind == "video" {
+		add, err = s.collectionAdds(ctx, acc, pl, itemIDs)
+		if err != nil || add == nil {
+			return err
+		}
+		itemIDs = nil
+	}
 	for _, itemID := range itemIDs {
 		leaves, err := s.Leaves(ctx, acc, itemID, false)
 		if errors.Is(err, ErrNotFound) {
@@ -237,6 +327,49 @@ func (s *Store) AddToPlaylist(ctx context.Context, acc Access, id int64, itemIDs
 		return err
 	}
 	return tx.Commit()
+}
+
+// collectionAdds picks what of itemIDs goes into collection pl: titles acc can see, of its
+// library, not already in it. Nil with no error means they're all in it already.
+func (s *Store) collectionAdds(ctx context.Context, acc Access, pl Playlist, itemIDs []int64) ([]int64, error) {
+	have := map[int64]bool{}
+	err := eachRow(ctx, s.db, `SELECT item_id FROM playlist_items WHERE playlist_id = ?`, []any{pl.ID}, func(r *sql.Rows) error {
+		var item int64
+		if err := r.Scan(&item); err != nil {
+			return err
+		}
+		have[item] = true
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	ac, aargs := acc.clause()
+	var add []int64
+	fits := false
+	for _, itemID := range itemIDs {
+		var typ string
+		var lib int64
+		err := s.db.QueryRowContext(ctx, `SELECT i.type, i.library_id`+summaryFrom+` WHERE i.id = ? AND `+ac, append([]any{itemID}, aargs...)...).Scan(&typ, &lib)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !collectionTypes[typ] || lib != pl.LibraryID {
+			continue
+		}
+		fits = true
+		if !have[itemID] {
+			have[itemID] = true
+			add = append(add, itemID)
+		}
+	}
+	if !fits {
+		return nil, ErrPlaylistKind
+	}
+	return add, nil
 }
 
 // PlaylistItems returns a page of a playlist's entries that acc can see.

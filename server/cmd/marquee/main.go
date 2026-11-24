@@ -767,6 +767,10 @@ func run() error {
 	scheduler.Register(plexSync.Task())
 	itemStore := items.NewStore(database)
 	itemStore.Learn = func() bool { return store.Get().AI.LearnFromBehaviour }
+	// Video playlists from before collections go to their libraries (USER-23).
+	if err := itemStore.ConvertVideoPlaylists(ctx); err != nil {
+		slog.Error("converting video playlists to collections", "err", err)
+	}
 	// Suggestions from on demand, and the data they need for titles matched before it was kept.
 	vodSuggest := &vodsuggest.Service{DB: database, Items: itemStore, VOD: vodSvc, InLibrary: vodSaves.InLibrary}
 	vodBackfill := &vodsuggest.Backfill{VOD: vodSvc, Suggest: vodSuggest, Scheduler: scheduler, Settings: store}
@@ -856,7 +860,8 @@ func run() error {
 		Storage:     storageSvc,
 		Plex: &plex.Importer{DB: database, Auth: authSvc, Libraries: libraries, Matcher: meta,
 			PlexRoot: cfg.PlexDir, WorkDir: filepath.Join(cfg.ConfigDir, "plex-import"),
-			ArtDir: filepath.Join(cfg.ConfigDir, "cache", "plex-artwork"), OnMapped: plexSync.SaveImport},
+			ArtDir: filepath.Join(cfg.ConfigDir, "cache", "plex-artwork"), OnMapped: plexSync.SaveImport,
+			AfterPlaylists: itemStore.ConvertVideoPlaylists},
 		PlexSync:         plexSync,
 		LibrariesChanged: func() { watch.Sync(ctx, store.Get().Library.WatchFilesystem) },
 		Bazarr: &bazarr.Service{DB: database, Config: func() (string, string) {

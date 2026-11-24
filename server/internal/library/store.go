@@ -44,6 +44,9 @@ type Options struct {
 	IncludeInHome     *bool     `json:"includeInHome,omitempty"`
 	IncludeInSearch   *bool     `json:"includeInSearch,omitempty"`
 	ScanIntervalHours *int      `json:"scanIntervalHours,omitempty"`
+	// PersonalCollections lets people keep their own collections of a video library's titles
+	// (USER-23).
+	PersonalCollections *bool `json:"personalCollections,omitempty"`
 }
 
 // WithDefaults fills unset options with type-appropriate defaults.
@@ -68,6 +71,9 @@ func (o Options) WithDefaults(t Type, metadataLanguage string) Options {
 	if o.ScanIntervalHours == nil {
 		h := 24
 		o.ScanIntervalHours = &h
+	}
+	if o.PersonalCollections == nil {
+		o.PersonalCollections = b(t == Movies || t == Shows || t == Anime || t == Videos)
 	}
 	return o
 }
@@ -356,6 +362,9 @@ func mergeOptions(cur, patch Options) Options {
 	}
 	if patch.ScanIntervalHours != nil {
 		cur.ScanIntervalHours = patch.ScanIntervalHours
+	}
+	if patch.PersonalCollections != nil {
+		cur.PersonalCollections = patch.PersonalCollections
 	}
 	return cur
 }

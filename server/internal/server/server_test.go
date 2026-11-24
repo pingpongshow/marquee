@@ -846,3 +846,81 @@ func TestSmartPlaylistAndRatings(t *testing.T) {
 		t.Fatalf("invalid rules accepted: %d", code)
 	}
 }
+
+// A playlist's or collection's owner gives it a picture of its own (MUSIC-30): it's served to
+// whoever can open it, replaces the mosaic until taken away, and nobody else can change it. A
+// collection is made in a video library and listed under it (USER-23).
+func TestPlaylistImageAndCollections(t *testing.T) {
+	h := newHarness(t)
+	var res api.AuthResult
+	h.do("POST", "/setup", map[string]any{"serverName": "T", "username": "admin", "password": "correct horse", "device": device}, &res)
+	h.token = res.Token
+	h.handlers.Images = images.New(h.db, t.TempDir(), "ffmpeg")
+	lib, _ := h.db.Exec(`INSERT INTO libraries (name, type) VALUES ('Movies', 'movies')`)
+	movies, _ := lib.LastInsertId()
+	it, _ := h.db.Exec(`INSERT INTO items (library_id, type, title, sort_title) VALUES (?, 'movie', 'Film', 'Film')`, movies)
+	film, _ := it.LastInsertId()
+
+	var none api.Playlist
+	if code := h.do("POST", "/playlists", map[string]any{"title": "Christmas", "kind": "video"}, &none); code != 400 {
+		t.Fatalf("a collection without a library: %d", code)
+	}
+	var c api.Playlist
+	if code := h.do("POST", "/playlists", map[string]any{"title": "Christmas", "kind": "video", "libraryId": movies, "itemIds": []int64{film}}, &c); code != 201 || c.LibraryId == nil || *c.LibraryId != movies || c.ItemCount != 1 {
+		t.Fatalf("create: %d %+v", code, c)
+	}
+	var list []api.Playlist
+	if h.do("GET", fmt.Sprintf("/playlists?kind=video&libraryId=%d", movies), nil, &list); len(list) != 1 {
+		t.Fatalf("listed under its library: %+v", list)
+	}
+
+	var pic bytes.Buffer
+	png.Encode(&pic, image.NewRGBA(image.Rect(0, 0, 40, 40)))
+	upload := func(token string, body []byte) (int, api.Playlist) {
+		req, _ := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/playlists/%d/image", h.srv.URL, c.Id), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "image/png")
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var p api.Playlist
+		json.NewDecoder(resp.Body).Decode(&p)
+		return resp.StatusCode, p
+	}
+	if resp, _ := h.raw("GET", fmt.Sprintf("/api/v1/playlists/%d/image", c.Id), nil); resp.StatusCode != 404 {
+		t.Fatalf("no picture yet: %d", resp.StatusCode)
+	}
+	if code, _ := upload(res.Token, []byte("not an image")); code != 400 {
+		t.Fatalf("not an image: %d", code)
+	}
+	code, p := upload(res.Token, pic.Bytes())
+	if code != 200 || p.ImageVersion == nil || *p.ImageVersion == "" {
+		t.Fatalf("upload: %d %+v", code, p)
+	}
+	if resp, _ := h.raw("GET", fmt.Sprintf("/api/v1/playlists/%d/image?w=120&v=%s", c.Id, *p.ImageVersion), nil); resp.StatusCode != 200 {
+		t.Fatalf("serving the picture: %d", resp.StatusCode)
+	}
+	// A link to the home network is refused before anything is fetched.
+	if code := h.do("PUT", fmt.Sprintf("/playlists/%d/image", c.Id), map[string]any{"url": "http://127.0.0.1:1/a.png"}, nil); code != 400 {
+		t.Fatalf("private link: %d", code)
+	}
+	// Someone else can't change it.
+	var other api.User
+	h.do("POST", "/users", map[string]any{"username": "bob", "displayName": "Bob", "password": "correct horse 2"}, &other)
+	var bob api.AuthResult
+	h.token = ""
+	h.do("POST", "/auth/login", map[string]any{"username": "bob", "password": "correct horse 2", "device": map[string]any{"clientId": "bob-1", "name": "Bob's", "platform": "web"}}, &bob)
+	if bob.Token == "" {
+		t.Fatal("bob couldn't sign in")
+	}
+	if code, _ := upload(bob.Token, pic.Bytes()); code != 404 {
+		t.Fatalf("someone else's playlist: %d", code)
+	}
+	h.token = res.Token
+	var plain api.Playlist
+	if code := h.do("DELETE", fmt.Sprintf("/playlists/%d/image", c.Id), nil, &plain); code != 200 || plain.ImageVersion != nil {
+		t.Fatalf("remove: %d %+v", code, plain)
+	}
+}

@@ -2,17 +2,36 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"marquee/internal/images"
 	"marquee/internal/items"
 )
 
 func toAPIPlaylist(p items.Playlist) Playlist {
 	return Playlist{Id: p.ID, Title: p.Title, Kind: PlaylistKind(p.Kind), ItemCount: p.ItemCount, DurationMs: p.DurationMS,
 		ImageIds: p.ImageIDs, UpdatedAt: p.UpdatedAt, Rules: rulesToAPI(p.Rules), ReadOnly: nz(p.ReadOnly), OwnerName: nz(p.OwnerName),
-		SharedWithAll: nz(p.SharedWithAll), ShareCount: nz(p.ShareCount), FolderId: nz(p.FolderID)}
+		SharedWithAll: nz(p.SharedWithAll), ShareCount: nz(p.ShareCount), FolderId: nz(p.FolderID), LibraryId: nz(p.LibraryID),
+		ImageVersion: nz(coverVersion(p.Cover))}
+}
+
+// coverVersion names a playlist's own picture: its file's name, which carries the image's hash,
+// so it changes when the picture does.
+func coverVersion(path string) string {
+	if path == "" {
+		return ""
+	}
+	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 }
 
 // The API and store rule types share their JSON shape.
@@ -47,7 +66,16 @@ func (h *Handlers) ListPlaylists(ctx context.Context, req ListPlaylistsRequestOb
 	if req.Params.Kind != nil {
 		kind = string(*req.Params.Kind)
 	}
-	list, err := h.Items.Playlists(ctx, access(ctx), kind)
+	var list []items.Playlist
+	var err error
+	if lib := req.Params.LibraryId; lib != nil {
+		if kind == "audio" || !h.canSeeLibrary(ctx, *lib) {
+			return ListPlaylists200JSONResponse{}, nil
+		}
+		list, err = h.Items.OwnCollections(ctx, access(ctx), *lib)
+	} else {
+		list, err = h.Items.Playlists(ctx, access(ctx), kind)
+	}
 	if err != nil {
 		return nil, internal(ctx, "playlists", err)
 	}
@@ -68,6 +96,25 @@ func (h *Handlers) CreatePlaylist(ctx context.Context, req CreatePlaylistRequest
 	}
 	var ids []int64
 	set(&ids, b.ItemIds)
+	if b.Kind == PlaylistKindVideo {
+		// A collection (USER-23): it belongs to a video library, and has no rules.
+		if b.Rules != nil {
+			return CreatePlaylist400JSONResponse{BadRequestJSONResponse(apiErr("invalid_rules", "a collection can't have rules"))}, nil
+		}
+		var lib int64
+		set(&lib, b.LibraryId)
+		if lib == 0 || !h.canSeeLibrary(ctx, lib) {
+			return CreatePlaylist400JSONResponse{BadRequestJSONResponse(apiErr("invalid_library", items.ErrCollectionLibrary.Error()))}, nil
+		}
+		p, err := h.Items.CreateOwnCollection(ctx, access(ctx), b.Title, lib, ids)
+		if errors.Is(err, items.ErrCollectionLibrary) {
+			return CreatePlaylist400JSONResponse{BadRequestJSONResponse(apiErr("invalid_library", err.Error()))}, nil
+		}
+		if err != nil {
+			return nil, internal(ctx, "createCollection", err)
+		}
+		return CreatePlaylist201JSONResponse(toAPIPlaylist(p)), nil
+	}
 	p, err := h.Items.CreatePlaylist(ctx, access(ctx), b.Title, string(b.Kind), ids, rulesFromAPI(b.Rules))
 	if err != nil {
 		if b.Rules != nil {
@@ -372,4 +419,165 @@ func (h *Handlers) MergePlaylists(ctx context.Context, req MergePlaylistsRequest
 		return nil, internal(ctx, "mergePlaylists", err)
 	}
 	return MergePlaylists200JSONResponse(toAPIPlaylist(p)), nil
+}
+
+// ---------- A playlist's or collection's own picture (MUSIC-30) ----------
+
+func (h *Handlers) GetPlaylistImage(ctx context.Context, req GetPlaylistImageRequestObject) (GetPlaylistImageResponseObject, error) {
+	if _, ok := session(ctx); !ok {
+		return GetPlaylistImage401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	missing := GetPlaylistImage404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "image not found"))}
+	p, err := h.Items.ReadablePlaylist(ctx, access(ctx), req.PlaylistId)
+	if err != nil || p.Cover == "" || h.Images == nil {
+		return missing, nil
+	}
+	w := 0
+	if req.Params.W != nil {
+		w = min(max(*req.Params.W, 0), 3840)
+	}
+	path, err := h.Images.Uploaded(ctx, p.Cover, w)
+	if err != nil {
+		if !errors.Is(err, images.ErrNotFound) && !errors.Is(err, os.ErrNotExist) {
+			slog.WarnContext(ctx, "playlist image", "playlist", req.PlaylistId, "err", err)
+		}
+		return missing, nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, internal(ctx, "playlistImage", err)
+	}
+	st, _ := f.Stat()
+	return GetPlaylistImage200ImagejpegResponse{Body: f, ContentLength: st.Size(), Headers: GetPlaylistImage200ResponseHeaders{CacheControl: ptr(immutable)}}, nil
+}
+
+// keepPlaylistImage checks data is an image, keeps it in the image cache and makes it the
+// playlist's picture. msg is set when the image is refused.
+func (h *Handlers) keepPlaylistImage(ctx context.Context, uid, id int64, data []byte) (p items.Playlist, msg string, err error) {
+	ext := map[string]string{"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[http.DetectContentType(data)]
+	if ext == "" {
+		return p, "use a JPEG, PNG or WebP image", nil
+	}
+	if _, _, err := images.CheckImage(data); err != nil {
+		return p, "that image couldn't be read: use a JPEG, PNG or WebP image", nil
+	}
+	if _, err := h.Items.Playlist(ctx, uid, id); err != nil {
+		return p, "", err
+	}
+	sum := sha256.Sum256(data)
+	rel := filepath.Join("uploads", fmt.Sprintf("playlist-%d-%x.%s", id, sum[:8], ext))
+	abs := filepath.Join(h.Images.CacheDir, rel)
+	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+		return p, "", err
+	}
+	if err := os.WriteFile(abs, data, 0o644); err != nil {
+		return p, "", err
+	}
+	if err := h.setPlaylistCover(ctx, uid, id, rel); err != nil {
+		return p, "", err
+	}
+	p, err = h.Items.Playlist(ctx, uid, id)
+	return p, "", err
+}
+
+// setPlaylistCover changes the picture and removes the file of the one it replaced.
+func (h *Handlers) setPlaylistCover(ctx context.Context, uid, id int64, rel string) error {
+	old, err := h.Items.SetPlaylistCover(ctx, uid, id, rel)
+	if err != nil {
+		return err
+	}
+	if old != "" && h.Images != nil && strings.HasPrefix(filepath.Clean(old), "uploads"+string(filepath.Separator)) {
+		os.Remove(filepath.Join(h.Images.CacheDir, filepath.Clean(old)))
+	}
+	return nil
+}
+
+func (h *Handlers) UploadPlaylistImage(ctx context.Context, req UploadPlaylistImageRequestObject) (UploadPlaylistImageResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return UploadPlaylistImage401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	bad := func(msg string) (UploadPlaylistImageResponseObject, error) {
+		return UploadPlaylistImage400JSONResponse{BadRequestJSONResponse(apiErr("invalid", msg))}, nil
+	}
+	if h.Images == nil {
+		return bad("images aren't available")
+	}
+	data, err := io.ReadAll(io.LimitReader(req.Body, maxArtworkUpload+1))
+	if err != nil {
+		return bad("couldn't read the image")
+	}
+	if len(data) > maxArtworkUpload {
+		return bad("the image is larger than 20 MB")
+	}
+	p, msg, err := h.keepPlaylistImage(ctx, s.User.ID, req.PlaylistId, data)
+	switch {
+	case msg != "":
+		return bad(msg)
+	case errors.Is(err, items.ErrNotFound):
+		return UploadPlaylistImage404JSONResponse{NotFoundJSONResponse(errPlaylistNotFound)}, nil
+	case err != nil:
+		return nil, internal(ctx, "uploadPlaylistImage", err)
+	}
+	return UploadPlaylistImage200JSONResponse(toAPIPlaylist(p)), nil
+}
+
+func (h *Handlers) SetPlaylistImageLink(ctx context.Context, req SetPlaylistImageLinkRequestObject) (SetPlaylistImageLinkResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return SetPlaylistImageLink401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	bad := func(msg string) (SetPlaylistImageLinkResponseObject, error) {
+		return SetPlaylistImageLink400JSONResponse{BadRequestJSONResponse(apiErr("invalid", msg))}, nil
+	}
+	if h.Images == nil {
+		return bad("images aren't available")
+	}
+	u, perr := url.Parse(strings.TrimSpace(req.Body.Url))
+	if perr != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		return bad("an image link starts with https://")
+	}
+	// Whose playlist it is comes first: nothing is fetched for one that isn't theirs.
+	if _, err := h.Items.Playlist(ctx, s.User.ID, req.PlaylistId); errors.Is(err, items.ErrNotFound) {
+		return SetPlaylistImageLink404JSONResponse{NotFoundJSONResponse(errPlaylistNotFound)}, nil
+	} else if err != nil {
+		return nil, internal(ctx, "playlistImageLink", err)
+	}
+	data, err := h.Images.FetchLink(ctx, u.String())
+	switch {
+	case errors.Is(err, images.ErrPrivateAddress):
+		return bad("that link leads to this server or your home network: use an image on the web, or upload it")
+	case errors.Is(err, images.ErrNotImage):
+		return bad("that link isn't a JPEG, PNG or WebP image: use the image's own address")
+	case err != nil:
+		slog.WarnContext(ctx, "playlist image link", "playlist", req.PlaylistId, "err", err)
+		return bad("the image couldn't be downloaded from that link")
+	}
+	p, msg, err := h.keepPlaylistImage(ctx, s.User.ID, req.PlaylistId, data)
+	switch {
+	case msg != "":
+		return bad(msg)
+	case errors.Is(err, items.ErrNotFound):
+		return SetPlaylistImageLink404JSONResponse{NotFoundJSONResponse(errPlaylistNotFound)}, nil
+	case err != nil:
+		return nil, internal(ctx, "playlistImageLink", err)
+	}
+	return SetPlaylistImageLink200JSONResponse(toAPIPlaylist(p)), nil
+}
+
+func (h *Handlers) RemovePlaylistImage(ctx context.Context, req RemovePlaylistImageRequestObject) (RemovePlaylistImageResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return RemovePlaylistImage401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	if err := h.setPlaylistCover(ctx, s.User.ID, req.PlaylistId, ""); errors.Is(err, items.ErrNotFound) {
+		return RemovePlaylistImage404JSONResponse{NotFoundJSONResponse(errPlaylistNotFound)}, nil
+	} else if err != nil {
+		return nil, internal(ctx, "removePlaylistImage", err)
+	}
+	p, err := h.Items.Playlist(ctx, s.User.ID, req.PlaylistId)
+	if err != nil {
+		return nil, internal(ctx, "removePlaylistImage", err)
+	}
+	return RemovePlaylistImage200JSONResponse(toAPIPlaylist(p)), nil
 }

@@ -5050,11 +5050,13 @@ paths:
     get:
       tags: [playlists]
       operationId: listPlaylists
-      summary: Your playlists.
+      summary: Your music playlists (kind audio) and your collections (kind video, USER-23).
+      description: "A video playlist is a personal collection: a list of titles from one video library, kept under that library, that opens each title's page rather than playing through. It holds films, shows, seasons, episodes and videos as they were added (a show stays a show), and can be renamed, reordered, shared and deleted like a playlist. Collections of a library whose personalCollections option is off aren't listed."
       parameters:
         - name: kind
           in: query
           schema: { $ref: "#/components/schemas/PlaylistKind" }
+        - { name: libraryId, in: query, schema: { type: integer, format: int64 }, description: Only the collections (kind video) of this library. }
       responses:
         "200":
           description: OK
@@ -5121,6 +5123,79 @@ paths:
       operationId: deletePlaylist
       responses:
         "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /playlists/{playlistId}/image:
+    parameters:
+      - $ref: "#/components/parameters/PlaylistId"
+    get:
+      tags: [images]
+      operationId: getPlaylistImage
+      summary: "A playlist's or collection's own picture (MUSIC-30), resized to a cached width. For anyone who can open it."
+      description: "Usable directly in <img> tags with the image key (?key=). Add ?v=<the playlist's imageVersion> so a changed picture is fetched again: responses are immutable."
+      parameters:
+        - $ref: "#/components/parameters/ImageWidth"
+        - { name: v, in: query, schema: { type: string }, description: "The playlist's imageVersion: it only makes the address change with the picture." }
+      responses:
+        "200":
+          description: Image.
+          headers:
+            Cache-Control: { schema: { type: string } }
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [playlists]
+      operationId: uploadPlaylistImage
+      summary: "Upload a picture (JPEG, PNG or WebP, up to 20 MB) for your playlist or collection (MUSIC-30). It's shown in place of the mosaic of its items, to you and to everyone it's shared with."
+      requestBody:
+        required: true
+        content:
+          image/*:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: The playlist as it is now.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [playlists]
+      operationId: setPlaylistImageLink
+      summary: "Use the image at a link as your playlist's or collection's picture (MUSIC-30). The server downloads it once and keeps its own copy; links to this server or the home network are refused."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, maxLength: 2000, description: "The image's own address (https://…): a JPEG, PNG or WebP." }
+      responses:
+        "200":
+          description: The playlist as it is now.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [playlists]
+      operationId: removePlaylistImage
+      summary: "Back to the mosaic of its items (MUSIC-30)."
+      responses:
+        "200":
+          description: The playlist as it is now.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Playlist" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -7732,6 +7807,7 @@ components:
         includeInHome: { type: boolean }
         includeInSearch: { type: boolean }
         scanIntervalHours: { type: integer, minimum: 0, description: 0 = rely on file watching only. }
+        personalCollections: { type: boolean, description: "Video libraries (USER-23): people can keep their own collections of its titles (playlists of kind video). On unless turned off; off hides them and refuses new ones, and keeps the ones already made." }
 
     Library:
       type: object
@@ -8949,6 +9025,8 @@ components:
         sharedWithAll: { type: boolean, description: "Your playlist is shared with everyone on the server." }
         shareCount: { type: integer, description: "How many people your playlist is offered to or shared with by name." }
         folderId: { type: integer, format: int64, description: "The folder of yours it's in (MUSIC-28). Left out at the top level." }
+        libraryId: { type: integer, format: int64, description: "Collections (kind video, USER-23): the video library it belongs to; it takes titles from that library only." }
+        imageVersion: { type: string, description: "Set when its owner gave it a picture of its own (MUSIC-30): show /playlists/{id}/image?v=<this> in place of the mosaic of imageIds. It changes when the picture does." }
 
     PlaylistFolder:
       type: object
@@ -9009,6 +9087,7 @@ components:
           maxItems: 500
           items: { type: integer, format: int64 }
         rules: { $ref: "#/components/schemas/SmartRules" }
+        libraryId: { type: integer, format: int64, description: "Required for kind video (USER-23): the video library the collection belongs to. A collection can't have rules." }
 
     PlaylistMerge:
       type: object

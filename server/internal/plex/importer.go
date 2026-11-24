@@ -39,6 +39,9 @@ type Importer struct {
 	// OnMapped, when set, hears the folder mappings and the Plex account → Marquee user
 	// pairs an import used (with the accounts' names), so two-way sync can reuse them.
 	OnMapped func(ctx context.Context, mappings []PathMapping, users map[int64]int64, names map[int64]string)
+	// AfterPlaylists, when set, runs once playlists are imported: video ones are sorted into
+	// their libraries as collections (USER-23).
+	AfterPlaylists func(ctx context.Context) error
 
 	mu       sync.Mutex
 	running  bool
@@ -474,6 +477,11 @@ func (im *Importer) run(ctx context.Context, opts Options) (*Report, error) {
 	if opts.Playlists {
 		if err := im.importPlaylists(ctx, src, plexItems, toOurs, userFor, rep); err != nil {
 			return rep, err
+		}
+		if im.AfterPlaylists != nil {
+			if err := im.AfterPlaylists(ctx); err != nil {
+				return rep, err
+			}
 		}
 	}
 	rep.FinishedAt = time.Now().UTC()

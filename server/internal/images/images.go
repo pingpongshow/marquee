@@ -125,6 +125,20 @@ func (s *Service) CheckChosen(ctx context.Context, kind, url string) (width, hei
 	return CheckImage(data)
 }
 
+// FetchLink downloads the image at a link someone gave (a playlist's picture, MUSIC-30): public
+// addresses only, and only an image. The caller keeps its own copy.
+func (s *Service) FetchLink(ctx context.Context, url string) ([]byte, error) {
+	a := artwork{kind: "poster", source: "chosen", remoteURL: url}
+	return s.original(ctx, a, cacheKey(a))
+}
+
+// Uploaded returns a cached, resized copy of an image kept in the image cache (rel is its
+// path inside it), as Path does for artwork.
+func (s *Service) Uploaded(ctx context.Context, rel string, width int) (string, error) {
+	p, _, err := s.pathFor(ctx, artwork{kind: "poster", source: "upload", localPath: rel}, SnapWidth(width))
+	return p, err
+}
+
 // SnapWidth rounds w up to a cached width; 0 means the largest.
 func SnapWidth(w int) int {
 	for _, s := range Widths {

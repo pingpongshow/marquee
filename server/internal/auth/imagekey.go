@@ -97,6 +97,8 @@ func IsImageRequest(r *http.Request) bool {
 		return true
 	case strings.HasPrefix(p, "/api/v1/users/") && strings.HasSuffix(p, "/avatar"):
 		return true
+	case strings.HasPrefix(p, "/api/v1/playlists/") && strings.HasSuffix(p, "/image"):
+		return true
 	}
 	return false
 }

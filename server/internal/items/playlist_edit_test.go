@@ -100,7 +100,10 @@ func TestPlaylistEditAndMerge(t *testing.T) {
 		t.Fatalf("source kept: %v", err)
 	}
 	// Music and videos don't mix.
-	vids, _ := s.CreatePlaylist(ctx, full, "Films", "video", []int64{film}, nil)
+	vids, err := s.CreateOwnCollection(ctx, full, "Films", movies, []int64{film})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.MergePlaylists(ctx, full, []int64{pl.ID, vids.ID}, MergeOptions{}); !errors.Is(err, ErrPlaylistMix) {
 		t.Fatalf("mixed kinds: %v", err)
 	}

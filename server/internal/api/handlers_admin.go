@@ -430,7 +430,7 @@ func (h *Handlers) toAPILibrary(l library.Library) Library {
 		IgnorePatterns:    o.IgnorePatterns,
 		IncludeInHome:     o.IncludeInHome,
 		IncludeInSearch:   o.IncludeInSearch,
-		ScanIntervalHours: o.ScanIntervalHours,
+		ScanIntervalHours: o.ScanIntervalHours, PersonalCollections: o.PersonalCollections,
 	}
 	if o.EpisodeOrdering != nil {
 		opts.EpisodeOrdering = ptr(LibraryOptionsEpisodeOrdering(*o.EpisodeOrdering))
@@ -459,6 +459,7 @@ func fromAPIOptions(o *LibraryOptions) library.Options {
 	out := library.Options{
 		Language: o.Language, IgnorePatterns: o.IgnorePatterns, IncludeInHome: o.IncludeInHome,
 		IncludeInSearch: o.IncludeInSearch, ScanIntervalHours: o.ScanIntervalHours,
+		PersonalCollections: o.PersonalCollections,
 	}
 	if o.EpisodeOrdering != nil {
 		out.EpisodeOrdering = ptr(string(*o.EpisodeOrdering))
