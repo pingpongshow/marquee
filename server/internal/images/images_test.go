@@ -114,3 +114,29 @@ func TestPublicAddr(t *testing.T) {
 		}
 	}
 }
+
+// A picture from elsewhere is shrunk to the width asked for and kept; a small one, or data
+// that isn't an image, comes back as it was.
+func TestShrunk(t *testing.T) {
+	s := New(nil, t.TempDir(), "ffmpeg")
+	var big bytes.Buffer
+	if err := jpeg.Encode(&big, image.NewRGBA(image.Rect(0, 0, 2000, 3000)), nil); err != nil {
+		t.Fatal(err)
+	}
+	out, ct := s.Shrunk(big.Bytes(), "image/jpeg", 200)
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(out))
+	if err != nil || ct != "image/jpeg" || cfg.Width != 240 || cfg.Height != 360 {
+		t.Fatalf("shrunk to %dx%d %s %v", cfg.Width, cfg.Height, ct, err)
+	}
+	if again, _ := s.Shrunk(big.Bytes(), "image/jpeg", 200); !bytes.Equal(again, out) {
+		t.Fatal("the kept copy differs")
+	}
+	var small bytes.Buffer
+	jpeg.Encode(&small, image.NewRGBA(image.Rect(0, 0, 100, 150)), nil)
+	if out, _ := s.Shrunk(small.Bytes(), "image/jpeg", 200); !bytes.Equal(out, small.Bytes()) {
+		t.Fatal("a small image was changed")
+	}
+	if out, ct := s.Shrunk([]byte("nope"), "text/html", 200); string(out) != "nope" || ct != "text/html" {
+		t.Fatal("not an image was changed")
+	}
+}

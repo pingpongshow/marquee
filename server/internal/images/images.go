@@ -139,6 +139,61 @@ func (s *Service) Uploaded(ctx context.Context, rel string, width int) (string, 
 	return p, err
 }
 
+// Shrunk returns image data no wider than width (snapped to a cached width), as a JPEG, or as
+// a PNG when it came as one (a logo keeps its transparency). The result is kept, keyed by the
+// image itself. Data that's small enough already, or can't be read, comes back as it was: this
+// is for pictures from elsewhere (on demand artwork), which arrive at any size.
+func (s *Service) Shrunk(data []byte, ctype string, width int) ([]byte, string) {
+	width = SnapWidth(width)
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil || cfg.Width <= width || cfg.Width*cfg.Height > maxPixels {
+		return data, ctype
+	}
+	ext, outType := "jpg", "image/jpeg"
+	if ctype == "image/png" {
+		ext, outType = "png", "image/png"
+	}
+	sum := sha1.Sum(data)
+	key := hex.EncodeToString(sum[:])
+	out := filepath.Join(s.CacheDir, "resized", key[:2], fmt.Sprintf("%s_%d.%s", key, width, ext))
+	if b, err := os.ReadFile(out); err == nil {
+		return b, outType
+	}
+	_, err = s.once(out, func() error {
+		img, _, err := image.Decode(bytes.NewReader(data))
+		if err != nil {
+			return err
+		}
+		b := img.Bounds()
+		dst := image.NewRGBA(image.Rect(0, 0, width, b.Dy()*width/b.Dx()))
+		draw.CatmullRom.Scale(dst, dst.Bounds(), img, b, draw.Src, nil)
+		var buf bytes.Buffer
+		if ext == "png" {
+			err = png.Encode(&buf, dst)
+		} else {
+			err = jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 82})
+		}
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+			return err
+		}
+		tmp := out + ".tmp"
+		if err := os.WriteFile(tmp, buf.Bytes(), 0o644); err != nil {
+			return err
+		}
+		return os.Rename(tmp, out)
+	})
+	if err != nil {
+		return data, ctype
+	}
+	if b, err := os.ReadFile(out); err == nil {
+		return b, outType
+	}
+	return data, ctype
+}
+
 // SnapWidth rounds w up to a cached width; 0 means the largest.
 func SnapWidth(w int) int {
 	for _, s := range Widths {

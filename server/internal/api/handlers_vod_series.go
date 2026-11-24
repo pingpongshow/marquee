@@ -315,6 +315,7 @@ func (h *Handlers) VodSeriesImage(ctx context.Context, req VodSeriesImageRequest
 	if err != nil {
 		return notFound, nil
 	}
+	b, ct = h.vodSized(b, ct, req.Params.W)
 	return VodSeriesImage200ImageResponse{Body: bytes.NewReader(b), ContentType: ct, ContentLength: int64(len(b))}, nil
 }
 
@@ -327,6 +328,7 @@ func (h *Handlers) VodEpisodeImage(ctx context.Context, req VodEpisodeImageReque
 	if err != nil {
 		return notFound, nil
 	}
+	b, ct = h.vodSized(b, ct, req.Params.W)
 	return VodEpisodeImage200ImageResponse{Body: bytes.NewReader(b), ContentType: ct, ContentLength: int64(len(b))}, nil
 }
 

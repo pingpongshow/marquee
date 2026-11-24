@@ -341,6 +341,15 @@ func (h *Handlers) GetVodMovie(ctx context.Context, req GetVodMovieRequestObject
 	return GetVodMovie200JSONResponse(out), nil
 }
 
+// vodSized shrinks an on demand picture to the width a client asked for: sources send posters
+// at any size, and a row of full-size ones is slow to draw on a phone.
+func (h *Handlers) vodSized(b []byte, ct string, w *int) ([]byte, string) {
+	if w == nil || *w <= 0 || h.Images == nil {
+		return b, ct
+	}
+	return h.Images.Shrunk(b, ct, min(*w, 3840))
+}
+
 func (h *Handlers) VodMovieImage(ctx context.Context, req VodMovieImageRequestObject) (VodMovieImageResponseObject, error) {
 	kind := "poster"
 	if req.Params.Kind != nil {
@@ -353,6 +362,7 @@ func (h *Handlers) VodMovieImage(ctx context.Context, req VodMovieImageRequestOb
 	if err != nil {
 		return VodMovieImage404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "no image"))}, nil
 	}
+	b, ct = h.vodSized(b, ct, req.Params.W)
 	return VodMovieImage200ImageResponse{Body: bytes.NewReader(b), ContentType: ct, ContentLength: int64(len(b))}, nil
 }
 

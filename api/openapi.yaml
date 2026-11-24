@@ -3889,10 +3889,11 @@ paths:
     parameters:
       - { name: movieId, in: path, required: true, schema: { type: integer, format: int64 } }
       - { name: kind, in: query, schema: { type: string, enum: [poster, backdrop], default: poster } }
+      - $ref: "#/components/parameters/ImageWidth"
     get:
       tags: [livetv]
       operationId: vodMovieImage
-      summary: A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+      summary: "A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork). With w it's resized to that width; without, it's the source's own image, which can be very large."
       security: []
       responses:
         "200":
@@ -4192,6 +4193,7 @@ paths:
       - { name: seriesId, in: path, required: true, schema: { type: integer, format: int64 } }
       - { name: kind, in: query, schema: { type: string, enum: [poster, backdrop], default: poster } }
       - { name: season, in: query, description: "A season's poster instead of the series' (kind is ignored).", schema: { type: integer } }
+      - $ref: "#/components/parameters/ImageWidth"
     get:
       tags: [livetv]
       operationId: vodSeriesImage
@@ -4275,6 +4277,7 @@ paths:
   /livetv/vod/episodes/{episodeId}/image:
     parameters:
       - { name: episodeId, in: path, required: true, schema: { type: integer, format: int64 } }
+      - $ref: "#/components/parameters/ImageWidth"
     get:
       tags: [livetv]
       operationId: vodEpisodeImage
